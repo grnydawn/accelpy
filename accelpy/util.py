@@ -1,6 +1,6 @@
 """accelpy utility module"""
 
-import ast
+import os, ast
 from subprocess import PIPE, run as subp_run
 
 _builtin_excludes = ["exec", "eval", "breakpoint", "memoryview"]
@@ -49,3 +49,10 @@ def shellcmd(cmd, shell=True, stdout=PIPE, stderr=PIPE,
 
     return subp_run(cmd, shell=shell, stdout=stdout,
                     stderr=stderr, check=check)
+
+def which(pgm):
+    path=os.getenv('PATH')
+    for p in path.split(os.path.pathsep):
+        p=os.path.join(p,pgm)
+        if os.path.exists(p) and os.access(p,os.X_OK):
+            return p

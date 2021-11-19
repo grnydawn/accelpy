@@ -161,3 +161,11 @@ class Order(Object):
 
             else:
                 output["curname"] = "accpy_out%d" % idx
+
+    def get_section(self, accel):
+
+        for sec in self._sections:
+            if sec.accel == accel and getattr(sec, "enable", True):
+                return sec
+
+        raise Exception("No section with '%s' exists or is enabled." % accel)

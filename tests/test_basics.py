@@ -14,8 +14,8 @@ set_argnames(("x", "y"), "z")
 cpp_enable = True
 
 [cpp: enable=cpp_enable]
-    for (int id = 0; id < a.shape(0); id++) {
-        c(id) = a(id) + b(id);
+    for (int id = 0; id < x.shape(0); id++) {
+        z(id) = x(id) + y(id);
     }
 """
 

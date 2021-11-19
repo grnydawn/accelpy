@@ -1,13 +1,12 @@
 """accelpy Compiler module"""
 
-import os, abc, time, threading, inspect
+import os, sys, abc, time, threading, inspect
 from numpy.ctypeslib import load_library
 from numpy import ndarray
 from collections import OrderedDict
 
 from accelpy.core import Object
-from accelpy.accel import AccelBase
-from accelpy.util import shellcmd
+from accelpy.util import shellcmd, which
 from accelpy import _config
 
 
@@ -15,30 +14,83 @@ class Compiler(Object):
     """Compiler Base Class"""
 
     avails = dict()
+    libext = "so"
 
-    def __init__(self, option=None):
-        self.option = option
+    def __init__(self, path, option=None):
+
+        self.version = None
+
+        if isinstance(path, str):
+            self.set_version(path)
+            self.path = path
+
+        elif isintance(path, (list, tuple)):
+            for p in path:
+                try:
+                    self.set_version(path)
+                    self.path = path
+                    break
+                except:
+                    pass
+
+            assert self.path
+        else:
+            import pdb; pdb.set_trace()
+
+        opts = self.get_option()
+        self.option = option.format(default=opts) if option else opts
+
+        if sys.platform == "darwin":
+            self.libext = "dylib"
 
     @abc.abstractmethod
-    def get_path(self):
+    def parse_version(self, stdout):
         pass
 
     @abc.abstractmethod
     def get_option(self):
-        pass
+        return ""
+
+    def from_path(self, path):
+        import pdb; pdb.set_trace()
+
+    def set_version(self, path=None):
+        out = shellcmd((path if path else self.path) + " " + self.opt_version)
+
+        if out.returncode != 0:
+            raise Exception("Compiler version check fails: %s" % out.stderr)
+
+        self.version = self.parse_version(out.stdout)
 
     def compile(self, code):
+
         lib = None
 
-        codepath = os.path.join(self.workdir, fname + "." + self.codeext)
+        blddir = _config["session"]["workdir"]
+
+        # TODO: change to hash
+        name = "test"
+
+        codepath = os.path.join(blddir, name + "." + self.codeext)
         with open(codepath, "w") as f:
             f.write(code)
 
-        cmd = "{compiler} {option} -o {outfile} {infile}".format(
-                compiler=self.get_path(), option=self.get_option(),
-                outfile=outfile, infile=infile)
+        libpath = os.path.join(blddir, name + "." + self.libext)
 
-        out = shellcmd(cmd)
+        compile_cmd = "{compiler} {option} -o {outfile} {infile}".format(
+                compiler=self.path, option=self.get_option(),
+                outfile=libpath, infile=codepath)
+
+        #import pdb; pdb.set_trace()
+        out = shellcmd(compile_cmd)
+
+        if out.returncode != 0:
+            raise Exception("Compilation fails: %s" % out.stderr)
+
+        if not os.path.isfile(libpath):
+            raise Exception("Shared library is not created.")
+
+        lib = load_library(name, blddir)
 
         return lib
 
@@ -47,22 +99,54 @@ class Compiler(Object):
 class CppCompiler(Compiler):
 
     lang = "cpp"
+    codeext = "cpp"
 
 # TODO: should be abstract
 class FortranCompiler(Compiler):
 
     lang = "fortran"
+    codeext = "F90"
+
 
 # TODO: should be abstract
 class CppCppCompiler(CppCompiler):
 
     accel = "cpp"
+    opt_version = "--version"
 
-# TODO: should be abstract
 class GnuCppCppCompiler(CppCppCompiler):
 
     vendor = "gnu"
+    opt_openmp = "--fopenmp"
 
+    def __init__(self, path=None, option=None):
+
+        if not path:
+            path = "g++"
+
+        super(GnuCppCppCompiler, self).__init__(path, option)
+
+    def parse_version(self, stdout):
+
+        items = stdout.split()
+        
+        if sys.platform == "darwin":
+            if items[:3] == [b'Apple', b'clang', b'version']:
+                return items[3].decode().split(".")
+            raise Exception("Unknown version syntaxt: %s" % str(items[:3]))
+
+        else:
+            import pdb; pdb.set_trace()
+
+    def get_option(self):
+
+        if sys.platform == "darwin":
+            opts = "-dynamiclib -fPIC " + super(GnuCppCppCompiler, self).get_option()
+
+        else:
+            import pdb; pdb.set_trace()
+
+        return opts
 # TODO: apply priority
 
 for langsubc in Compiler.__subclasses__():
@@ -77,121 +161,3 @@ for langsubc in Compiler.__subclasses__():
             vendor = vendorsubc.vendor
             Compiler.avails[lang][accel][vendor] = vendorsubc
 
-
-def generate_compilor(compile):
-
-    clist = compile.split()
-
-    compcls = Compiler.from_path(clist[0])
-    comp = compcls(option=" ".join(clist[1:]))
-
-    return comp
-
-
-def get_compilers(accel, compiler=None):
-    """
-        parameters:
-
-        accel: the accelerator id or a list of them
-        compiler: compiler path or compiler id, or a list of them 
-                  syntax: "vendor|path [{default}] [additional options]"
-"""
-
-    accels = []
-
-    if isinstance(accel, str):
-        accels.append((accel, AccelBase.avails[accel].lang))
-
-    elif isinstance(accel, AccelBase):
-        accels.append((accel.name, accel.lang))
-
-    elif isinstance(accel, (list, tuple)):
-        for a in accel:
-            if isinstance(a, str):
-                accels.append((a, AccelBase.avails[a].lang))
-
-            elif isinstance(a, AccelBase):
-                accels.append((a.name, a.lang))
-
-            else:
-                raise Exception("Unknown accelerator type: %s" % str(a))
-
-    else:
-        raise Exception("Unknown accelerator type: %s" % str(accel))
-
-    compilers = []
-
-    if compiler:
-        if isinstance(compiler, str):
-            citems = compiler.split()
-
-            if not citems:
-                raise Exception("Blank compiler")
-
-            if os.path.isfile(citems[0]):
-                compilers.append(generate_compiler(compiler))
-
-            else:
-                # TODO: vendor name search
-                for lang, langsubc in Compiler.avalis.items():
-                    for accel, accelsubc in langsubc.items():
-                        for vendor, vendorsubc in accelsubc.items():
-                            if vendor == citems[0]:
-                                try:
-                                    compilers.append(vendorsubc(option=" ".join(citems[1:])))
-                                except:
-                                    pass
-
-        elif isinstance(compiler, Compiler):
-            compilers.append(compiler)
-
-        elif isinstance(compiler (list, tuple)):
-
-            for comp in compiler:
-                if isinstance(comp, str):
-                    citems = comp.split()
-
-                    if not citems:
-                        raise Exception("Blank compilor")
-
-                    if os.path.isfile(citems[0]):
-                        try:
-                            compilers.append(generate_compilor(comp))
-                        except:
-                            pass
-
-                    else:
-                        # TODO: vendor name search
-                        for lang, langsubc in Compiler.avalis.items():
-                            for accel, accelsubc in langsubc.items():
-                                for vendor, vendorsubc in accelsubc.items():
-                                    if vendor == citems[0]:
-                                        try:
-                                            compilers.append(vendorsubc(option=" ".join(citems[1:])))
-                                        except:
-                                            pass
-
-                elif isinstance(comp, Compiler):
-                    compilers.append(comp)
-
-                else:
-                    raise Exception("Unsupported compiler type: %s" % str(comp))
-        else:
-            raise Exception("Unsupported compiler type: %s" % str(compiler))
-
-    new_compilers = []
-
-    if compilers:
-        for comp in compiers:
-            if any(comp.accel==a[0] and comp.lang==a[1] for a in accels):
-                new_compilers.append(comp)
-    else:
-        for acc, lang in accels:
-            vendors = Compiler.avails[lang][acc]
-            for vendor, cls in vendors.items():
-                try:
-                    new_compilers.append(cls())
-                except:
-                    pass
-
-    return new_compilers
