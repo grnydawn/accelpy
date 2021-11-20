@@ -1,6 +1,6 @@
 """accelpy Compiler module"""
 
-import os, sys, abc, time, threading, inspect
+import os, sys, abc, time, threading, inspect, hashlib
 from numpy.ctypeslib import load_library
 from numpy import ndarray
 from collections import OrderedDict
@@ -18,7 +18,7 @@ class Compiler(Object):
 
     def __init__(self, path, option=None):
 
-        self.version = None
+        self.version = []
 
         if isinstance(path, str):
             self.set_version(path)
@@ -69,7 +69,9 @@ class Compiler(Object):
         blddir = _config["session"]["workdir"]
 
         # TODO: change to hash
-        name = "test"
+        text = (code+ self.lang + self.accel + self.vendor +
+                    "".join(self.version))
+        name = hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
 
         codepath = os.path.join(blddir, name + "." + self.codeext)
         with open(codepath, "w") as f:
@@ -81,7 +83,7 @@ class Compiler(Object):
                 compiler=self.path, option=self.get_option(),
                 outfile=libpath, infile=codepath)
 
-        #import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
         out = shellcmd(compile_cmd)
 
         if out.returncode != 0:
@@ -147,6 +149,48 @@ class GnuCppCppCompiler(CppCppCompiler):
             import pdb; pdb.set_trace()
 
         return opts
+
+# TODO: should be abstract
+class FortranFortranCompiler(FortranCompiler):
+
+    accel = "fortran"
+    opt_version = "--version"
+
+class GnuFortranFortranCompiler(FortranFortranCompiler):
+
+    vendor = "gnu"
+    opt_openmp = "--fopenmp"
+
+    def __init__(self, path=None, option=None):
+
+        if not path:
+            path = "gfortran"
+
+        super(GnuFortranFortranCompiler, self).__init__(path, option)
+
+    def parse_version(self, stdout):
+
+        items = stdout.split()
+        
+        if sys.platform == "darwin":
+            if items[:3] == [b'GNU', b'Fortran', b'(GCC)']:
+                return items[3].decode().split(".")
+            raise Exception("Unknown version syntaxt: %s" % str(items[:3]))
+
+        else:
+            import pdb; pdb.set_trace()
+
+    def get_option(self):
+
+        if sys.platform == "darwin":
+            opts = "-dynamiclib -fPIC " + super(GnuFortranFortranCompiler, self).get_option()
+
+        else:
+            import pdb; pdb.set_trace()
+
+        return opts
+
+
 # TODO: apply priority
 
 for langsubc in Compiler.__subclasses__():

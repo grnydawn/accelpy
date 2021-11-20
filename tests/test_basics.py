@@ -17,6 +17,14 @@ cpp_enable = True
     for (int id = 0; id < x.shape(0); id++) {
         z(id) = x(id) + y(id);
     }
+
+[fortran]
+    INTEGER id
+
+    DO id=1, x_attr%shape(1)
+        z(id) = x(id) + y(id)
+    END DO
+
 """
 
 
@@ -31,7 +39,7 @@ b_1d = np.arange(N1, dtype=np.int64) * 2
 c_1d = np.zeros(N1, dtype=np.int64)
 
 
-def test_first():
+def ttest_first():
 
     c_1d.fill(0)
 
@@ -48,10 +56,12 @@ def test_multiaccel():
 
     c_1d.fill(0)
 
-    accel = Accel(order_vecadd1d, (a_1d, b_1d), c_1d, kind=["cpp", "fortran"])
+    #accel = Accel(order_vecadd1d, (a_1d, b_1d), c_1d, kind=["cpp", "fortran"])
+    accel = Accel(order_vecadd1d, (a_1d, b_1d), c_1d, kind=["fortran"])
 
     accel.run()
 
     accel.wait()
 
+    import pdb; pdb.set_trace()
     assert all(c_1d == a_1d + b_1d)

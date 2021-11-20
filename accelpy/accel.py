@@ -1,7 +1,7 @@
 """accelpy Accelerator module"""
 
 import os, abc, time, threading, inspect
-from ctypes import c_int, c_longlong, c_float, c_double, c_size_t
+from ctypes import c_int
 from numpy.ctypeslib import ndpointer
 from numpy import ndarray, zeros, equal
 from numpy.random import random
@@ -19,13 +19,6 @@ class AccelBase(Object):
 
     # priority is implicit by loading subclasses at __init__.py
     avails = OrderedDict()
-
-    dtypemap = {
-        "int32": ["int", c_int],
-        "int64": ["long", c_longlong],
-        "float32": ["float", c_float],
-        "float64": ["double", c_double]
-    }
 
     _testdata = [
             {
@@ -57,15 +50,15 @@ class AccelBase(Object):
         pass
 
     @abc.abstractmethod
-    def getname_h2acopy(self, input):
+    def getname_h2acopy(self, arg):
         pass
 
     @abc.abstractmethod
-    def getname_h2amalloc(self, input):
+    def getname_h2amalloc(self, arg):
         pass
 
     @abc.abstractmethod
-    def getname_a2hcopy(self, input):
+    def getname_a2hcopy(self, arg):
         pass
 
     def get_argpair(self, arg):
@@ -309,34 +302,32 @@ class AccelBase(Object):
         else:
             self._thread.join(max(0, timeout-time.time()+self._time_start))
 
-class Accel(object):
-    """Accelerator wrapper"""
 
-    def __new__(cls, *vargs, **kwargs):
+def Accel(*vargs, **kwargs):
 
-        kind = kwargs.pop("kind", None)
+    kind = kwargs.pop("kind", None)
 
-        if isinstance(kind, str):
-            return AccelBase.avails[kind].__new__(cls, *vargs, **kwargs)
+    if isinstance(kind, str):
+        return AccelBase.avails[kind](*vargs, **kwargs)
 
-        elif kind is None or isinstance(kind, (list, tuple)):
+    elif kind is None or isinstance(kind, (list, tuple)):
 
-            if kind is None:
-                kind = AccelBasel.avails.keys()
+        if kind is None:
+            kind = AccelBasel.avails.keys()
 
-            errmsgs = []
+        errmsgs = []
 
-            for k in kind:
-                try:
-                    return AccelBase.avails[k].__new__(cls, *vargs, **kwargs)
+        for k in kind:
+            try:
+                accel = AccelBase.avails[k](*vargs, **kwargs)
+                return accel 
 
-                except Exception as err:
-                    errmsgs.append(str(err))
+            except Exception as err:
+                errmsgs.append(str(err))
 
-            raise Exception("No accelerator is working: %s" % "\n".join(errmsgs))
+        raise Exception("No accelerator is working: %s" % "\n".join(errmsgs))
 
-        raise Exception("Kind '%s' is not valid." % str(kind))
-
+    raise Exception("Kind '%s' is not valid." % str(kind))
 
 
 def generate_compiler(compile):
@@ -449,7 +440,15 @@ def get_compilers(accel, compiler=None):
                 new_compilers.append(comp)
     else:
         for acc, lang in accels:
+
+            if lang not in Compiler.avails:
+                continue
+
+            if acc not in Compiler.avails[lang]:
+                continue
+
             vendors = Compiler.avails[lang][acc]
+
             for vendor, cls in vendors.items():
                 try:
                     new_compilers.append(cls())
@@ -457,6 +456,9 @@ def get_compilers(accel, compiler=None):
                     errmsgs.append(str(err))
 
     if not new_compilers:
-        print("\n".join(errmsgs))
+        if errmsgs:
+            print("\n".join(errmsgs))
+        else:
+            print("No compiler is found for %s" % str(accels))
 
     return new_compilers

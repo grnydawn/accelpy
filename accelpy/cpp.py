@@ -2,6 +2,7 @@
 
 
 from accelpy.accel import AccelBase, get_compilers
+from ctypes import c_int, c_longlong, c_float, c_double
 
 t_main = """
 #include <stdlib.h>
@@ -122,6 +123,12 @@ class CppAccel(AccelBase):
     name = "cpp"
     lang = "cpp"
 
+    dtypemap = {
+        "int32": ["int", c_int],
+        "int64": ["long", c_longlong],
+        "float32": ["float", c_float],
+        "float64": ["double", c_double]
+    }
 
     def gen_varclasses(self, inputs, outputs):
 
