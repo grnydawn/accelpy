@@ -39,7 +39,7 @@ b_1d = np.arange(N1, dtype=np.int64) * 2
 c_1d = np.zeros(N1, dtype=np.int64)
 
 
-def ttest_first():
+def test_first():
 
     c_1d.fill(0)
 
@@ -52,7 +52,7 @@ def ttest_first():
     assert all(c_1d == a_1d + b_1d)
 
 
-def test_multiaccel():
+def ttest_multiaccel():
 
     c_1d.fill(0)
 

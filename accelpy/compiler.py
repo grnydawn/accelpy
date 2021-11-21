@@ -15,6 +15,7 @@ class Compiler(Object):
 
     avails = dict()
     libext = "so"
+    objext = "o"
 
     def __init__(self, path, option=None):
 
@@ -62,35 +63,66 @@ class Compiler(Object):
 
         self.version = self.parse_version(out.stdout)
 
-    def compile(self, code):
-
-        lib = None
+    def _compile(self, code, ext, compile_only=False, objfiles=[]):
 
         blddir = _config["session"]["workdir"]
 
-        # TODO: change to hash
-        text = (code+ self.lang + self.accel + self.vendor +
-                    "".join(self.version))
-        name = hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
+        objhashes = []
+        for objfile in objfiles:
+            objhash.append(os.path.basename(objfile))
+
+        text = (code + self.vendor + "".join(self.version) + ext + "".join(objhashes))
+        name =  hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
 
         codepath = os.path.join(blddir, name + "." + self.codeext)
         with open(codepath, "w") as f:
             f.write(code)
 
-        libpath = os.path.join(blddir, name + "." + self.libext)
+        outfile = os.path.join(blddir, name + "." + ext)
 
-        compile_cmd = "{compiler} {option} -o {outfile} {infile}".format(
-                compiler=self.path, option=self.get_option(),
-                outfile=libpath, infile=codepath)
+        if compile_only:
+            option = self.opt_compile_only + " " + self.get_option()
 
-        import pdb; pdb.set_trace()
-        out = shellcmd(compile_cmd)
+        else:
+            option = self.get_option()
+
+        build_cmd = "{compiler} {option} -o {outfile} {infile}".format(
+                compiler=self.path, option=option,
+                outfile=outfile, infile=codepath)
+
+        #import pdb; pdb.set_trace()
+        out = shellcmd(build_cmd)
 
         if out.returncode != 0:
             raise Exception("Compilation fails: %s" % out.stderr)
 
-        if not os.path.isfile(libpath):
-            raise Exception("Shared library is not created.")
+        if not os.path.isfile(outfile):
+            raise Exception("Output is not generated.")
+
+        return outfile
+
+    def compile(self, code):
+
+        lib = None
+
+
+        objfiles = []
+
+        # build object files
+        if isinstance(code, str):
+            main_code = code
+
+        elif isinstance(code, (list, tuple)):
+            main_code = code[-1]
+
+            for extracode in code[:-1]:
+                objfiles.append(self._compile(extracode, self.objext,
+                                    compile_only=True))
+
+        libfile = self._compile(main_code, self.libext, objfiles=objfiles)
+
+        blddir, libname = os.path.split(libfile)
+        name, _ = os.path.splitext(libname)
 
         lib = load_library(name, blddir)
 
@@ -178,6 +210,7 @@ class GnuFortranFortranCompiler(FortranFortranCompiler):
             raise Exception("Unknown version syntaxt: %s" % str(items[:3]))
 
         else:
+            print("'%s' is not supported yet.")
             import pdb; pdb.set_trace()
 
     def get_option(self):
