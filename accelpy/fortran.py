@@ -86,7 +86,7 @@ INTEGER (C_INT64_T) FUNCTION {funcname} (attrsize, attrs, data) BIND(C, name="{f
 
     INTEGER (C_INT64_T), INTENT(IN) :: attrsize
     INTEGER (C_INT64_T), DIMENSION(attrsize), INTENT(IN) :: attrs
-    {dtype}, DIMENSION(attrs(1)), INTENT(IN), TARGET :: data
+    {dtype}, DIMENSION({bound}), INTENT(IN), TARGET :: data
 
     {varname} => data
     ALLOCATE({varname}_attr%attrs(attrsize))
@@ -105,7 +105,7 @@ INTEGER (C_INT64_T) FUNCTION {funcname} (attrsize, attrs, data) BIND(C, name="{f
 
     INTEGER (C_INT64_T), INTENT(IN) :: attrsize
     INTEGER (C_INT64_T), DIMENSION(attrsize), INTENT(IN) :: attrs
-    {dtype}, DIMENSION(attrs(1)), INTENT(IN), TARGET :: data
+    {dtype}, DIMENSION({bound}), INTENT(IN), TARGET :: data
 
     {funcname} = 0
 
@@ -272,12 +272,14 @@ class FortranAccel(AccelBase):
         funcname_in = "accelpy_test_h2acopy"
         funcname_out = "accelpy_test_h2amalloc"
         funcname_a2h = "accelpy_test_a2hcopy"
+        bound_in = ",".join(["attrs(%d)"%(d+4) for d in range(input["data"].ndim)])
+        bound_out = ",".join(["attrs(%d)"%(d+4) for d in range(output["data"].ndim)])
 
-        out.append(t_h2a.format(funcname=funcname_in,
+        out.append(t_h2a.format(funcname=funcname_in, bound=bound_in,
                     varname=input["curname"], dtype=dtype_in))
-        out.append(t_h2a.format(funcname=funcname_out,
+        out.append(t_h2a.format(funcname=funcname_out, bound=bound_out,
                     varname=output["curname"], dtype=dtype_out))
-        out.append(t_a2hcopy.format(funcname=funcname_a2h,
+        out.append(t_a2hcopy.format(funcname=funcname_a2h, bound=bound_out,
                     varname=output["curname"], dtype=dtype_out))
 
         out.append(t_testfunc.format(varin=input["curname"],
@@ -292,19 +294,25 @@ class FortranAccel(AccelBase):
         for input in inputs:
             dtype = self.get_dtype(input)
             funcname = self.getname_h2acopy(input)
+            bound = ",".join(["attrs(%d)"%(d+4) for d in range(input["data"].ndim)])
 
-            out.append(t_h2a.format(funcname=funcname, varname=input["curname"], dtype=dtype))
+            out.append(t_h2a.format(funcname=funcname, varname=input["curname"],
+                        bound=bound, dtype=dtype))
 
         for output in outputs:
             dtype = self.get_dtype(output)
             funcname = self.getname_h2amalloc(output)
+            bound = ",".join(["attrs(%d)"%(d+4) for d in range(output["data"].ndim)])
 
-            out.append(t_h2a.format(funcname=funcname, varname=output["curname"], dtype=dtype))
+            out.append(t_h2a.format(funcname=funcname, varname=output["curname"],
+                        bound=bound, dtype=dtype))
 
         for output in outputs:
             funcname = self.getname_a2hcopy(output)
+            bound = ",".join(["attrs(%d)"%(d+4) for d in range(output["data"].ndim)])
 
-            out.append(t_a2hcopy.format(funcname=funcname, varname=output["curname"], dtype=dtype))
+            out.append(t_a2hcopy.format(funcname=funcname, varname=output["curname"],
+                        bound=bound, dtype=dtype))
 
         return "\n".join(out)
 

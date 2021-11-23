@@ -56,8 +56,8 @@ def test_multiaccel():
 
     c_1d.fill(0)
 
-    accel = Accel(order_vecadd1d, (a_1d, b_1d), c_1d, kind=["cpp", "fortran"])
-    #accel = Accel(order_vecadd1d, (a_1d, b_1d), c_1d, kind=["fortran", "cpp"])
+    #accel = Accel(order_vecadd1d, (a_1d, b_1d), c_1d, kind=["cpp", "fortran"])
+    accel = Accel(order_vecadd1d, (a_1d, b_1d), c_1d, kind=["fortran", "cpp"])
 
     accel.run()
 
