@@ -94,7 +94,7 @@ class Compiler(Object):
                         compiler=self.path, option=option, outfile=outfile,
                         infile=codepath, objfiles=" ".join(objfiles))
 
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
         out = shellcmd(build_cmd)
 
         if out.returncode != 0:

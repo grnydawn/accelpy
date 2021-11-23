@@ -20,8 +20,11 @@ t_main = """
 
 extern "C" int64_t accelpy_start(int64_t * device, int64_t * channel) {{
     int64_t res;
+    int64_t ACCELPY_WORKER_ID;
 
-    res = accelpy_kernel(*device, *channel);
+    ACCELPY_WORKER_ID = 0;
+
+    res = accelpy_kernel(*device, *channel, ACCELPY_WORKER_ID);
 
     return res;
 }}
@@ -106,7 +109,7 @@ extern "C" int64_t {funcname}(int64_t * attrsize, int64_t * _attrs, void * data)
 """
 
 t_a2hcopy = """
-extern "C" int64_t {funcname}(void * data) {{
+extern "C" int64_t {funcname}(int64_t * attrsize, int64_t * _attrs, void * data) {{
     int64_t res;
 
     res = 0;
@@ -130,9 +133,8 @@ extern "C" int64_t accelpy_test_run() {{
 """
 
 t_kernel = """
-extern "C" int64_t accelpy_kernel(int64_t device, int64_t channel){{
+extern "C" int64_t accelpy_kernel(int64_t device, int64_t channel, int64_t ACCELPY_WORKER_ID){{
 
-    int64_t ACCELPY_WORKER_ID = 0;
     int64_t res;
 
     {order}
@@ -148,30 +150,8 @@ class CppAccel(AccelBase):
     name = "cpp"
     lang = "cpp"
 
-# ctypes type C type Python type
-# 
-# c_bool _Bool bool (1)
-# c_char char 1-character bytes object
-# c_wchar wchar_t 1-character string
-# c_byte char int
-# c_ubyte unsigned char int
-# c_short short int
-# c_ushort unsigned short int
-# c_int int int
-# c_uint unsigned int int
-# c_long long int
-# c_ulong unsigned long int
-# c_longlong __int64 or long long int
-# c_ulonglong unsigned __int64 or unsigned long long int
-# c_size_t size_t int
-# c_ssize_t ssize_t or Py_ssize_t int
-# c_float float float
-# c_double double float
-# c_longdouble long double float
-# c_char_p char* (NUL terminated) bytes object or None
-# c_wchar_p wchar_t* (NUL terminated) string or None
-# c_void_p void* int or None
-
+    # dtype: ( C type name, ctype )
+    # TODO: dynamically generates on loading
     dtypemap = {
         "int32": ["int32_t", c_int32],
         "int64": ["int64_t", c_int64],
@@ -290,12 +270,17 @@ class CppAccel(AccelBase):
             "varclasses":self.gen_varclasses(inputs, outputs),
             "testcode":self.gen_testcode(),
             "datacopies":self.gen_datacopies(inputs, outputs),
-            "kernel":self.gen_kernel(),
+            "kernel":self.gen_kernel()
         }
 
         code = t_main.format(**main_fmt)
 
         return code
+
+    def get_vartype(self, arg, prefix=""):
+
+        dtype = self.get_dtype(arg)
+        return "%s%s_dim%d" % (prefix, dtype, arg["data"].ndim)
 
     def getname_h2amalloc(self, arg):
         return "accelpy_h2amalloc_%s" % arg["curname"]

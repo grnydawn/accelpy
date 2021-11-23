@@ -66,11 +66,6 @@ class AccelBase(Object):
     def get_dtype(self, arg):
         return self.dtypemap[arg["data"].dtype.name][0]
 
-    def get_vartype(self, arg, prefix=""):
-
-        dtype = self.get_dtype(arg)
-        return "%s%s_dim%d" % (prefix, dtype, arg["data"].ndim)
-
     #def len_numpyattrs(self, arg):
 
     #    return 3 + len(arg["data"].shape)*2
@@ -192,12 +187,12 @@ class AccelBase(Object):
             try:
                 lib = comp.compile(code)
 
-                if self.h2a_func(self._testdata[0], "accelpy_test_h2acopy", lib=lib) != 0:
+                if self.datacopy(self._testdata[0], "accelpy_test_h2acopy", lib=lib) != 0:
                     raise Exception("H2D copy test faild.")
 
                 self._testdata[1]["data"].fill(0.0)
 
-                if self.h2a_func(self._testdata[1], "accelpy_test_h2amalloc",
+                if self.datacopy(self._testdata[1], "accelpy_test_h2amalloc",
                         lib=lib, writable=True) != 0:
                     raise Exception("H2D malloc test faild.")
 
@@ -205,7 +200,7 @@ class AccelBase(Object):
                 if testrun() != 0:
                     raise Exception("testrun faild.")
 
-                if self.a2h_func(self._testdata[1], "accelpy_test_a2hcopy", lib=lib) != 0:
+                if self.datacopy(self._testdata[1], "accelpy_test_a2hcopy", lib=lib) != 0:
                     raise Exception("D2H copy test faild.")
 
                 if not all(numpy.equal(self._testdata[0]["data"], self._testdata[1]["data"])):
@@ -218,7 +213,7 @@ class AccelBase(Object):
 
         raise Exception("\n".join(errmsgs))
 
-    def h2a_func(self, arg, funcname, lib=None, writable=None):
+    def datacopy(self, arg, funcname, lib=None, writable=None):
 
         if lib is None:
             lib = self._sharedlib
@@ -239,22 +234,6 @@ class AccelBase(Object):
             ]
         return h2acopy(byref(c_int64(attrs.size)), attrs, arg["data"])
 
-    def a2h_func(self, arg, funcname, lib=None, writable=None):
-
-        if lib is None:
-            lib = self._sharedlib
-
-        flags = ["contiguous"]
-
-        if writable:
-            flags.append("writeable")
-
-        a2hcopy = getattr(lib, funcname)
-        a2hcopy.restype = c_int64
-        a2hcopy.argtypes = [ndpointer(arg["data"].dtype, flags=",".join(flags))]
-
-        return a2hcopy(arg["data"])
-
     def _start_accel(self, device, channel, lib=None):
 
         if lib is None:
@@ -274,14 +253,14 @@ class AccelBase(Object):
         if self._inputs:
             for input in self._inputs:
                 if input["id"] not in self._copyin_cache:
-                    if self.h2a_func(input, self.getname_h2acopy(input)) != 0:
+                    if self.datacopy(input, self.getname_h2acopy(input)) != 0:
                         raise Exception("Accel h2a copy failed.")
                     self._copyin_cache[input["id"]] = input
 
         if self._outputs:
             for output in self._outputs:
                 if output["id"] not in self._malloc_cache:
-                    if self.h2a_func(output, self.getname_h2amalloc(output), writable=True) != 0:
+                    if self.datacopy(output, self.getname_h2amalloc(output), writable=True) != 0:
                         raise Exception("Accel h2a malloc failed.")
                     self._malloc_cache[output["id"]] = output
 
@@ -305,7 +284,7 @@ class AccelBase(Object):
         if self._outputs:
             for output in self._outputs:
                 if output["id"] not in self._copyout_cache:
-                    if self.a2h_func(output, self.getname_a2hcopy(output)) != 0:
+                    if self.datacopy(output, self.getname_a2hcopy(output)) != 0:
                         raise Exception("Accel a2h copy failed.")
                     self._copyout_cache[output["id"]] = output
 

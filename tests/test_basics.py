@@ -52,16 +52,16 @@ def test_first():
     assert all(c_1d == a_1d + b_1d)
 
 
-def ttest_multiaccel():
+def test_multiaccel():
 
     c_1d.fill(0)
 
-    #accel = Accel(order_vecadd1d, (a_1d, b_1d), c_1d, kind=["cpp", "fortran"])
-    accel = Accel(order_vecadd1d, (a_1d, b_1d), c_1d, kind=["fortran"])
+    accel = Accel(order_vecadd1d, (a_1d, b_1d), c_1d, kind=["cpp", "fortran"])
+    #accel = Accel(order_vecadd1d, (a_1d, b_1d), c_1d, kind=["fortran", "cpp"])
 
     accel.run()
 
     accel.wait()
 
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
     assert all(c_1d == a_1d + b_1d)
