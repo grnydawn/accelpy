@@ -2,12 +2,13 @@
 
 
 from accelpy.accel import AccelBase, get_compilers
-from ctypes import c_int, c_longlong, c_float, c_double
+from ctypes import c_int32, c_int64, c_float, c_double
 
 t_main = """
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdint.h>
 
 {varclasses}
 
@@ -17,22 +18,28 @@ t_main = """
 
 {kernel}
 
-extern "C" int accelpy_start(int device, int channel) {{
-    int res;
+extern "C" int64_t accelpy_start(int64_t * device, int64_t * channel) {{
+    int64_t res;
 
-    res = accelpy_kernel(device, channel);
+    res = accelpy_kernel(*device, *channel);
 
     return res;
 }}
 
-extern "C" int accelpy_stop() {{
+extern "C" int64_t accelpy_stop() {{
+    int64_t res;
 
-    return 0;
+    res = 0;
+
+    return res;
 }}
 
-extern "C" int accelpy_isbusy() {{
+extern "C" int64_t accelpy_isbusy() {{
+    int64_t res;
 
-    return 0;
+    res = 0;
+
+    return res;
 }}
 """
 
@@ -40,34 +47,39 @@ t_varclass = """
 class {vartype} {{
 public:
     {dtype} * data;
-    int * _attrs; // ndim, itemsize, size, shape, strides
+    int64_t * _attrs; // size, ndim, itemsize, shape, strides
 
     {dtype}& operator() ({oparg}) {{
-        int * s = &(_attrs[3+_attrs[0]]);
+        int64_t * s = &(_attrs[3+_attrs[1]]);
         return data[{offset}];
     }}
     {dtype} operator() ({oparg}) const {{
-        int * s = &(_attrs[3+_attrs[0]]);
+        int64_t * s = &(_attrs[3+_attrs[1]]);
         return data[{offset}];
     }}
 
-    int ndim() {{
+    int size() {{
         return _attrs[0];
     }}
-    int itemsize() {{
+
+    int ndim() {{
         return _attrs[1];
     }}
-    int size() {{
+
+    int itemsize() {{
         return _attrs[2];
     }}
+
     int shape(int dim) {{
         return _attrs[3+dim];
     }}
+
     int stride(int dim) {{
-        return _attrs[3+_attrs[0]+dim];
+        return _attrs[3+_attrs[1]+dim];
     }}
+
     int unravel_index(int tid, int dim) {{
-        int q, r=tid, s;
+        int64_t q, r=tid, s;
         for (int i = 0; i < dim + 1; i++) {{
             s = stride(i);
             q = r / s;
@@ -80,41 +92,54 @@ public:
 """
 
 t_h2a = """
-extern "C" int {funcname}(void * data, void * _attrs, int attrsize) {{
+extern "C" int64_t {funcname}(int64_t * attrsize, int64_t * _attrs, void * data) {{
+    int64_t res;
 
     {varname}.data = ({dtype} *) data;
-    {varname}._attrs = (int *) malloc(attrsize * sizeof(int));
-    memcpy({varname}._attrs, _attrs, attrsize * sizeof(int));
+    {varname}._attrs = (int64_t *) malloc((*attrsize) * sizeof(int64_t));
+    memcpy({varname}._attrs, _attrs, (*attrsize) * sizeof(int64_t));
 
-    return 0;
+    res = 0;
+
+    return res;
 }}
 """
 
 t_a2hcopy = """
-extern "C" int {funcname}(void * data) {{
+extern "C" int64_t {funcname}(void * data) {{
+    int64_t res;
 
-    return 0;
+    res = 0;
+
+    return res;
 }}
 """
 
 t_testfunc = """
-extern "C" int accelpy_test_run() {{
+extern "C" int64_t accelpy_test_run() {{
+    int64_t res;
+    
     for (int id = 0; id < {varin}.shape(0); id++) {{
         {varout}(id) = {varin}(id);
     }}
 
-    return 0;
+    res = 0;
+
+    return res;
 }}
 """
 
 t_kernel = """
-extern "C" int accelpy_kernel(int device, int channel){{
+extern "C" int64_t accelpy_kernel(int64_t device, int64_t channel){{
 
-    int ACCELPY_WORKER_ID = 0;
+    int64_t ACCELPY_WORKER_ID = 0;
+    int64_t res;
 
     {order}
 
-    return 0;
+    res = 0;
+
+    return res;
 }}
 """
 
@@ -123,9 +148,33 @@ class CppAccel(AccelBase):
     name = "cpp"
     lang = "cpp"
 
+# ctypes type C type Python type
+# 
+# c_bool _Bool bool (1)
+# c_char char 1-character bytes object
+# c_wchar wchar_t 1-character string
+# c_byte char int
+# c_ubyte unsigned char int
+# c_short short int
+# c_ushort unsigned short int
+# c_int int int
+# c_uint unsigned int int
+# c_long long int
+# c_ulong unsigned long int
+# c_longlong __int64 or long long int
+# c_ulonglong unsigned __int64 or unsigned long long int
+# c_size_t size_t int
+# c_ssize_t ssize_t or Py_ssize_t int
+# c_float float float
+# c_double double float
+# c_longdouble long double float
+# c_char_p char* (NUL terminated) bytes object or None
+# c_wchar_p wchar_t* (NUL terminated) string or None
+# c_void_p void* int or None
+
     dtypemap = {
-        "int32": ["int", c_int],
-        "int64": ["long", c_longlong],
+        "int32": ["int32_t", c_int32],
+        "int64": ["int64_t", c_int64],
         "float32": ["float", c_float],
         "float64": ["double", c_double]
     }

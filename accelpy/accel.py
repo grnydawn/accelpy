@@ -1,9 +1,8 @@
 """accelpy Accelerator module"""
 
-import os, abc, time, threading, inspect
-from ctypes import c_int
+import os, abc, time, threading, inspect, numpy
+from ctypes import c_int64, POINTER, byref
 from numpy.ctypeslib import ndpointer
-from numpy import ndarray, zeros, equal
 from numpy.random import random
 from collections import OrderedDict
 
@@ -26,7 +25,7 @@ class AccelBase(Object):
                 "curname": "accelpy_test_input"
             },
             {
-                "data":zeros(LEN_TESTDATA),
+                "data":numpy.zeros(LEN_TESTDATA),
                 "curname": "accelpy_test_output"
             }
     ]
@@ -72,15 +71,15 @@ class AccelBase(Object):
         dtype = self.get_dtype(arg)
         return "%s%s_dim%d" % (prefix, dtype, arg["data"].ndim)
 
-    def len_numpyattrs(self, arg):
+    #def len_numpyattrs(self, arg):
 
-        return 3 + len(arg["data"].shape)*2
+    #    return 3 + len(arg["data"].shape)*2
 
     def get_numpyattrs(self, arg):
         data = arg["data"]
 
-        return ((data.ndim, data.itemsize, data.size) + data.shape +
-                tuple([int(s//data.itemsize) for s in data.strides]))
+        return numpy.array((data.size, data.ndim, data.itemsize) + data.shape +
+                tuple([int(s//data.itemsize) for s in data.strides]), dtype=numpy.int64)
 
     def get_ctype(self, arg):
 
@@ -89,11 +88,11 @@ class AccelBase(Object):
     def _pack_arguments(self, inputs, outputs):
 
         def _tondarray(d):
-            if isinstance(d, ndarray):
+            if isinstance(d, numpy.ndarray):
                 return d
 
             elif isinstance(d, (list, tuple)):
-                return asarray(d)
+                return numpy.asarray(d)
 
             else:
                 raise Exception("No supported type: %s" % type(d))
@@ -198,7 +197,8 @@ class AccelBase(Object):
 
                 self._testdata[1]["data"].fill(0.0)
 
-                if self.h2a_func(self._testdata[1], "accelpy_test_h2amalloc", lib=lib) != 0:
+                if self.h2a_func(self._testdata[1], "accelpy_test_h2amalloc",
+                        lib=lib, writable=True) != 0:
                     raise Exception("H2D malloc test faild.")
 
                 testrun = getattr(lib, "accelpy_test_run")
@@ -208,7 +208,7 @@ class AccelBase(Object):
                 if self.a2h_func(self._testdata[1], "accelpy_test_a2hcopy", lib=lib) != 0:
                     raise Exception("D2H copy test faild.")
 
-                if not all(equal(self._testdata[1]["data"], self._testdata[1]["data"])):
+                if not all(numpy.equal(self._testdata[0]["data"], self._testdata[1]["data"])):
                     raise Exception("data integrity check failure")
 
                 return lib
@@ -218,27 +218,40 @@ class AccelBase(Object):
 
         raise Exception("\n".join(errmsgs))
 
-    def h2a_func(self, arg, funcname, lib=None):
+    def h2a_func(self, arg, funcname, lib=None, writable=None):
 
         if lib is None:
             lib = self._sharedlib
+
+        flags = ["contiguous"]
+
+        if writable:
+            flags.append("writeable")
 
         attrs = self.get_numpyattrs(arg)
-        cattrs = c_int*len(attrs)
 
         h2acopy = getattr(lib, funcname)
-        h2acopy.restype = c_int
-        h2acopy.argtypes = [ndpointer(self.get_ctype(arg)), cattrs, c_int]
-        return h2acopy(arg["data"], cattrs(*attrs), len(attrs))
+        h2acopy.restype = c_int64
+        h2acopy.argtypes = [
+            POINTER(c_int64),
+            ndpointer(attrs.dtype, flags=",".join(flags)),
+            ndpointer(arg["data"].dtype, flags=",".join(flags))
+            ]
+        return h2acopy(byref(c_int64(attrs.size)), attrs, arg["data"])
 
-    def a2h_func(self, arg, funcname, lib=None):
+    def a2h_func(self, arg, funcname, lib=None, writable=None):
 
         if lib is None:
             lib = self._sharedlib
 
+        flags = ["contiguous"]
+
+        if writable:
+            flags.append("writeable")
+
         a2hcopy = getattr(lib, funcname)
-        a2hcopy.restype = c_int
-        a2hcopy.argtypes = [ndpointer(self.get_ctype(arg))]
+        a2hcopy.restype = c_int64
+        a2hcopy.argtypes = [ndpointer(arg["data"].dtype, flags=",".join(flags))]
 
         return a2hcopy(arg["data"])
 
@@ -248,10 +261,10 @@ class AccelBase(Object):
             lib = self._sharedlib
 
         start = getattr(lib, "accelpy_start")
-        start.restype = c_int
-        start.argtypes = [c_int, c_int]
+        start.restype = c_int64
+        start.argtypes = [POINTER(c_int64), POINTER(c_int64)]
 
-        if start(device, channel) != 0:
+        if start(byref(c_int64(device)), byref(c_int64(channel))) != 0:
             raise Exception("kernel run failed.")
 
     def run(self, *workers, device=0, channel=0):
@@ -268,7 +281,7 @@ class AccelBase(Object):
         if self._outputs:
             for output in self._outputs:
                 if output["id"] not in self._malloc_cache:
-                    if self.h2a_func(output, self.getname_h2amalloc(output)) != 0:
+                    if self.h2a_func(output, self.getname_h2amalloc(output), writable=True) != 0:
                         raise Exception("Accel h2a malloc failed.")
                     self._malloc_cache[output["id"]] = output
 
@@ -284,7 +297,7 @@ class AccelBase(Object):
             lib = self._sharedlib
 
         stop = getattr(lib, "accelpy_stop")
-        stop.restype = c_int
+        stop.restype = c_int64
         stop.argtypes = []
 
         stop()

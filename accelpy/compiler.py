@@ -16,6 +16,7 @@ class Compiler(Object):
     avails = dict()
     libext = "so"
     objext = "o"
+    opt_compile_only = "-c"
 
     def __init__(self, path, option=None):
 
@@ -63,13 +64,13 @@ class Compiler(Object):
 
         self.version = self.parse_version(out.stdout)
 
-    def _compile(self, code, ext, compile_only=False, objfiles=[]):
+    def _compile(self, code, ext, compile_only=False, objfiles=[], moddir=None):
 
         blddir = _config["session"]["workdir"]
 
         objhashes = []
         for objfile in objfiles:
-            objhash.append(os.path.basename(objfile))
+            objhashes.append(os.path.basename(objfile))
 
         text = (code + self.vendor + "".join(self.version) + ext + "".join(objhashes))
         name =  hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
@@ -86,11 +87,14 @@ class Compiler(Object):
         else:
             option = self.get_option()
 
-        build_cmd = "{compiler} {option} -o {outfile} {infile}".format(
-                compiler=self.path, option=option,
-                outfile=outfile, infile=codepath)
+        if moddir:
+            option += " " + self.opt_moddir % moddir
 
-        #import pdb; pdb.set_trace()
+        build_cmd = "{compiler} {option} -o {outfile} {infile} {objfiles}".format(
+                        compiler=self.path, option=option, outfile=outfile,
+                        infile=codepath, objfiles=" ".join(objfiles))
+
+        import pdb; pdb.set_trace()
         out = shellcmd(build_cmd)
 
         if out.returncode != 0:
@@ -114,17 +118,18 @@ class Compiler(Object):
 
         elif isinstance(code, (list, tuple)):
             main_code = code[-1]
+            blddir = _config["session"]["workdir"]
 
             for extracode in code[:-1]:
                 objfiles.append(self._compile(extracode, self.objext,
-                                    compile_only=True))
+                                    compile_only=True, moddir=blddir))
 
         libfile = self._compile(main_code, self.libext, objfiles=objfiles)
 
-        blddir, libname = os.path.split(libfile)
+        libdir, libname = os.path.split(libfile)
         name, _ = os.path.splitext(libname)
 
-        lib = load_library(name, blddir)
+        lib = load_library(name, libdir)
 
         return lib
 
@@ -191,7 +196,8 @@ class FortranFortranCompiler(FortranCompiler):
 class GnuFortranFortranCompiler(FortranFortranCompiler):
 
     vendor = "gnu"
-    opt_openmp = "--fopenmp"
+    opt_openmp = "-fopenmp"
+    opt_moddir = "-J %s"
 
     def __init__(self, path=None, option=None):
 
@@ -207,7 +213,7 @@ class GnuFortranFortranCompiler(FortranFortranCompiler):
         if sys.platform == "darwin":
             if items[:3] == [b'GNU', b'Fortran', b'(GCC)']:
                 return items[3].decode().split(".")
-            raise Exception("Unknown version syntaxt: %s" % str(items[:3]))
+            raise Exception("Unknown compiler version syntax on MacOS: %s" % str(items[:3]))
 
         else:
             print("'%s' is not supported yet.")
