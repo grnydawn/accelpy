@@ -9,16 +9,21 @@ from accelpy.core import Object
 from accelpy.util import shellcmd, which
 from accelpy import _config
 
+#########################
+# Generic Compilers
+#########################
 
 class Compiler(Object):
     """Compiler Base Class"""
 
-    avails = dict()
+    avails = OrderedDict()
     libext = "so"
     objext = "o"
     opt_compile_only = "-c"
 
     def __init__(self, path, option=None):
+
+        self._blddir = _config["session"]["workdir"]
 
         self.version = []
 
@@ -66,7 +71,6 @@ class Compiler(Object):
 
     def _compile(self, code, ext, compile_only=False, objfiles=[], moddir=None):
 
-        blddir = _config["session"]["workdir"]
 
         objhashes = []
         for objfile in objfiles:
@@ -75,11 +79,11 @@ class Compiler(Object):
         text = (code + self.vendor + "".join(self.version) + ext + "".join(objhashes))
         name =  hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
 
-        codepath = os.path.join(blddir, name + "." + self.codeext)
+        codepath = os.path.join(self._blddir, name + "." + self.codeext)
         with open(codepath, "w") as f:
             f.write(code)
 
-        outfile = os.path.join(blddir, name + "." + ext)
+        outfile = os.path.join(self._blddir, name + "." + ext)
 
         if compile_only:
             option = self.opt_compile_only + " " + self.get_option()
@@ -118,11 +122,10 @@ class Compiler(Object):
 
         elif isinstance(code, (list, tuple)):
             main_code = code[-1]
-            blddir = _config["session"]["workdir"]
 
             for extracode in code[:-1]:
                 objfiles.append(self._compile(extracode, self.objext,
-                                    compile_only=True, moddir=blddir))
+                                    compile_only=True, moddir=self._blddir))
 
         libfile = self._compile(main_code, self.libext, objfiles=objfiles)
 
@@ -152,6 +155,18 @@ class CppCppCompiler(CppCompiler):
 
     accel = "cpp"
     opt_version = "--version"
+
+
+# TODO: should be abstract
+class FortranFortranCompiler(FortranCompiler):
+
+    accel = "fortran"
+    opt_version = "--version"
+
+
+################
+# GNU Compilers
+################
 
 class GnuCppCppCompiler(CppCppCompiler):
 
@@ -195,12 +210,6 @@ class GnuCppCppCompiler(CppCppCompiler):
 
         return opts
 
-# TODO: should be abstract
-class FortranFortranCompiler(FortranCompiler):
-
-    accel = "fortran"
-    opt_version = "--version"
-
 class GnuFortranFortranCompiler(FortranFortranCompiler):
 
     vendor = "gnu"
@@ -221,7 +230,7 @@ class GnuFortranFortranCompiler(FortranFortranCompiler):
         if sys.platform in ("darwin", "linux"):
             if items[:3] == [b'GNU', b'Fortran', b'(GCC)']:
                 return items[3].decode().split(".")
-            raise Exception("Unknown compiler version syntax on MacOS: %s" % str(items[:3]))
+            raise Exception("Unknown compiler version syntax: %s" % str(items[:3]))
 
         else:
             print("'%s' is not supported yet.")
@@ -241,17 +250,120 @@ class GnuFortranFortranCompiler(FortranFortranCompiler):
         return opts
 
 
-# TODO: apply priority
+################
+# Cray Compilers
+################
 
-for langsubc in Compiler.__subclasses__():
+class CrayClangCppCppCompiler(CppCppCompiler):
+
+    vendor = "crayclang"
+    opt_openmp = "--fopenmp"
+
+    def __init__(self, path=None, option=None):
+
+        if path:
+            pass
+
+        elif which("CC"):
+            path = "CC"
+
+        elif which("crayCC"):
+            path = "crayCC"
+
+        elif which("clang++"):
+            path = "clang++"
+
+        super(CrayClangCppCppCompiler, self).__init__(path, option)
+
+    def parse_version(self, stdout):
+
+        items = stdout.split()
+
+        if sys.platform == "linux":
+            if items[:3] == [b'Cray', b'clang', b'version']:
+                return items[3].decode().split(".")
+            raise Exception("Unknown version syntaxt: %s" % str(items[:3]))
+
+        else:
+            import pdb; pdb.set_trace()
+
+    def get_option(self):
+
+        if sys.platform == "linux":
+            opts = "-shared -fPIC " + super(CrayClangCppCppCompiler, self).get_option()
+
+        else:
+            import pdb; pdb.set_trace()
+
+        return opts
+
+class CrayFortranFortranCompiler(FortranFortranCompiler):
+
+    vendor = "cray"
+    opt_openmp = "-h omp"
+    opt_moddir = "-J %s"
+
+    def __init__(self, path=None, option=None):
+
+        if path:
+            pass
+
+        elif which("ftn"):
+            path = "ftn"
+
+        elif which("crayftn"):
+            path = "crayftn"
+
+        super(CrayFortranFortranCompiler, self).__init__(path, option)
+
+    def parse_version(self, stdout):
+
+        items = stdout.split()
+        
+        if sys.platform == "linux":
+            if items[:4] == [b'Cray', b'Fortran', b':', b'Version']:
+                return items[4].decode().split(".")
+            raise Exception("Unknown compiler version syntax: %s" % str(items[:3]))
+
+        else:
+            print("'%s' is not supported yet.")
+            import pdb; pdb.set_trace()
+
+    def get_option(self):
+
+        if sys.platform == "linux":
+            moddir = self.opt_moddir % self._blddir
+            opts = ("-shared -fPIC %s " % moddir +
+                    super(CrayFortranFortranCompiler, self).get_option())
+
+        else:
+            import pdb; pdb.set_trace()
+
+        return opts
+
+
+# priorities
+_lang_priority = ["fortran", "cpp"]
+_accel_priority = ["fortran", "cpp"]
+_vendor_priority = ["crayclang", "cray", "gnu"]
+
+def _langsort(l):
+    return _lang_priority.index(l.lang)
+
+def _accelsort(a):
+    return _accel_priority.index(a.accel)
+
+def _vendorsort(v):
+    return _vendor_priority.index(v.vendor)
+
+for langsubc in sorted(Compiler.__subclasses__(), key=_langsort):
     lang = langsubc.lang
     Compiler.avails[lang] = OrderedDict()
 
-    for accelsubc in langsubc.__subclasses__():
+    for accelsubc in sorted(langsubc.__subclasses__(), key=_accelsort):
         accel = accelsubc.accel
         Compiler.avails[lang][accel] = OrderedDict()
 
-        for vendorsubc in accelsubc.__subclasses__():
+        for vendorsubc in sorted(accelsubc.__subclasses__(), key=_vendorsort):
             vendor = vendorsubc.vendor
             Compiler.avails[lang][accel][vendor] = vendorsubc
-
