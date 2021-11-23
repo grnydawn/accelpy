@@ -31,7 +31,7 @@ class AccelBase(Object):
     ]
 
 
-    def __init__(self, order, inputs, outputs, compilers=None):
+    def __init__(self, order, inputs, outputs, compiler=None):
 
         self._order = self._get_order(order)
         self._inputs, self._outputs = self._pack_arguments(inputs, outputs)
@@ -40,7 +40,7 @@ class AccelBase(Object):
 
         self._sharedlib = None
         self._thread_run = None
-        self._thread_compile = threading.Thread(target=self._build_sharedlib, args=(compilers,))
+        self._thread_compile = threading.Thread(target=self._build_sharedlib, args=(compiler,))
         self._thread_compile.start()
 
         #self._sharedlib = self.build_sharedlib(compilers=compilers)
@@ -48,9 +48,9 @@ class AccelBase(Object):
         self._stopped = False
         self._time_start = time.time()
 
-    def _build_sharedlib(self, compilers):
+    def _build_sharedlib(self, compiler):
 
-        self._sharedlib = self.build_sharedlib(compilers=compilers)
+        self._sharedlib = self.build_sharedlib(compiler=compiler)
 
 
     @abc.abstractmethod
@@ -181,12 +181,11 @@ class AccelBase(Object):
             raise Exception("Wrong # of worker initialization: %d" %
                         len(workers))
 
-    def build_sharedlib(self, compilers=None):
+    def build_sharedlib(self, compiler=None):
 
         code = self.gen_code(self._inputs, self._outputs)
 
-        if compilers is None:
-            compilers = get_compilers(self.name)
+        compilers = get_compilers(self.name, compiler=compiler)
 
         errmsgs = []
 
@@ -443,7 +442,7 @@ def get_compilers(accel, compiler=None):
         elif isinstance(compiler, Compiler):
             compilers.append(compiler)
 
-        elif isinstance(compiler (list, tuple)):
+        elif isinstance(compiler, (list, tuple)):
 
             for comp in compiler:
                 if isinstance(comp, str):
@@ -460,7 +459,7 @@ def get_compilers(accel, compiler=None):
 
                     else:
                         # TODO: vendor name search
-                        for lang, langsubc in Compiler.avalis.items():
+                        for lang, langsubc in Compiler.avails.items():
                             for accel, accelsubc in langsubc.items():
                                 for vendor, vendorsubc in accelsubc.items():
                                     if vendor == citems[0]:
@@ -481,7 +480,7 @@ def get_compilers(accel, compiler=None):
     errmsgs = []
 
     if compilers:
-        for comp in compiers:
+        for comp in compilers:
             if any(comp.accel==a[0] and comp.lang==a[1] for a in accels):
                 new_compilers.append(comp)
     else:

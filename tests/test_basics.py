@@ -5,7 +5,12 @@ import pytest
 from accelpy import Accel, CppAccel, FortranAccel
 
 
-test_accels = ("cpp", "fortran")
+test_accels = (
+    ("cpp", "gnu"),
+    ("cpp", "crayclang"),
+    ("fortran","gnu"),
+    ("fortran", "cray"),
+)
 #test_accels = ("cpp",)
 #test_accels = ("fortran",)
 
@@ -127,12 +132,13 @@ def test_first():
 
     assert np.array_equal(c_1d, a_1d + b_1d)
 
-@pytest.mark.parametrize("accel", test_accels)
-def test_add3d(accel):
+@pytest.mark.parametrize("accel, comp", test_accels)
+def test_add3d(accel, comp):
 
     c_3d.fill(0)
 
-    accel = Accel(order_vecadd3d, (a_3d, b_3d), c_3d, kind=[accel])
+    accel = Accel(order_vecadd3d, (a_3d, b_3d), c_3d,
+                    kind=[accel], compiler=[comp])
 
     accel.run()
 
@@ -140,12 +146,13 @@ def test_add3d(accel):
 
     assert np.array_equal(c_3d, a_3d + b_3d)
 
-@pytest.mark.parametrize("accel", test_accels)
-def test_matmul(accel):
+@pytest.mark.parametrize("accel, comp", test_accels)
+def test_matmul(accel, comp):
 
     c_2d.fill(0)
 
-    accel = Accel(order_matmul, (a_2d, b_2d), c_2d, kind=[accel])
+    accel = Accel(order_matmul, (a_2d, b_2d), c_2d,
+                    kind=[accel], compiler=[comp])
 
     accel.run()
 
