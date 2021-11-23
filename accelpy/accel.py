@@ -304,12 +304,12 @@ class AccelBase(Object):
         self._run_time_start = time.time()
 
 
-    def output(self, output=None):
+    def output(self, output=None, force=False):
 
         outputs = output if output else self._outputs
 
         for outp in self._outputs:
-            if "a2hcopy" not in outp or not outp["a2hcopy"]:
+            if "a2hcopy" not in outp or not outp["a2hcopy"] or force:
                 if self.a2hcopy(outp, self.getname_a2hcopy(outp)) != 0:
                     raise Exception("Accel a2h copy failed.")
 
