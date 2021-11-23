@@ -323,7 +323,7 @@ class CrayFortranFortranCompiler(FortranFortranCompiler):
         if sys.platform == "linux":
             if items[:4] == [b'Cray', b'Fortran', b':', b'Version']:
                 return items[4].decode().split(".")
-            raise Exception("Unknown compiler version syntax: %s" % str(items[:3]))
+            raise Exception("Unknown compiler version syntax: %s" % str(items[:4]))
 
         else:
             print("'%s' is not supported yet.")
@@ -341,11 +341,92 @@ class CrayFortranFortranCompiler(FortranFortranCompiler):
 
         return opts
 
+################
+# AMD Compilers
+################
+
+class AmdClangCppCppCompiler(CppCppCompiler):
+
+    vendor = "amdclang"
+    opt_openmp = "-fopenmp"
+
+    def __init__(self, path=None, option=None):
+
+        if path:
+            pass
+
+        elif which("clang++"):
+            path = "clang++"
+
+        super(AmdClangCppCppCompiler, self).__init__(path, option)
+
+    def parse_version(self, stdout):
+
+        items = stdout.split()
+
+        if sys.platform == "linux":
+            if items[:2] == [b'clang', b'version']:
+                return items[2].decode().split(".")
+            raise Exception("Unknown version syntaxt: %s" % str(items[:2]))
+
+        else:
+            import pdb; pdb.set_trace()
+
+    def get_option(self):
+
+        if sys.platform == "linux":
+            opts = "-shared -fPIC " + super(AmdClangCppCppCompiler, self).get_option()
+
+        else:
+            import pdb; pdb.set_trace()
+
+        return opts
+
+class AmdFlangFortranFortranCompiler(FortranFortranCompiler):
+
+    vendor = "amdflang"
+    opt_openmp = "-fopenmp"
+    opt_moddir = "-J %s"
+
+    def __init__(self, path=None, option=None):
+
+        if path:
+            pass
+
+        elif which("flang"):
+            path = "flang"
+
+        super(AmdFlangFortranFortranCompiler, self).__init__(path, option)
+
+    def parse_version(self, stdout):
+
+        items = stdout.split()
+        
+        if sys.platform == "linux":
+            if items[:2] == [b'flang-new', b'version']:
+                return items[2].decode().split(".")
+            raise Exception("Unknown compiler version syntax: %s" % str(items[:2]))
+
+        else:
+            print("'%s' is not supported yet.")
+            import pdb; pdb.set_trace()
+
+    def get_option(self):
+
+        if sys.platform == "linux":
+            moddir = self.opt_moddir % self._blddir
+            opts = ("-shared -fPIC %s " % moddir +
+                    super(AmdFlangFortranFortranCompiler, self).get_option())
+
+        else:
+            import pdb; pdb.set_trace()
+
+        return opts
 
 # priorities
 _lang_priority = ["fortran", "cpp"]
 _accel_priority = ["fortran", "cpp"]
-_vendor_priority = ["crayclang", "cray", "gnu"]
+_vendor_priority = ["amdflang", "amdclang", "crayclang", "cray", "gnu"]
 
 def _langsort(l):
     return _lang_priority.index(l.lang)

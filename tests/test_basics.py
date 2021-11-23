@@ -8,8 +8,10 @@ from accelpy import Accel, CppAccel, FortranAccel
 test_accels = (
     ("cpp", "gnu"),
     ("cpp", "crayclang"),
+    ("cpp", "amdclang"),
     ("fortran","gnu"),
     ("fortran", "cray"),
+    ("fortran", "amdflang"),
 )
 #test_accels = ("cpp",)
 #test_accels = ("fortran",)
