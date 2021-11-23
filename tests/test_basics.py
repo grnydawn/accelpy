@@ -9,12 +9,14 @@ test_accels = (
     ("cpp", "gnu"),
     ("cpp", "crayclang"),
     ("cpp", "amdclang"),
+    ("cpp", "ibmxl"),
+    ("cpp", "pgi"),
     ("fortran","gnu"),
     ("fortran", "cray"),
     ("fortran", "amdflang"),
+    ("fortran", "ibmxl"),
+    ("fortran", "pgi"),
 )
-#test_accels = ("cpp",)
-#test_accels = ("fortran",)
 
 #######################
 # Order definitions

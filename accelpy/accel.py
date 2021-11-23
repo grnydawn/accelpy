@@ -483,7 +483,8 @@ def get_compilers(accel, compiler=None):
         for comp in compilers:
             if any(comp.accel==a[0] and comp.lang==a[1] for a in accels):
                 new_compilers.append(comp)
-    else:
+
+    elif compiler is None:
         for acc, lang in accels:
 
             if lang not in Compiler.avails:
@@ -502,8 +503,8 @@ def get_compilers(accel, compiler=None):
 
     if not new_compilers:
         if errmsgs:
-            print("\n".join(errmsgs))
+            raise Exception("No compiler is found: %s" % "\n".join(errmsgs))
         else:
-            print("No compiler is found for %s" % str(accels))
+            raise Exception("No compiler is found: %s" % str(accels))
 
     return new_compilers

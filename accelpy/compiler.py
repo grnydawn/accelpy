@@ -31,7 +31,7 @@ class Compiler(Object):
             self.set_version(path)
             self.path = path
 
-        elif isintance(path, (list, tuple)):
+        elif isinstance(path, (list, tuple)):
             for p in path:
                 try:
                     self.set_version(path)
@@ -42,7 +42,7 @@ class Compiler(Object):
 
             assert self.path
         else:
-            import pdb; pdb.set_trace()
+            raise Exception("Unsupported compiler path type" % str(path))
 
         opts = self.get_option()
         self.option = option.format(default=opts) if option else opts
@@ -98,6 +98,7 @@ class Compiler(Object):
                         compiler=self.path, option=option, outfile=outfile,
                         infile=codepath, objfiles=" ".join(objfiles))
 
+        #print(build_cmd)
         #import pdb; pdb.set_trace()
         out = shellcmd(build_cmd)
 
@@ -113,6 +114,9 @@ class Compiler(Object):
 
         lib = None
 
+
+        for f in os.listdir(self._blddir):
+            os.remove(os.path.join(self._blddir, f))
 
         objfiles = []
 
@@ -195,7 +199,7 @@ class GnuCppCppCompiler(CppCppCompiler):
             raise Exception("Unknown version syntaxt: %s" % str(items[:2]))
 
         else:
-            import pdb; pdb.set_trace()
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
 
     def get_option(self):
 
@@ -206,7 +210,7 @@ class GnuCppCppCompiler(CppCppCompiler):
             opts = "-shared -fPIC " + super(GnuCppCppCompiler, self).get_option()
 
         else:
-            import pdb; pdb.set_trace()
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
 
         return opts
 
@@ -233,8 +237,7 @@ class GnuFortranFortranCompiler(FortranFortranCompiler):
             raise Exception("Unknown compiler version syntax: %s" % str(items[:3]))
 
         else:
-            print("'%s' is not supported yet.")
-            import pdb; pdb.set_trace()
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
 
     def get_option(self):
 
@@ -245,7 +248,7 @@ class GnuFortranFortranCompiler(FortranFortranCompiler):
             opts = "-shared -fPIC " + super(GnuFortranFortranCompiler, self).get_option()
 
         else:
-            import pdb; pdb.set_trace()
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
 
         return opts
 
@@ -285,7 +288,7 @@ class CrayClangCppCppCompiler(CppCppCompiler):
             raise Exception("Unknown version syntaxt: %s" % str(items[:3]))
 
         else:
-            import pdb; pdb.set_trace()
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
 
     def get_option(self):
 
@@ -293,7 +296,7 @@ class CrayClangCppCppCompiler(CppCppCompiler):
             opts = "-shared -fPIC " + super(CrayClangCppCppCompiler, self).get_option()
 
         else:
-            import pdb; pdb.set_trace()
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
 
         return opts
 
@@ -326,8 +329,7 @@ class CrayFortranFortranCompiler(FortranFortranCompiler):
             raise Exception("Unknown compiler version syntax: %s" % str(items[:4]))
 
         else:
-            print("'%s' is not supported yet.")
-            import pdb; pdb.set_trace()
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
 
     def get_option(self):
 
@@ -337,7 +339,7 @@ class CrayFortranFortranCompiler(FortranFortranCompiler):
                     super(CrayFortranFortranCompiler, self).get_option())
 
         else:
-            import pdb; pdb.set_trace()
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
 
         return opts
 
@@ -370,7 +372,7 @@ class AmdClangCppCppCompiler(CppCppCompiler):
             raise Exception("Unknown version syntaxt: %s" % str(items[:2]))
 
         else:
-            import pdb; pdb.set_trace()
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
 
     def get_option(self):
 
@@ -378,7 +380,7 @@ class AmdClangCppCppCompiler(CppCppCompiler):
             opts = "-shared -fPIC " + super(AmdClangCppCppCompiler, self).get_option()
 
         else:
-            import pdb; pdb.set_trace()
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
 
         return opts
 
@@ -408,8 +410,7 @@ class AmdFlangFortranFortranCompiler(FortranFortranCompiler):
             raise Exception("Unknown compiler version syntax: %s" % str(items[:2]))
 
         else:
-            print("'%s' is not supported yet.")
-            import pdb; pdb.set_trace()
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
 
     def get_option(self):
 
@@ -419,14 +420,203 @@ class AmdFlangFortranFortranCompiler(FortranFortranCompiler):
                     super(AmdFlangFortranFortranCompiler, self).get_option())
 
         else:
-            import pdb; pdb.set_trace()
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
+
+        return opts
+
+###################
+# IBM XL Compilers
+###################
+
+class IbmXlCppCppCompiler(CppCppCompiler):
+
+    vendor = "ibmxl"
+    opt_openmp = "-qsmp=omp"
+    opt_version = "-qversion"
+
+    def __init__(self, path=None, option=None):
+
+        if path:
+            pass
+
+        elif which("xlc++_r"):
+            path = "xlc++_r"
+
+        elif which("xlc++"):
+            path = "xlc++"
+
+        super(IbmXlCppCppCompiler, self).__init__(path, option)
+
+    def parse_version(self, stdout):
+
+        items = stdout.split()
+
+        if sys.platform == "linux":
+            if items[:3] == [b'IBM', b'XL', b'C/C++']:
+                return items[5].decode().split(".")
+            raise Exception("Unknown version syntaxt: %s" % str(items[:3]))
+
+        else:
+            raise Exception("'%s' platform is not supported yet." % sys.platform)
+
+    def get_option(self):
+
+        if sys.platform == "linux":
+            opts = "-shared -fPIC " + super(IbmXlCppCppCompiler, self).get_option()
+
+        else:
+            raise Exception("'%s' platform is not supported yet." % sys.platform)
+
+        return opts
+
+class IbmXlFortranFortranCompiler(FortranFortranCompiler):
+
+    vendor = "ibmxl"
+    opt_openmp = "-qsmp=omp"
+    opt_moddir = "-qmoddir=%s"
+    opt_version = "-qversion"
+
+    def __init__(self, path=None, option=None):
+
+        if path:
+            pass
+
+        elif which("xlf2008_r"):
+            path = "xlf2008_r"
+
+        elif which("xlf2008"):
+            path = "xlf2008"
+
+        elif which("xlf2003_r"):
+            path = "xlf2003_r"
+
+        elif which("xlf2003"):
+            path = "xlf2003"
+
+        elif which("xlf95_r"):
+            path = "xlf95_r"
+
+        elif which("xlf95"):
+            path = "xlf95"
+
+        elif which("xlf90_r"):
+            path = "xlf90_r"
+
+        elif which("xlf90"):
+            path = "xlf90"
+
+        super(IbmXlFortranFortranCompiler, self).__init__(path, option)
+
+    def parse_version(self, stdout):
+
+        items = stdout.split()
+        
+        if sys.platform == "linux":
+            if items[:3] == [b'IBM', b'XL', b'Fortran']:
+                return items[5].decode().split(".")
+            raise Exception("Unknown compiler version syntax: %s" % str(items[:3]))
+
+        else:
+            raise Exception("'%s' platform is not supported yet." % sys.platform)
+
+    def get_option(self):
+
+        if sys.platform == "linux":
+            moddir = self.opt_moddir % self._blddir
+            opts = ("-qmkshrobj -qpic %s " % moddir +
+                    super(IbmXlFortranFortranCompiler, self).get_option())
+
+        else:
+            raise Exception("'%s' platform is not supported yet." % sys.platform)
+
+        return opts
+
+
+###################
+# PGI Compilers
+###################
+
+class PgiCppCppCompiler(CppCppCompiler):
+
+    vendor = "pgi"
+    opt_openmp = "-mp"
+
+    def __init__(self, path=None, option=None):
+
+        if path:
+            pass
+
+        elif which("pgc++"):
+            path = "pgc++"
+
+        super(PgiCppCppCompiler, self).__init__(path, option)
+
+    def parse_version(self, stdout):
+
+        items = stdout.strip().split()
+
+        if sys.platform == "linux":
+            if items[0] == b'pgc++':
+                return items[1].decode().split(".")
+            raise Exception("Unknown version syntaxt: %s" % str(items[:1]))
+
+        else:
+            raise Exception("'%s' platform is not supported yet." % sys.platform)
+
+    def get_option(self):
+
+        if sys.platform == "linux":
+            opts = "-shared -fpic " + super(PgiCppCppCompiler, self).get_option()
+
+        else:
+            raise Exception("'%s' platform is not supported yet." % sys.platform)
+
+        return opts
+
+class PgiFortranFortranCompiler(FortranFortranCompiler):
+
+    vendor = "pgi"
+    opt_openmp = "-mp"
+    opt_moddir = "-module %s"
+
+    def __init__(self, path=None, option=None):
+
+        if path:
+            pass
+
+        elif which("pgfortran"):
+            path = "pgfortran"
+
+        super(PgiFortranFortranCompiler, self).__init__(path, option)
+
+    def parse_version(self, stdout):
+
+        items = stdout.strip().split()
+
+        if sys.platform == "linux":
+            if items[0] == b'pgfortran':
+                return items[1].decode().split(".")
+            raise Exception("Unknown version syntaxt: %s" % str(items[:1]))
+
+        else:
+            raise Exception("'%s' platform is not supported yet." % sys.platform)
+
+    def get_option(self):
+
+        if sys.platform == "linux":
+            moddir = self.opt_moddir % self._blddir
+            opts = ("-shared -fpic %s " % moddir +
+                    super(PgiFortranFortranCompiler, self).get_option())
+
+        else:
+            raise Exception("'%s' platform is not supported yet." % sys.platform)
 
         return opts
 
 # priorities
 _lang_priority = ["fortran", "cpp"]
 _accel_priority = ["fortran", "cpp"]
-_vendor_priority = ["amdflang", "amdclang", "crayclang", "cray", "gnu"]
+_vendor_priority = ["pgi", "ibmxl", "amdflang", "amdclang", "crayclang", "cray", "gnu"]
 
 def _langsort(l):
     return _lang_priority.index(l.lang)
