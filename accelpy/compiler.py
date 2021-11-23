@@ -613,10 +613,93 @@ class PgiFortranFortranCompiler(FortranFortranCompiler):
 
         return opts
 
+
+###################
+# Intel Compilers
+###################
+
+class IntelCppCppCompiler(CppCppCompiler):
+
+    vendor = "intel"
+    opt_openmp = "-qopenmp"
+
+    def __init__(self, path=None, option=None):
+
+        if path:
+            pass
+
+        elif which("icpc"):
+            path = "icpc"
+
+        super(IntelCppCppCompiler, self).__init__(path, option)
+
+    def parse_version(self, stdout):
+
+        items = stdout.strip().split()
+
+        if sys.platform == "linux":
+            if items[:2] == [b'icpc', b'(ICC)']:
+                return items[2].decode().split(".")
+            raise Exception("Unknown version syntaxt: %s" % str(items[:1]))
+
+        else:
+            raise Exception("'%s' platform is not supported yet." % sys.platform)
+
+    def get_option(self):
+
+        if sys.platform == "linux":
+            opts = "-shared -fpic " + super(IntelCppCppCompiler, self).get_option()
+
+        else:
+            raise Exception("'%s' platform is not supported yet." % sys.platform)
+
+        return opts
+
+class IntelFortranFortranCompiler(FortranFortranCompiler):
+
+    vendor = "intel"
+    opt_openmp = "-qopenmp"
+    opt_moddir = "-module %s"
+
+    def __init__(self, path=None, option=None):
+
+        if path:
+            pass
+
+        elif which("ifort"):
+            path = "ifort"
+
+        super(IntelFortranFortranCompiler, self).__init__(path, option)
+
+    def parse_version(self, stdout):
+
+        items = stdout.strip().split()
+
+        if sys.platform == "linux":
+            if items[:2] == [b'ifort', b'(IFORT)']:
+                return items[2].decode().split(".")
+            raise Exception("Unknown version syntaxt: %s" % str(items[:1]))
+
+        else:
+            raise Exception("'%s' platform is not supported yet." % sys.platform)
+
+    def get_option(self):
+
+        if sys.platform == "linux":
+            moddir = self.opt_moddir % self._blddir
+            opts = ("-shared -fpic %s " % moddir +
+                    super(IntelFortranFortranCompiler, self).get_option())
+
+        else:
+            raise Exception("'%s' platform is not supported yet." % sys.platform)
+
+        return opts
+
+
 # priorities
 _lang_priority = ["fortran", "cpp"]
 _accel_priority = ["fortran", "cpp"]
-_vendor_priority = ["pgi", "ibmxl", "amdflang", "amdclang", "crayclang", "cray", "gnu"]
+_vendor_priority = ["intel", "pgi", "ibmxl", "amdflang", "amdclang", "crayclang", "cray", "gnu"]
 
 def _langsort(l):
     return _lang_priority.index(l.lang)

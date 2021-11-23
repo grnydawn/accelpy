@@ -11,11 +11,13 @@ test_accels = (
     ("cpp", "amdclang"),
     ("cpp", "ibmxl"),
     ("cpp", "pgi"),
+    ("cpp", "intel"),
     ("fortran","gnu"),
     ("fortran", "cray"),
     ("fortran", "amdflang"),
     ("fortran", "ibmxl"),
     ("fortran", "pgi"),
+    ("fortran", "intel"),
 )
 
 #######################
