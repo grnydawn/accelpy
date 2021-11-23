@@ -1,7 +1,11 @@
 """accelpy basic tests"""
 
 import numpy as np
-from accelpy import Accel, CppAccel
+import pytest
+from accelpy import Accel, CppAccel, FortranAccel
+
+
+test_accels = ("cpp", "fortran")
 
 #######################
 # Order definitions
@@ -27,41 +31,124 @@ cpp_enable = True
 
 """
 
+order_vecadd3d = """
+
+set_argnames(("x", "y"), "z")
+
+[cpp]
+    for (int i = 0; i < x.shape(0); i++) {
+        for (int j = 0; j < x.shape(1); j++) {
+            for (int k = 0; k < x.shape(2); k++) {
+                z(i, j, k) = x(i, j, k) + y(i, j, k);
+            }
+        }
+    }
+
+[fortran]
+    INTEGER i, j, k
+
+    DO i=1, x_attr%shape(1)
+        DO j=1, x_attr%shape(2)
+            DO k=1, x_attr%shape(3)
+                z(i, j, k) = x(i, j, k) + y(i, j, k)
+            END DO
+        END DO
+    END DO
+"""
+
+order_matmul = """
+
+set_argnames(("X", "Y"), "Z")
+
+[cpp]
+
+    for (int i = 0; i < X.shape(0); i++) {
+        for (int j = 0; j < Y.shape(1); j++) {
+            Z(i, j) = 0.0;
+            for (int k = 0; k < Y.shape(0); k++) {
+                Z(i, j) += X(i, k) * Y(k, j);
+            }
+        }
+    }
+
+[fortran]
+    INTEGER i, j, k
+
+    DO i=1, X_attr%shape(1)
+        DO j=1, Y_attr%shape(2)
+            Z(i, j) = 0
+            DO k=1, Y_attr%shape(1)
+                Z(i, j) = Z(i, j) + X(i, k) * Y(k, j)
+            END DO
+        END DO
+    END DO
+"""
 
 #######################
 # Tests
 #######################
 
 N1 = 100
-
 a_1d = np.arange(N1, dtype=np.int64)
 b_1d = np.arange(N1, dtype=np.int64) * 2
 c_1d = np.zeros(N1, dtype=np.int64)
 
+N3 = (2, 5, 10)
+a_3d = np.reshape(np.arange(N1, dtype=np.int64), N3)
+b_3d = np.reshape(np.arange(N1, dtype=np.int64) * 2, N3)
+c_3d = np.reshape(np.zeros(N1, dtype=np.int64), N3)
 
-def test_first():
+
+a_2d = np.reshape(np.arange(N1, dtype=np.float64), (4, 25))
+b_2d = np.reshape(np.arange(N1, dtype=np.float64) * 2, (25, 4))
+c_2d = np.reshape(np.zeros(16, dtype=np.float64), (4, 4))
+
+@pytest.mark.parametrize("accel", test_accels)
+def test_first(accel):
 
     c_1d.fill(0)
 
-    accel = CppAccel(order_vecadd1d, (a_1d, b_1d), c_1d)
+    accel_cpp = CppAccel(order_vecadd1d, (a_1d, b_1d), c_1d)
+
+    accel_cpp.run()
+
+    accel_cpp.wait()
+
+    assert np.array_equal(c_1d, a_1d + b_1d)
+
+    c_1d.fill(0)
+
+    accel_fortran = FortranAccel(order_vecadd1d, (a_1d, b_1d), c_1d)
+
+    accel_fortran.run()
+
+    accel_fortran.wait()
+
+    assert np.array_equal(c_1d, a_1d + b_1d)
+
+@pytest.mark.parametrize("accel", test_accels)
+def test_add3d(accel):
+
+    c_3d.fill(0)
+
+    accel = Accel(order_vecadd3d, (a_3d, b_3d), c_3d, kind=[accel])
 
     accel.run()
 
     accel.wait()
 
-    assert all(c_1d == a_1d + b_1d)
+    assert np.array_equal(c_3d, a_3d + b_3d)
 
+@pytest.mark.parametrize("accel", test_accels)
+def test_matmul(accel):
 
-def test_multiaccel():
+    c_2d.fill(0)
 
-    c_1d.fill(0)
-
-    #accel = Accel(order_vecadd1d, (a_1d, b_1d), c_1d, kind=["cpp", "fortran"])
-    accel = Accel(order_vecadd1d, (a_1d, b_1d), c_1d, kind=["fortran", "cpp"])
+    accel = Accel(order_matmul, (a_2d, b_2d), c_2d, kind=[accel])
 
     accel.run()
 
     accel.wait()
 
-    #import pdb; pdb.set_trace()
-    assert all(c_1d == a_1d + b_1d)
+    assert np.array_equal(c_2d, np.matmul(a_2d, b_2d))
+

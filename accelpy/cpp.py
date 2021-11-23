@@ -32,6 +32,8 @@ extern "C" int64_t accelpy_start(int64_t * device, int64_t * channel) {{
 extern "C" int64_t accelpy_stop() {{
     int64_t res;
 
+    {freemem}
+
     res = 0;
 
     return res;
@@ -125,6 +127,9 @@ extern "C" int64_t accelpy_test_run() {{
     for (int id = 0; id < {varin}.shape(0); id++) {{
         {varout}(id) = {varin}(id);
     }}
+
+    free({varin}._attrs);
+    free({varout}._attrs);
 
     res = 0;
 
@@ -264,13 +269,23 @@ class CppAccel(AccelBase):
         order =  self._order.get_section(self.name)
         return t_kernel.format(order="\n".join(order.body))
 
+    def gen_freemem(self, inputs, outputs):
+
+        out = []
+
+        for data in inputs+outputs:
+            out.append("free(%s._attrs);" % data["curname"])
+
+        return "\n".join(out)
+
     def gen_code(self, inputs, outputs):
 
         main_fmt = {
             "varclasses":self.gen_varclasses(inputs, outputs),
             "testcode":self.gen_testcode(),
             "datacopies":self.gen_datacopies(inputs, outputs),
-            "kernel":self.gen_kernel()
+            "kernel":self.gen_kernel(),
+            "freemem":self.gen_freemem(inputs, outputs)
         }
 
         code = t_main.format(**main_fmt)
