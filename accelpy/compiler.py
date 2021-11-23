@@ -174,6 +174,11 @@ class GnuCppCppCompiler(CppCppCompiler):
                 return items[3].decode().split(".")
             raise Exception("Unknown version syntaxt: %s" % str(items[:3]))
 
+        elif sys.platform == "linux":
+            if items[:2] == [b'g++', b'(GCC)']:
+                return items[2].decode().split(".")
+            raise Exception("Unknown version syntaxt: %s" % str(items[:2]))
+
         else:
             import pdb; pdb.set_trace()
 
@@ -181,6 +186,9 @@ class GnuCppCppCompiler(CppCppCompiler):
 
         if sys.platform == "darwin":
             opts = "-dynamiclib -fPIC " + super(GnuCppCppCompiler, self).get_option()
+
+        elif sys.platform == "linux":
+            opts = "-shared -fPIC " + super(GnuCppCppCompiler, self).get_option()
 
         else:
             import pdb; pdb.set_trace()
@@ -210,7 +218,7 @@ class GnuFortranFortranCompiler(FortranFortranCompiler):
 
         items = stdout.split()
         
-        if sys.platform == "darwin":
+        if sys.platform ("darwin", "linux"):
             if items[:3] == [b'GNU', b'Fortran', b'(GCC)']:
                 return items[3].decode().split(".")
             raise Exception("Unknown compiler version syntax on MacOS: %s" % str(items[:3]))
@@ -223,6 +231,9 @@ class GnuFortranFortranCompiler(FortranFortranCompiler):
 
         if sys.platform == "darwin":
             opts = "-dynamiclib -fPIC " + super(GnuFortranFortranCompiler, self).get_option()
+
+        elif sys.platform == "linux":
+            opts = "-shared -fPIC " + super(GnuFortranFortranCompiler, self).get_option()
 
         else:
             import pdb; pdb.set_trace()
