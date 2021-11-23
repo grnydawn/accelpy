@@ -218,7 +218,7 @@ class GnuFortranFortranCompiler(FortranFortranCompiler):
 
         items = stdout.split()
         
-        if sys.platform ("darwin", "linux"):
+        if sys.platform in ("darwin", "linux"):
             if items[:3] == [b'GNU', b'Fortran', b'(GCC)']:
                 return items[3].decode().split(".")
             raise Exception("Unknown compiler version syntax on MacOS: %s" % str(items[:3]))

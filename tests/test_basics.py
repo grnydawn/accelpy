@@ -6,6 +6,8 @@ from accelpy import Accel, CppAccel, FortranAccel
 
 
 test_accels = ("cpp", "fortran")
+#test_accels = ("cpp",)
+#test_accels = ("fortran",)
 
 #######################
 # Order definitions
