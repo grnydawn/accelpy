@@ -36,13 +36,22 @@ class AccelBase(Object):
         self._order = self._get_order(order)
         self._inputs, self._outputs = self._pack_arguments(inputs, outputs)
 
+        self._order.update_argnames(self._inputs, self._outputs)
+
+        self._sharedlib = None
+        self._thread_run = None
+        self._thread_compile = threading.Thread(target=self._build_sharedlib, args=(compilers,))
+        self._thread_compile.start()
+
+        #self._sharedlib = self.build_sharedlib(compilers=compilers)
+
+        self._stopped = False
+        self._time_start = time.time()
+
+    def _build_sharedlib(self, compilers):
+
         self._sharedlib = self.build_sharedlib(compilers=compilers)
 
-        self._copyin_cache = dict()
-        self._copyout_cache = dict()
-        self._malloc_cache = dict()
-
-        self._time_start = None
 
     @abc.abstractmethod
     def gen_code(self, inputs, outputs):
@@ -98,20 +107,20 @@ class AccelBase(Object):
         if isinstance(inputs, (tuple, list)):
             for input in inputs:
                 inp = _tondarray(input)
-                resin.append({"data": inp, "id": id(inp)})
+                resin.append({"data": inp, "id": id(inp), "h2acopy": False})
 
         else:
             inp = _tondarray(input)
-            resin = [{"data": inp, "id": id(inp)}]
+            resin = [{"data": inp, "id": id(inp), "h2acopy": False}]
 
         if isinstance(outputs, (tuple, list)):
             for output in outputs:
                 outp = _tondarray(output)
-                resout.append({"data": outp, "id": id(outp)})
+                resout.append({"data": outp, "id": id(outp), "a2hcopy": False})
 
         else:
             outp = _tondarray(outputs)
-            resout = [{"data": outp, "id": id(outp)}]
+            resout = [{"data": outp, "id": id(outp), "a2hcopy": False}]
 
         return resin, resout
 
@@ -174,8 +183,6 @@ class AccelBase(Object):
 
     def build_sharedlib(self, compilers=None):
 
-        self._order.update_argnames(self._inputs, self._outputs)
-
         code = self.gen_code(self._inputs, self._outputs)
 
         if compilers is None:
@@ -187,12 +194,12 @@ class AccelBase(Object):
             try:
                 lib = comp.compile(code)
 
-                if self.datacopy(self._testdata[0], "accelpy_test_h2acopy", lib=lib) != 0:
+                if self.h2acopy(self._testdata[0], "accelpy_test_h2acopy", lib=lib) != 0:
                     raise Exception("H2D copy test faild.")
 
                 self._testdata[1]["data"].fill(0.0)
 
-                if self.datacopy(self._testdata[1], "accelpy_test_h2amalloc",
+                if self.h2amalloc(self._testdata[1], "accelpy_test_h2amalloc",
                         lib=lib, writable=True) != 0:
                     raise Exception("H2D malloc test faild.")
 
@@ -200,7 +207,7 @@ class AccelBase(Object):
                 if testrun() != 0:
                     raise Exception("testrun faild.")
 
-                if self.datacopy(self._testdata[1], "accelpy_test_a2hcopy", lib=lib) != 0:
+                if self.a2hcopy(self._testdata[1], "accelpy_test_a2hcopy", lib=lib) != 0:
                     raise Exception("D2H copy test faild.")
 
                 if not all(numpy.equal(self._testdata[0]["data"], self._testdata[1]["data"])):
@@ -213,7 +220,7 @@ class AccelBase(Object):
 
         raise Exception("\n".join(errmsgs))
 
-    def datacopy(self, arg, funcname, lib=None, writable=None):
+    def _datacopy(self, arg, funcname, lib=None, writable=None):
 
         if lib is None:
             lib = self._sharedlib
@@ -225,14 +232,40 @@ class AccelBase(Object):
 
         attrs = self.get_numpyattrs(arg)
 
-        h2acopy = getattr(lib, funcname)
-        h2acopy.restype = c_int64
-        h2acopy.argtypes = [
+        datacopy = getattr(lib, funcname)
+        datacopy.restype = c_int64
+        datacopy.argtypes = [
             POINTER(c_int64),
             ndpointer(attrs.dtype, flags=",".join(flags)),
             ndpointer(arg["data"].dtype, flags=",".join(flags))
             ]
-        return h2acopy(byref(c_int64(attrs.size)), attrs, arg["data"])
+        res = datacopy(byref(c_int64(attrs.size)), attrs, arg["data"])
+
+        return res
+
+    def h2acopy(self, arg, funcname, lib=None, writable=None):
+        res = self._datacopy(arg, funcname, lib=lib, writable=writable)
+
+        if res == 0:
+            arg["h2acopy"] = True
+
+        return res
+
+    def h2amalloc(self, arg, funcname, lib=None, writable=None):
+        res = self._datacopy(arg, funcname, lib=lib, writable=writable)
+
+        if res == 0:
+            arg["h2amalloc"] = True
+
+        return res
+
+    def a2hcopy(self, arg, funcname, lib=None, writable=None):
+        res = self._datacopy(arg, funcname, lib=lib, writable=writable)
+
+        if res == 0:
+            arg["a2hcopy"] = True
+
+        return res
 
     def _start_accel(self, device, channel, lib=None):
 
@@ -246,31 +279,46 @@ class AccelBase(Object):
         if start(byref(c_int64(device)), byref(c_int64(channel))) != 0:
             raise Exception("kernel run failed.")
 
-    def run(self, *workers, device=0, channel=0):
+    def run(self, *workers, device=0, channel=0, timeout=None):
+
+        # compilation should be done first
+        self._thread_compile.join()
 
         worker_triple = self._get_worker_triple(*workers)
 
         if self._inputs:
             for input in self._inputs:
-                if input["id"] not in self._copyin_cache:
-                    if self.datacopy(input, self.getname_h2acopy(input)) != 0:
+                if "h2acopy" not in input or not input["h2acopy"]:
+                    if self.h2acopy(input, self.getname_h2acopy(input)) != 0:
                         raise Exception("Accel h2a copy failed.")
-                    self._copyin_cache[input["id"]] = input
 
         if self._outputs:
             for output in self._outputs:
-                if output["id"] not in self._malloc_cache:
-                    if self.datacopy(output, self.getname_h2amalloc(output), writable=True) != 0:
+                if "h2amalloc" not in output or not output["h2amalloc"]:
+                    if self.h2amalloc(output, self.getname_h2amalloc(output), writable=True) != 0:
                         raise Exception("Accel h2a malloc failed.")
-                    self._malloc_cache[output["id"]] = output
 
         # run accel
-        self._thread = threading.Thread(target=self._start_accel, args=(device, channel))
-        self._thread.start()
-        self._time_start = time.time()
+        self._thread_run = threading.Thread(target=self._start_accel, args=(device, channel))
+        self._thread_run.start()
+        self._run_time_start = time.time()
 
 
-    def wait(self, timeout=None, lib=None):
+    def output(self, output=None):
+
+        outputs = output if output else self._outputs
+
+        for outp in self._outputs:
+            if "a2hcopy" not in outp or not outp["a2hcopy"]:
+                if self.a2hcopy(outp, self.getname_a2hcopy(outp)) != 0:
+                    raise Exception("Accel a2h copy failed.")
+
+    def stop(self, lib=None, output=True, timeout=None):
+
+        if self._stopped:
+            return
+
+        self.wait(timeout=timeout)
 
         if lib is None:
             lib = self._sharedlib
@@ -281,18 +329,24 @@ class AccelBase(Object):
 
         stop()
 
-        if self._outputs:
-            for output in self._outputs:
-                if output["id"] not in self._copyout_cache:
-                    if self.datacopy(output, self.getname_a2hcopy(output)) != 0:
-                        raise Exception("Accel a2h copy failed.")
-                    self._copyout_cache[output["id"]] = output
+        self._stopped = True
+
+        if output is True:
+            self.output()
+
+        elif output:
+            self.output(output=output)
+
+    def wait(self, timeout=None):
+
+        self._thread_compile.join()
 
         if timeout is None:
-            self._thread.join()
-
+            if self._thread_run:
+                self._thread_run.join()
         else:
-            self._thread.join(max(0, timeout-time.time()+self._time_start))
+            if self._thread_run:
+                self._thread_run.join(max(0, self._time_start+timeout-time.time()))
 
 
 def Accel(*vargs, **kwargs):

@@ -38,13 +38,6 @@ INTEGER (C_INT64_T) FUNCTION accelpy_stop() BIND(C, name="accelpy_stop")
 
     accelpy_stop = 0 
 END FUNCTION
-
-INTEGER (C_INT64_T) FUNCTION accelpy_isbusy() BIND(C, name="accelpy_isbusy")
-    USE, INTRINSIC :: ISO_C_BINDING
-    IMPLICIT NONE
-
-    accelpy_isbusy = 0 
-END FUNCTION
 """
 
 t_module = """

@@ -38,14 +38,6 @@ extern "C" int64_t accelpy_stop() {{
 
     return res;
 }}
-
-extern "C" int64_t accelpy_isbusy() {{
-    int64_t res;
-
-    res = 0;
-
-    return res;
-}}
 """
 
 t_varclass = """

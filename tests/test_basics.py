@@ -103,8 +103,7 @@ a_2d = np.reshape(np.arange(N1, dtype=np.float64), (4, 25))
 b_2d = np.reshape(np.arange(N1, dtype=np.float64) * 2, (25, 4))
 c_2d = np.reshape(np.zeros(16, dtype=np.float64), (4, 4))
 
-@pytest.mark.parametrize("accel", test_accels)
-def test_first(accel):
+def test_first():
 
     c_1d.fill(0)
 
@@ -112,7 +111,7 @@ def test_first(accel):
 
     accel_cpp.run()
 
-    accel_cpp.wait()
+    accel_cpp.stop()
 
     assert np.array_equal(c_1d, a_1d + b_1d)
 
@@ -122,7 +121,7 @@ def test_first(accel):
 
     accel_fortran.run()
 
-    accel_fortran.wait()
+    accel_fortran.stop()
 
     assert np.array_equal(c_1d, a_1d + b_1d)
 
@@ -135,7 +134,7 @@ def test_add3d(accel):
 
     accel.run()
 
-    accel.wait()
+    accel.stop()
 
     assert np.array_equal(c_3d, a_3d + b_3d)
 
@@ -148,7 +147,7 @@ def test_matmul(accel):
 
     accel.run()
 
-    accel.wait()
+    accel.stop()
 
     assert np.array_equal(c_2d, np.matmul(a_2d, b_2d))
 
