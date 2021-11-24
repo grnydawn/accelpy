@@ -292,6 +292,8 @@ class AccelBase(Object):
 
     def run(self, *workers, device=0, channel=0, timeout=None, inputs=None, outputs=None):
 
+        # TODO: keep allocated address per data movements in accel
+
         # compilation should be done first
         self._thread_compile.join()
 
@@ -333,6 +335,8 @@ class AccelBase(Object):
                     raise Exception("Accel a2h copy failed.")
 
     def stop(self, lib=None, output=True, timeout=None):
+
+        # TODO: deallocated the addresses per data movements in accel
 
         if self._stopped:
             return
