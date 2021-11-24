@@ -7,17 +7,17 @@ from accelpy import Accel, CppAccel, FortranAccel
 
 test_accels = (
     ("cpp", "gnu"),
-#    ("cpp", "crayclang"),
-#    ("cpp", "amdclang"),
-#    ("cpp", "ibmxl"),
-#    ("cpp", "pgi"),
-#    ("cpp", "intel"),
+    ("cpp", "crayclang"),
+    ("cpp", "amdclang"),
+    ("cpp", "ibmxl"),
+    ("cpp", "pgi"),
+    ("cpp", "intel"),
     ("fortran","gnu"),
-#    ("fortran", "cray"),
-#    ("fortran", "amdflang"),
-#    ("fortran", "ibmxl"),
-#    ("fortran", "pgi"),
-#    ("fortran", "intel"),
+    ("fortran", "cray"),
+    ("fortran", "amdflang"),
+    ("fortran", "ibmxl"),
+    ("fortran", "pgi"),
+    ("fortran", "intel"),
 )
 
 #######################

@@ -35,9 +35,8 @@ extern "C" int64_t accelpy_start(  \\
 }}
 
 extern "C" int64_t accelpy_stop() {{
-    int64_t res;
 
-    {freemem}
+    int64_t res;
 
     res = 0;
 
@@ -98,8 +97,9 @@ extern "C" int64_t {funcname}(int64_t * attrsize, int64_t * _attrs, void * data)
     int64_t res;
 
     {varname}.data = ({dtype} *) data;
-    {varname}._attrs = (int64_t *) malloc((*attrsize) * sizeof(int64_t));
-    memcpy({varname}._attrs, _attrs, (*attrsize) * sizeof(int64_t));
+    {varname}._attrs = _attrs;
+    //{varname}._attrs = (int64_t *) malloc((*attrsize) * sizeof(int64_t));
+    //memcpy({varname}._attrs, _attrs, (*attrsize) * sizeof(int64_t));
 
     res = 0;
 
@@ -125,8 +125,8 @@ extern "C" int64_t accelpy_test_run() {{
         {varout}(id) = {varin}(id);
     }}
 
-    free({varin}._attrs);
-    free({varout}._attrs);
+    //free({varin}._attrs);
+    //free({varout}._attrs);
 
     res = 0;
 
@@ -266,23 +266,13 @@ class CppAccel(AccelBase):
         order =  self._order.get_section(self.name)
         return t_kernel.format(order="\n".join(order.body))
 
-    def gen_freemem(self, inputs, outputs):
-
-        out = []
-
-        for data in inputs+outputs:
-            out.append("free(%s._attrs);" % data["curname"])
-
-        return "\n".join(out)
-
     def gen_code(self, inputs, outputs):
 
         main_fmt = {
             "varclasses":self.gen_varclasses(inputs, outputs),
             "testcode":self.gen_testcode(),
             "datacopies":self.gen_datacopies(inputs, outputs),
-            "kernel":self.gen_kernel(),
-            "freemem":self.gen_freemem(inputs, outputs)
+            "kernel":self.gen_kernel()
         }
 
         code = t_main.format(**main_fmt)

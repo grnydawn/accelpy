@@ -41,9 +41,8 @@ INTEGER (C_INT64_T) FUNCTION accelpy_stop() BIND(C, name="accelpy_stop")
     USE accelpy_global, ONLY : {varattrs}
     IMPLICIT NONE
 
-    {freemem}
-
     accelpy_stop = 0 
+
 END FUNCTION
 """
 
@@ -86,12 +85,11 @@ INTEGER (C_INT64_T) FUNCTION {funcname} (attrsize, attrs, data) BIND(C, name="{f
     IMPLICIT NONE
 
     INTEGER (C_INT64_T), INTENT(IN) :: attrsize
-    INTEGER (C_INT64_T), DIMENSION(attrsize), INTENT(IN) :: attrs
+    INTEGER (C_INT64_T), DIMENSION(attrsize), INTENT(IN), TARGET :: attrs
     {dtype}, DIMENSION({bound}), INTENT(IN), TARGET :: data
 
     {varname} => data
-    ALLOCATE({varname}_attr%attrs(attrsize))
-    {varname}_attr%attrs(:) = attrs(1:attrsize)
+    {varname}_attr%attrs => attrs
 
     {funcname} = 0
 
@@ -124,9 +122,6 @@ INTEGER (C_INT64_T) FUNCTION accelpy_test_run()  BIND(C, name="accelpy_test_run"
         {varout}(id) = {varin}(id)
     END DO
 
-    DEALLOCATE({varin}_attr%attrs)
-    DEALLOCATE({varout}_attr%attrs)
-
     accelpy_test_run = 0
 
 END FUNCTION
@@ -134,7 +129,7 @@ END FUNCTION
 
 t_typeattr = """
 TYPE :: accelpy_attrtype
-    INTEGER (C_INT64_T), DIMENSION(:), ALLOCATABLE :: attrs
+    INTEGER (C_INT64_T), DIMENSION(:), POINTER :: attrs
 
 CONTAINS
 
@@ -223,8 +218,7 @@ class FortranAccel(AccelBase):
             "testcode": self._get_testcode(),
             "datacopies":self._gen_datacopies(inputs, outputs),
             "kernel":self._gen_kernel(inputs, outputs),
-            "varattrs":self._gen_varattrs(inputs, outputs),
-            "freemem":self._gen_freemem(inputs, outputs)
+            "varattrs":self._gen_varattrs(inputs, outputs)
         }
         main = t_main.format(**main_fmt)
 
@@ -332,15 +326,6 @@ class FortranAccel(AccelBase):
 
         order =  self._order.get_section(self.name)
         return t_kernel.format(order="\n".join(order.body), varandattr=", ".join(names))
-
-    def _gen_freemem(self, inputs, outputs):
-
-        out = []
-
-        for data in inputs+outputs:
-            out.append("DEALLOCATE(%s_attr%%attrs)" % data["curname"])
-
-        return "\n".join(out)
 
     def _gen_varattrs(self, inputs, outputs):
 
