@@ -360,20 +360,13 @@ class AccelBase(Object):
 
         self._thread_compile.join()
 
-        if timeout is None:
-            for rid, (thread_run, _) in enumerate(self._threads_run):
-                if run_id and rid != run_id:
-                    continue
+        for rid, (thread_run, time_start) in enumerate(self._threads_run):
+            if run_id and rid != run_id:
+                continue
 
-                if thread_run:
-                    thread_run.join()
-        else:
-            for rid, (thread_run, time_start) in enumerate(self._threads_run):
-                if run_id and rid != run_id:
-                    continue
-
-                if thread_run:
-                    thread_run.join(max(0, time_start+timeout-time.time()))
+            if thread_run:
+                timeout = max(0, time_start+timeout-time.time()) if timeout else None
+                thread_run.join(timeout=timeout)
 
 
 def Accel(*vargs, **kwargs):
