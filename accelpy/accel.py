@@ -290,21 +290,25 @@ class AccelBase(Object):
         if start(*args) != 0:
             raise Exception("kernel run failed.")
 
-    def run(self, *workers, device=0, channel=0, timeout=None):
+    def run(self, *workers, device=0, channel=0, timeout=None, inputs=None, outputs=None):
 
         # compilation should be done first
         self._thread_compile.join()
 
         worker_triple = self._get_worker_triple(*workers)
 
-        if self._inputs:
-            for input in self._inputs:
+        _inputs = inputs if inputs else self._inputs
+
+        if _inputs:
+            for input in _inputs:
                 if "h2acopy" not in input or not input["h2acopy"]:
                     if self.h2acopy(input, self.getname_h2acopy(input)) != 0:
                         raise Exception("Accel h2a copy failed.")
 
-        if self._outputs:
-            for output in self._outputs:
+        _outputs = outputs if outputs else self._outputs
+
+        if _outputs:
+            for output in _outputs:
                 if "h2amalloc" not in output or not output["h2amalloc"]:
                     if self.h2amalloc(output, self.getname_h2amalloc(output), writable=True) != 0:
                         raise Exception("Accel h2a malloc failed.")
