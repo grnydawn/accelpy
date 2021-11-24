@@ -361,8 +361,13 @@ class AccelBase(Object):
         self._thread_compile.join()
 
         for rid, (thread_run, time_start) in enumerate(self._threads_run):
-            if run_id and rid != run_id:
-                continue
+            if run_id:
+                if isinstance(run_id, int):
+                    if rid != run_id: continue
+
+                elif isinstance(int, (list, tuple)):
+                    for r in run_id:
+                        if rid != r: contine
 
             if thread_run:
                 timeout = max(0, time_start+timeout-time.time()) if timeout else None
