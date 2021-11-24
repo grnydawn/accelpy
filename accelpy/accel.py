@@ -42,6 +42,7 @@ class AccelBase(Object):
         self._threads_run = []
         self._thread_compile = threading.Thread(target=self._build_sharedlib, args=(compile,))
         self._thread_compile.start()
+        self._attr_arrays = []
 
         self._stopped = False
         self._time_start = time.time()
@@ -78,10 +79,15 @@ class AccelBase(Object):
     #    return 3 + len(arg["data"].shape)*2
 
     def get_numpyattrs(self, arg):
+
         data = arg["data"]
 
-        return numpy.array((data.size, data.ndim, data.itemsize) + data.shape +
+        attrs = numpy.array((data.size, data.ndim, data.itemsize) + data.shape +
                 tuple([int(s//data.itemsize) for s in data.strides]), dtype=numpy.int64)
+
+        self._attr_arrays.append(attrs)
+
+        return attrs
 
     def get_ctype(self, arg):
 
@@ -247,6 +253,7 @@ class AccelBase(Object):
         return res
 
     def h2acopy(self, arg, funcname, lib=None, writable=None):
+
         res = self._datacopy(arg, funcname, lib=lib, writable=writable)
 
         if res == 0:
@@ -255,6 +262,7 @@ class AccelBase(Object):
         return res
 
     def h2amalloc(self, arg, funcname, lib=None, writable=None):
+
         res = self._datacopy(arg, funcname, lib=lib, writable=writable)
 
         if res == 0:
@@ -263,6 +271,7 @@ class AccelBase(Object):
         return res
 
     def a2hcopy(self, arg, funcname, lib=None, writable=None):
+
         res = self._datacopy(arg, funcname, lib=lib, writable=writable)
 
         if res == 0:
@@ -293,6 +302,7 @@ class AccelBase(Object):
     def run(self, *workers, device=0, channel=0, timeout=None, inputs=None, outputs=None):
 
         # TODO: keep allocated address per data movements in accel
+        # TODO: may use prebuild ndarray to prevent memory allocation
 
         # compilation should be done first
         self._thread_compile.join()
@@ -337,6 +347,7 @@ class AccelBase(Object):
     def stop(self, lib=None, output=True, timeout=None):
 
         # TODO: deallocated the addresses per data movements in accel
+        # TODO: may use prebuild ndarray to prevent memory allocation
 
         if self._stopped:
             return
@@ -359,6 +370,8 @@ class AccelBase(Object):
 
         elif output:
             self.output(output=output)
+
+        self._attr_arrays.clear()
 
     def wait(self, run_id=None, timeout=None):
 
