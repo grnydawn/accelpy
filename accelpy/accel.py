@@ -31,7 +31,7 @@ class AccelBase(Object):
     ]
 
 
-    def __init__(self, order, inputs, outputs, compiler=None):
+    def __init__(self, order, inputs, outputs, compile=None):
 
         self._order = self._get_order(order)
         self._inputs, self._outputs = self._pack_arguments(inputs, outputs)
@@ -39,18 +39,16 @@ class AccelBase(Object):
         self._order.update_argnames(self._inputs, self._outputs)
 
         self._sharedlib = None
-        self._thread_run = None
-        self._thread_compile = threading.Thread(target=self._build_sharedlib, args=(compiler,))
+        self._threads_run = []
+        self._thread_compile = threading.Thread(target=self._build_sharedlib, args=(compile,))
         self._thread_compile.start()
-
-        #self._sharedlib = self.build_sharedlib(compilers=compilers)
 
         self._stopped = False
         self._time_start = time.time()
 
-    def _build_sharedlib(self, compiler):
+    def _build_sharedlib(self, compile):
 
-        self._sharedlib = self.build_sharedlib(compiler=compiler)
+        self._sharedlib = self.build_sharedlib(compile=compile)
 
 
     @abc.abstractmethod
@@ -181,11 +179,11 @@ class AccelBase(Object):
             raise Exception("Wrong # of worker initialization: %d" %
                         len(workers))
 
-    def build_sharedlib(self, compiler=None):
+    def build_sharedlib(self, compile=None):
 
         code = self.gen_code(self._inputs, self._outputs)
 
-        compilers = get_compilers(self.name, compiler=compiler)
+        compilers = get_compilers(self.name, compile=compile)
 
         errmsgs = []
 
@@ -272,16 +270,18 @@ class AccelBase(Object):
 
         return res
 
-    def _start_accel(self, device, channel, workers, lib=None):
+    def _start_accel(self, run_id, device, channel, workers, lib=None):
 
         if lib is None:
             lib = self._sharedlib
 
         start = getattr(lib, "accelpy_start")
         start.restype = c_int64
-        start.argtypes = [POINTER(c_int64)]*11
+        start.argtypes = [POINTER(c_int64)]*12
 
-        args = [byref(c_int64(device)), byref(c_int64(channel))]
+        args = [byref(c_int64(run_id)), byref(c_int64(device)),
+                byref(c_int64(channel))]
+
         for (x, y, z) in workers:
             args.append(byref(c_int64(x)))
             args.append(byref(c_int64(y)))
@@ -310,11 +310,10 @@ class AccelBase(Object):
                         raise Exception("Accel h2a malloc failed.")
 
         # run accel
-        self._thread_run = threading.Thread(target=self._start_accel,
-                            args=(device, channel, worker_triple))
-        self._thread_run.start()
-        self._run_time_start = time.time()
-
+        thread_run = threading.Thread(target=self._start_accel,
+                            args=(len(self._threads_run), device, channel, worker_triple))
+        thread_run.start()
+        self._threads_run.append((thread_run, time.time()))
 
     def output(self, output=None, force=False):
 
@@ -349,16 +348,24 @@ class AccelBase(Object):
         elif output:
             self.output(output=output)
 
-    def wait(self, timeout=None):
+    def wait(self, run_id=None, timeout=None):
 
         self._thread_compile.join()
 
         if timeout is None:
-            if self._thread_run:
-                self._thread_run.join()
+            for rid, (thread_run, _) in enumerate(self._threads_run):
+                if run_id and rid != run_id:
+                    continue
+
+                if thread_run:
+                    thread_run.join()
         else:
-            if self._thread_run:
-                self._thread_run.join(max(0, self._time_start+timeout-time.time()))
+            for rid, (thread_run, time_start) in enumerate(self._threads_run):
+                if run_id and rid != run_id:
+                    continue
+
+                if thread_run:
+                    thread_run.join(max(0, time_start+timeout-time.time()))
 
 
 def Accel(*vargs, **kwargs):
@@ -398,12 +405,12 @@ def generate_compiler(compile):
     return comp
 
 
-def get_compilers(accel, compiler=None):
+def get_compilers(accel, compile=None):
     """
         parameters:
 
         accel: the accelerator id or a list of them
-        compiler: compiler path or compiler id, or a list of them 
+        compile: compiler path or compiler id, or a list of them 
                   syntax: "vendor|path [{default}] [additional options]"
 """
 
@@ -431,15 +438,15 @@ def get_compilers(accel, compiler=None):
 
     compilers = []
 
-    if compiler:
-        if isinstance(compiler, str):
-            citems = compiler.split()
+    if compile:
+        if isinstance(compile, str):
+            citems = compile.split()
 
             if not citems:
-                raise Exception("Blank compiler")
+                raise Exception("Blank compile")
 
             if os.path.isfile(citems[0]):
-                compilers.append(generate_compiler(compiler))
+                compilers.append(generate_compiler(compile))
 
             else:
                 # TODO: vendor name search
@@ -452,17 +459,17 @@ def get_compilers(accel, compiler=None):
                                 except:
                                     pass
 
-        elif isinstance(compiler, Compiler):
-            compilers.append(compiler)
+        elif isinstance(compile, Compiler):
+            compilers.append(compile)
 
-        elif isinstance(compiler, (list, tuple)):
+        elif isinstance(compile, (list, tuple)):
 
-            for comp in compiler:
+            for comp in compile:
                 if isinstance(comp, str):
                     citems = comp.split()
 
                     if not citems:
-                        raise Exception("Blank compiler")
+                        raise Exception("Blank compile")
 
                     if os.path.isfile(citems[0]):
                         try:
@@ -487,17 +494,17 @@ def get_compilers(accel, compiler=None):
                 else:
                     raise Exception("Unsupported compiler type: %s" % str(comp))
         else:
-            raise Exception("Unsupported compiler type: %s" % str(compiler))
+            raise Exception("Unsupported compiler type: %s" % str(compile))
 
-    new_compilers = []
+    return_compilers = []
     errmsgs = []
 
     if compilers:
         for comp in compilers:
             if any(comp.accel==a[0] and comp.lang==a[1] for a in accels):
-                new_compilers.append(comp)
+                return_compilers.append(comp)
 
-    elif compiler is None:
+    elif compile is None:
         for acc, lang in accels:
 
             if lang not in Compiler.avails:
@@ -510,14 +517,14 @@ def get_compilers(accel, compiler=None):
 
             for vendor, cls in vendors.items():
                 try:
-                    new_compilers.append(cls())
+                    return_compilers.append(cls())
                 except Exception as err:
                     errmsgs.append(str(err))
 
-    if not new_compilers:
+    if not return_compilers:
         if errmsgs:
             raise Exception("No compiler is found: %s" % "\n".join(errmsgs))
         else:
             raise Exception("No compiler is found: %s" % str(accels))
 
-    return new_compilers
+    return return_compilers

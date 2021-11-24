@@ -143,7 +143,7 @@ def test_add3d(accel, comp):
     c_3d.fill(0)
 
     accel = Accel(order_vecadd3d, (a_3d, b_3d), c_3d,
-                    kind=[accel], compiler=[comp])
+                    kind=[accel], compile=[comp])
 
     accel.run(N3)
 
@@ -157,7 +157,7 @@ def test_matmul(accel, comp):
     c_2d.fill(0)
 
     accel = Accel(order_matmul, (a_2d, b_2d), c_2d,
-                    kind=[accel], compiler=[comp])
+                    kind=[accel], compile=[comp])
 
     accel.run()
 

@@ -19,7 +19,7 @@ t_main = """
 {kernel}
 
 extern "C" int64_t accelpy_start(  \\
-        int64_t * device, int64_t * channel, \\
+        int64_t * run_id, int64_t * device, int64_t * channel, \\
         int64_t * thread_x, int64_t * thread_y, int64_t * thread_z, \\
         int64_t * team_x, int64_t * team_y, int64_t * team_z, \\
         int64_t * assign_x, int64_t * assign_y, int64_t * assign_z) {{
