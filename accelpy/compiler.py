@@ -140,27 +140,23 @@ class Compiler(Object):
         return lib
 
 
-# TODO: should be abstract
 class CppCompiler(Compiler):
 
     lang = "cpp"
     codeext = "cpp"
 
-# TODO: should be abstract
 class FortranCompiler(Compiler):
 
     lang = "fortran"
     codeext = "F90"
 
 
-# TODO: should be abstract
 class CppCppCompiler(CppCompiler):
 
     accel = "cpp"
     opt_version = "--version"
 
 
-# TODO: should be abstract
 class FortranFortranCompiler(FortranCompiler):
 
     accel = "fortran"
@@ -259,7 +255,7 @@ class GnuFortranFortranCompiler(FortranFortranCompiler):
 class CrayClangCppCppCompiler(CppCppCompiler):
 
     vendor = "crayclang"
-    opt_openmp = "--fopenmp"
+    opt_openmp = "-h omp"
 
     def __init__(self, path=None, option=None):
 
@@ -298,6 +294,7 @@ class CrayClangCppCppCompiler(CppCppCompiler):
             raise Exception("Platform '%s' is not supported." % str(sys.platform))
 
         return opts
+
 
 class CrayFortranFortranCompiler(FortranFortranCompiler):
 
