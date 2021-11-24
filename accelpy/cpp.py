@@ -18,13 +18,18 @@ t_main = """
 
 {kernel}
 
-extern "C" int64_t accelpy_start(int64_t * device, int64_t * channel) {{
+extern "C" int64_t accelpy_start(  \\
+        int64_t * device, int64_t * channel, \\
+        int64_t * thread_x, int64_t * thread_y, int64_t * thread_z, \\
+        int64_t * team_x, int64_t * team_y, int64_t * team_z, \\
+        int64_t * assign_x, int64_t * assign_y, int64_t * assign_z) {{
+
     int64_t res;
     int64_t ACCELPY_WORKER_ID;
 
     ACCELPY_WORKER_ID = 0;
 
-    res = accelpy_kernel(*device, *channel, ACCELPY_WORKER_ID);
+    res = accelpy_kernel(ACCELPY_WORKER_ID);
 
     return res;
 }}
@@ -130,7 +135,7 @@ extern "C" int64_t accelpy_test_run() {{
 """
 
 t_kernel = """
-extern "C" int64_t accelpy_kernel(int64_t device, int64_t channel, int64_t ACCELPY_WORKER_ID){{
+extern "C" int64_t accelpy_kernel(int64_t ACCELPY_WORKER_ID){{
 
     int64_t res;
 

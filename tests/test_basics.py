@@ -107,13 +107,12 @@ b_1d = np.arange(N1, dtype=np.int64) * 2
 c_1d = np.zeros(N1, dtype=np.int64)
 
 N3 = (2, 5, 10)
-a_3d = np.reshape(np.arange(N1, dtype=np.int64), N3)
-b_3d = np.reshape(np.arange(N1, dtype=np.int64) * 2, N3)
-c_3d = np.reshape(np.zeros(N1, dtype=np.int64), N3)
+a_3d = np.reshape(np.arange(100, dtype=np.int64), N3)
+b_3d = np.reshape(np.arange(100, dtype=np.int64) * 2, N3)
+c_3d = np.reshape(np.zeros(100, dtype=np.int64), N3)
 
-
-a_2d = np.reshape(np.arange(N1, dtype=np.float64), (4, 25))
-b_2d = np.reshape(np.arange(N1, dtype=np.float64) * 2, (25, 4))
+a_2d = np.reshape(np.arange(100, dtype=np.float64), (4, 25))
+b_2d = np.reshape(np.arange(100, dtype=np.float64) * 2, (25, 4))
 c_2d = np.reshape(np.zeros(16, dtype=np.float64), (4, 4))
 
 def test_first():
@@ -146,7 +145,7 @@ def test_add3d(accel, comp):
     accel = Accel(order_vecadd3d, (a_3d, b_3d), c_3d,
                     kind=[accel], compiler=[comp])
 
-    accel.run()
+    accel.run(N3)
 
     accel.stop()
 

@@ -10,18 +10,25 @@ t_main = """
 
 {datacopies}
 
-INTEGER (C_INT64_T) FUNCTION accelpy_start(device, channel) BIND(C, name="accelpy_start")
+INTEGER (C_INT64_T) FUNCTION accelpy_start( &
+        device, channel, &
+        thread_x, thread_y, thread_z, &
+        team_x, team_y, team_z, &
+        assign_x, assign_y, assign_z) BIND(C, name="accelpy_start")
+
     USE, INTRINSIC :: ISO_C_BINDING
     IMPLICIT NONE
 
-    INTEGER (C_INT64_T), INTENT(IN) :: device
-    INTEGER (C_INT64_T), INTENT(IN) :: channel
+    INTEGER (C_INT64_T), INTENT(IN) :: device, channel
+    INTEGER (C_INT64_T), INTENT(IN) :: thread_x, thread_y, thread_z
+    INTEGER (C_INT64_T), INTENT(IN) :: team_x, team_y, team_z
+    INTEGER (C_INT64_T), INTENT(IN) :: assign_x, assign_y, assign_z
 
     INTEGER (C_INT64_T) :: ACCELPY_WORKER_ID
 
     ACCELPY_WORKER_ID = 0
     
-    accelpy_start = accelpy_kernel(device, channel, ACCELPY_WORKER_ID)
+    accelpy_start = accelpy_kernel(ACCELPY_WORKER_ID)
 
 CONTAINS
 
@@ -59,13 +66,11 @@ END MODULE
 """
 
 t_kernel = """
-INTEGER (C_INT64_T) FUNCTION accelpy_kernel(device, channel, ACCELPY_WORKER_ID)
+INTEGER (C_INT64_T) FUNCTION accelpy_kernel(ACCELPY_WORKER_ID)
     USE, INTRINSIC :: ISO_C_BINDING
     USE accelpy_global, ONLY : {varandattr}
     IMPLICIT NONE
 
-    INTEGER (C_INT64_T), INTENT(IN) :: device
-    INTEGER (C_INT64_T), INTENT(IN) :: channel
     INTEGER (C_INT64_T), INTENT(IN) :: ACCELPY_WORKER_ID
 
     {order}

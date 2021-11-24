@@ -272,16 +272,22 @@ class AccelBase(Object):
 
         return res
 
-    def _start_accel(self, device, channel, lib=None):
+    def _start_accel(self, device, channel, workers, lib=None):
 
         if lib is None:
             lib = self._sharedlib
 
         start = getattr(lib, "accelpy_start")
         start.restype = c_int64
-        start.argtypes = [POINTER(c_int64), POINTER(c_int64)]
+        start.argtypes = [POINTER(c_int64)]*11
 
-        if start(byref(c_int64(device)), byref(c_int64(channel))) != 0:
+        args = [byref(c_int64(device)), byref(c_int64(channel))]
+        for (x, y, z) in workers:
+            args.append(byref(c_int64(x)))
+            args.append(byref(c_int64(y)))
+            args.append(byref(c_int64(z)))
+
+        if start(*args) != 0:
             raise Exception("kernel run failed.")
 
     def run(self, *workers, device=0, channel=0, timeout=None):
@@ -304,7 +310,8 @@ class AccelBase(Object):
                         raise Exception("Accel h2a malloc failed.")
 
         # run accel
-        self._thread_run = threading.Thread(target=self._start_accel, args=(device, channel))
+        self._thread_run = threading.Thread(target=self._start_accel,
+                            args=(device, channel, worker_triple))
         self._thread_run.start()
         self._run_time_start = time.time()
 
