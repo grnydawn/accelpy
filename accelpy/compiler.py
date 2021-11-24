@@ -69,14 +69,9 @@ class Compiler(Object):
 
         self.version = self.parse_version(out.stdout)
 
-    def _compile(self, code, ext, compile_only=False, objfiles=[], moddir=None):
+    def _compile(self, code, ext):
 
-
-        objhashes = []
-        for objfile in objfiles:
-            objhashes.append(os.path.basename(objfile))
-
-        text = (code + self.vendor + "".join(self.version) + ext + "".join(objhashes))
+        text = (code + self.vendor + "".join(self.version) + ext)
         name =  hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
 
         codepath = os.path.join(self._blddir, name + "." + self.codeext)
@@ -85,18 +80,40 @@ class Compiler(Object):
 
         outfile = os.path.join(self._blddir, name + "." + ext)
 
-        if compile_only:
-            option = self.opt_compile_only + " " + self.get_option()
+        option = self.opt_compile_only + " " + self.get_option()
 
-        else:
-            option = self.get_option()
-
-        if moddir:
-            option += " " + self.opt_moddir % moddir
-
-        build_cmd = "{compiler} {option} -o {outfile} {infile} {objfiles}".format(
+        build_cmd = "{compiler} {option} -o {outfile} {infile}".format(
                         compiler=self.path, option=option, outfile=outfile,
-                        infile=codepath, objfiles=" ".join(objfiles))
+                        infile=codepath)
+
+        #print(build_cmd)
+        #import pdb; pdb.set_trace()
+        out = shellcmd(build_cmd)
+
+        if out.returncode != 0:
+            raise Exception("Compilation fails: %s" % out.stderr)
+
+        if not os.path.isfile(outfile):
+            raise Exception("Output is not generated.")
+
+        return outfile
+
+    def _link(self, ext, objfiles):
+
+
+        objhashes = []
+        for objfile in objfiles:
+            objhashes.append(os.path.basename(objfile))
+
+        text = (self.vendor + "".join(self.version) + ext + "".join(objhashes))
+        name =  hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
+
+        outfile = os.path.join(self._blddir, name + "." + ext)
+        option = self.get_option()
+
+        build_cmd = "{compiler} {option} -o {outfile} {objfiles}".format(
+                        compiler=self.path, option=option, outfile=outfile,
+                        objfiles=" ".join(objfiles))
 
         #print(build_cmd)
         #import pdb; pdb.set_trace()
@@ -121,16 +138,13 @@ class Compiler(Object):
 
         # build object files
         if isinstance(code, str):
-            main_code = code
+            objfiles.append(self._compile(code, self.objext))
 
         elif isinstance(code, (list, tuple)):
-            main_code = code[-1]
+            for _c in code:
+                objfiles.append(self._compile(_c, self.objext))
 
-            for extracode in code[:-1]:
-                objfiles.append(self._compile(extracode, self.objext,
-                                    compile_only=True, moddir=self._blddir))
-
-        libfile = self._compile(main_code, self.libext, objfiles=objfiles)
+        libfile = self._link(self.libext, objfiles)
 
         libdir, libname = os.path.split(libfile)
         name, _ = os.path.splitext(libname)
@@ -236,11 +250,15 @@ class GnuFortranFortranCompiler(FortranFortranCompiler):
 
     def get_option(self):
 
+        moddir = self.opt_moddir % self._blddir
+
         if sys.platform == "darwin":
-            opts = "-dynamiclib -fPIC " + super(GnuFortranFortranCompiler, self).get_option()
+            opts = ("-dynamiclib -fPIC %s " % moddir +
+                    super(GnuFortranFortranCompiler, self).get_option())
 
         elif sys.platform == "linux":
-            opts = "-shared -fPIC " + super(GnuFortranFortranCompiler, self).get_option()
+            opts = ("-shared -fPIC %s " % moddir +
+                    super(GnuFortranFortranCompiler, self).get_option())
 
         else:
             raise Exception("Platform '%s' is not supported." % str(sys.platform))
