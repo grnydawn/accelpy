@@ -114,7 +114,6 @@ class Compiler(Object):
 
         lib = None
 
-
         for f in os.listdir(self._blddir):
             os.remove(os.path.join(self._blddir, f))
 

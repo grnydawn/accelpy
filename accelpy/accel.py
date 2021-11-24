@@ -193,6 +193,9 @@ class AccelBase(Object):
             try:
                 lib = comp.compile(code)
 
+                if lib is None:
+                    continue
+
                 if self.h2acopy(self._testdata[0], "accelpy_test_h2acopy", lib=lib) != 0:
                     raise Exception("H2D copy test faild.")
 
@@ -223,6 +226,9 @@ class AccelBase(Object):
 
         if lib is None:
             lib = self._sharedlib
+
+        if lib is None:
+            return -1
 
         flags = ["contiguous"]
 
