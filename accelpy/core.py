@@ -5,7 +5,7 @@ import abc
 
 
 name            = "accelpy"
-version         = "0.1.0"
+version         = "0.2.1"
 description     = "Scalable Accelerator Interface in Python"
 long_description = """
 T.B.D.
