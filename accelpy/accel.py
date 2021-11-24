@@ -314,10 +314,14 @@ class AccelBase(Object):
                         raise Exception("Accel h2a malloc failed.")
 
         # run accel
+        run_id = len(self._threads_run)
+
         thread_run = threading.Thread(target=self._start_accel,
-                            args=(len(self._threads_run), device, channel, worker_triple))
+                            args=(run_id, device, channel, worker_triple))
         thread_run.start()
         self._threads_run.append((thread_run, time.time()))
+
+        return run_id
 
     def output(self, output=None, force=False):
 
