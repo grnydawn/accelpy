@@ -86,12 +86,13 @@ class Compiler(Object):
                         compiler=self.path, option=option, outfile=outfile,
                         infile=codepath)
 
-        #print(build_cmd)
-        #import pdb; pdb.set_trace()
+        print(build_cmd)
+        import pdb; pdb.set_trace()
         out = shellcmd(build_cmd)
 
         if out.returncode != 0:
-            raise Exception("Compilation fails: %s" % out.stderr)
+            errmsg = str(out.stderr).replace("\\n", "\n")
+            raise Exception("Compilation fails: %s" % errmsg)
 
         if not os.path.isfile(outfile):
             raise Exception("Output is not generated.")
@@ -272,7 +273,7 @@ class GnuFortranFortranCompiler(FortranFortranCompiler):
 
 class CrayClangCppCppCompiler(CppCppCompiler):
 
-    vendor = "crayclang"
+    vendor = "cray"
     opt_openmp = "-h omp"
 
     def __init__(self, path=None, option=None):
@@ -363,7 +364,7 @@ class CrayFortranFortranCompiler(FortranFortranCompiler):
 
 class AmdClangCppCppCompiler(CppCppCompiler):
 
-    vendor = "amdclang"
+    vendor = "amd"
     opt_openmp = "-fopenmp"
 
     def __init__(self, path=None, option=None):
@@ -400,7 +401,7 @@ class AmdClangCppCppCompiler(CppCppCompiler):
 
 class AmdFlangFortranFortranCompiler(FortranFortranCompiler):
 
-    vendor = "amdflang"
+    vendor = "amd"
     opt_openmp = "-fopenmp"
     opt_moddir = "-J %s"
 
@@ -438,13 +439,50 @@ class AmdFlangFortranFortranCompiler(FortranFortranCompiler):
 
         return opts
 
+class AmdHipCppCompiler(CppCppCompiler):
+
+    accel = "hip"
+    vendor = "amd"
+
+    def __init__(self, path=None, option=None):
+
+        if path:
+            pass
+
+        elif which("hipcc"):
+            path = "hipcc"
+
+        super(AmdHipCppCompiler, self).__init__(path, option)
+
+    def parse_version(self, stdout):
+
+        items = stdout.split()
+
+        if sys.platform == "linux":
+            if items[:2] == [b'HIP', b'version:']:
+                return items[2].decode().split(".")
+            raise Exception("Unknown version syntaxt: %s" % str(items[:2]))
+
+        else:
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
+
+    def get_option(self):
+
+        if sys.platform == "linux":
+            opts = "-shared -fPIC " + super(AmdHipCppCompiler, self).get_option()
+
+        else:
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
+
+        return opts
+
 ###################
 # IBM XL Compilers
 ###################
 
 class IbmXlCppCppCompiler(CppCppCompiler):
 
-    vendor = "ibmxl"
+    vendor = "ibm"
     opt_openmp = "-qsmp=omp"
     opt_version = "-qversion"
 
@@ -485,7 +523,7 @@ class IbmXlCppCppCompiler(CppCppCompiler):
 
 class IbmXlFortranFortranCompiler(FortranFortranCompiler):
 
-    vendor = "ibmxl"
+    vendor = "ibm"
     opt_openmp = "-qsmp=omp"
     opt_moddir = "-qmoddir=%s"
     opt_version = "-qversion"
@@ -712,8 +750,8 @@ class IntelFortranFortranCompiler(FortranFortranCompiler):
 
 # priorities
 _lang_priority = ["fortran", "cpp"]
-_accel_priority = ["fortran", "cpp"]
-_vendor_priority = ["intel", "pgi", "ibmxl", "amdflang", "amdclang", "crayclang", "cray", "gnu"]
+_accel_priority = ["hip", "fortran", "cpp"]
+_vendor_priority = ["cray", "amd", "intel", "pgi", "ibm", "gnu"]
 
 def _langsort(l):
     return _lang_priority.index(l.lang)

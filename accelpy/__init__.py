@@ -82,5 +82,6 @@ from .accel import Accel, AccelBase
 # import accelerator per their priority
 from .cpp import CppAccel
 from .fortran import FortranAccel
+from .hip import HipAccel
 
 del _load_config, _unload_config, atexit

@@ -2,22 +2,23 @@
 
 import numpy as np
 import pytest
-from accelpy import Accel, CppAccel, FortranAccel
+from accelpy import Accel, CppAccel, FortranAccel, HipAccel
 
 
 test_accels = (
-    ("cpp", "gnu"),
-    ("cpp", "crayclang"),
-    ("cpp", "amdclang"),
-    ("cpp", "ibmxl"),
-    ("cpp", "pgi"),
-    ("cpp", "intel"),
-    ("fortran","gnu"),
-    ("fortran", "cray"),
-    ("fortran", "amdflang"),
-    ("fortran", "ibmxl"),
-    ("fortran", "pgi"),
-    ("fortran", "intel"),
+#    ("cpp", "gnu"),
+#    ("cpp", "cray"),
+#    ("cpp", "amd"),
+#    ("cpp", "ibm"),
+#    ("cpp", "pgi"),
+#    ("cpp", "intel"),
+#    ("fortran","gnu"),
+#    ("fortran", "cray"),
+#    ("fortran", "amd"),
+#    ("fortran", "ibm"),
+#    ("fortran", "pgi"),
+#    ("fortran", "intel"),
+    ("hip", "amd"),
 )
 
 #######################
@@ -42,6 +43,9 @@ cpp_enable = True
         z(id) = x(id) + y(id)
     END DO
 
+[hip]
+    int id = ACCELPY_WORKER_ID0;
+    if(id < x.size()) z(id) = x(id) + y(id);
 """
 
 order_vecadd3d = """
@@ -67,6 +71,15 @@ set_argnames(("x", "y"), "z")
             END DO
         END DO
     END DO
+
+[hip]
+
+    int i = blockIdx.x;
+    int j = blockIdx.y;
+    int k = threadIdx.x;
+
+    if (i < x.shape(0) && j < x.shape(1) && k < x.shape(2))
+        z(i, j, k) = x(i, j, k) + y(i, j, k);
 """
 
 order_matmul = """
@@ -115,13 +128,13 @@ a_2d = np.reshape(np.arange(100, dtype=np.float64), (4, 25))
 b_2d = np.reshape(np.arange(100, dtype=np.float64) * 2, (25, 4))
 c_2d = np.reshape(np.zeros(16, dtype=np.float64), (4, 4))
 
-def test_first():
+def ttest_first():
 
     c_1d.fill(0)
 
     accel_cpp = CppAccel(order_vecadd1d, (a_1d, b_1d), c_1d)
 
-    accel_cpp.run()
+    accel_cpp.run(a_1d.size)
 
     accel_cpp.stop()
 
@@ -131,28 +144,40 @@ def test_first():
 
     accel_fortran = FortranAccel(order_vecadd1d, (a_1d, b_1d), c_1d)
 
-    accel_fortran.run()
+    accel_fortran.run(a_1d.size)
 
     accel_fortran.stop()
 
     assert np.array_equal(c_1d, a_1d + b_1d)
 
+    c_1d.fill(0)
+
+    accel_hip = HipAccel(order_vecadd1d, (a_1d, b_1d), c_1d)
+
+    accel_hip.run(a_1d.size)
+
+    accel_hip.stop()
+
+    assert np.array_equal(c_1d, a_1d + b_1d)
+
+
 @pytest.mark.parametrize("accel, comp", test_accels)
-def test_add3d(accel, comp):
+def test_add1d(accel, comp):
 
-    c_3d.fill(0)
+    c_1d.fill(0)
 
-    accel = Accel(order_vecadd3d, (a_3d, b_3d), c_3d,
+    accel = Accel(order_vecadd1d, (a_1d, b_1d), c_1d,
                     kind=[accel], compile=[comp])
 
-    accel.run(N3)
+    accel.run(a_1d.size)
 
     accel.stop()
 
-    assert np.array_equal(c_3d, a_3d + b_3d)
+    assert np.array_equal(c_1d, a_1d + b_1d)
+
 
 @pytest.mark.parametrize("accel, comp", test_accels)
-def test_matmul(accel, comp):
+def ttest_matmul(accel, comp):
 
     c_2d.fill(0)
 
@@ -165,3 +190,17 @@ def test_matmul(accel, comp):
 
     assert np.array_equal(c_2d, np.matmul(a_2d, b_2d))
 
+
+@pytest.mark.parametrize("accel, comp", test_accels)
+def ttest_add3d(accel, comp):
+
+    c_3d.fill(0)
+
+    accel = Accel(order_vecadd3d, (a_3d, b_3d), c_3d,
+                    kind=[accel], compile=[comp])
+
+    accel.run(N3)
+
+    accel.stop()
+
+    assert np.array_equal(c_3d, a_3d + b_3d)
