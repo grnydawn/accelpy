@@ -6,18 +6,18 @@ from accelpy import Accel, CppAccel, FortranAccel, HipAccel
 
 
 test_accels = (
-#    ("cpp", "gnu"),
-#    ("cpp", "cray"),
-#    ("cpp", "amd"),
-#    ("cpp", "ibm"),
-#    ("cpp", "pgi"),
-#    ("cpp", "intel"),
-#    ("fortran","gnu"),
-#    ("fortran", "cray"),
-#    ("fortran", "amd"),
-#    ("fortran", "ibm"),
-#    ("fortran", "pgi"),
-#    ("fortran", "intel"),
+    ("cpp", "gnu"),
+    ("cpp", "cray"),
+    ("cpp", "amd"),
+    ("cpp", "ibm"),
+    ("cpp", "pgi"),
+    ("cpp", "intel"),
+    ("fortran","gnu"),
+    ("fortran", "cray"),
+    ("fortran", "amd"),
+    ("fortran", "ibm"),
+    ("fortran", "pgi"),
+    ("fortran", "intel"),
     ("hip", "amd"),
 )
 
