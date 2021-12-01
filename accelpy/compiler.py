@@ -178,6 +178,13 @@ class HipCppCompiler(CppCompiler):
     opt_version = "--version"
 
 
+class CudaCppCompiler(CppCompiler):
+
+    accel = "cuda"
+    codeext = "cu"
+    opt_version = "--version"
+
+
 class FortranFortranCompiler(FortranCompiler):
 
     accel = "fortran"
@@ -590,6 +597,48 @@ class IbmXlFortranFortranCompiler(FortranFortranCompiler):
 
 
 ###################
+# Nvidia Compilers
+###################
+
+class NvidiaCudaCppCompiler(CudaCppCompiler):
+
+    vendor = "nvidia"
+
+    def __init__(self, path=None, option=None):
+
+        if path:
+            pass
+
+        elif which("nvcc"):
+            path = "nvcc"
+
+        super(NvidiaCudaCppCompiler, self).__init__(path, option)
+
+    def parse_version(self, stdout):
+
+        items = stdout.split()
+
+        if sys.platform == "linux":
+            if items[:2] == [b'nvcc:', b'NVIDIA']:
+                idx = items.index(b'Build')
+                return items[idx+1].decode().split("_")
+            raise Exception("Unknown version syntaxt: %s" % str(items[:2]))
+
+        else:
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
+
+    def get_option(self):
+
+        if sys.platform == "linux":
+            opts = "-shared --compiler-options '-fPIC' " + super(NvidiaCudaCppCompiler, self).get_option()
+
+        else:
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
+
+        return opts
+
+
+###################
 # PGI Compilers
 ###################
 
@@ -755,8 +804,8 @@ class IntelFortranFortranCompiler(FortranFortranCompiler):
 
 # priorities
 _lang_priority = ["fortran", "cpp"]
-_accel_priority = ["hip", "fortran", "cpp"]
-_vendor_priority = ["cray", "amd", "intel", "pgi", "ibm", "gnu"]
+_accel_priority = ["hip", "cuda", "fortran", "cpp"]
+_vendor_priority = ["cray", "amd", "nvidia", "intel", "pgi", "ibm", "gnu"]
 
 def _langsort(l):
     return _lang_priority.index(l.lang)

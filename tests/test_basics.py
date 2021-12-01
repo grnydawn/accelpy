@@ -6,19 +6,20 @@ from accelpy import Accel, CppAccel, FortranAccel, HipAccel
 
 
 test_accels = (
-    ("cpp", "gnu"),
-    ("cpp", "cray"),
-    ("cpp", "amd"),
-    ("cpp", "ibm"),
-    ("cpp", "pgi"),
-    ("cpp", "intel"),
-    ("fortran","gnu"),
-    ("fortran", "cray"),
-    ("fortran", "amd"),
-    ("fortran", "ibm"),
-    ("fortran", "pgi"),
-    ("fortran", "intel"),
-    ("hip", "amd"),
+#    ("cpp", "gnu"),
+#    ("cpp", "cray"),
+#    ("cpp", "amd"),
+#    ("cpp", "ibm"),
+#    ("cpp", "pgi"),
+#    ("cpp", "intel"),
+#    ("fortran","gnu"),
+#    ("fortran", "cray"),
+#    ("fortran", "amd"),
+#    ("fortran", "ibm"),
+#    ("fortran", "pgi"),
+#    ("fortran", "intel"),
+#    ("hip", "amd"),
+    ("cuda", "nvidia"),
 )
 
 #######################
@@ -43,7 +44,7 @@ cpp_enable = True
         z(id) = x(id) + y(id)
     END DO
 
-[hip]
+[hip, cuda]
     int id = ACCELPY_WORKER_ID0;
     if(id < x.size()) z(id) = x(id) + y(id);
 """
@@ -72,7 +73,7 @@ set_argnames(("x", "y"), "z")
         END DO
     END DO
 
-[hip]
+[hip, cuda]
 
     int i = ACCELPY_WORKER_ID0;
     int j = ACCELPY_WORKER_ID1;
@@ -128,7 +129,7 @@ a_2d = np.reshape(np.arange(100, dtype=np.float64), (4, 25))
 b_2d = np.reshape(np.arange(100, dtype=np.float64) * 2, (25, 4))
 c_2d = np.reshape(np.zeros(16, dtype=np.float64), (4, 4))
 
-def test_first():
+def ttest_first():
 
     c_1d.fill(0)
 
@@ -192,7 +193,7 @@ def ttest_matmul(accel, comp):
 
 
 @pytest.mark.parametrize("accel, comp", test_accels)
-def test_add3d(accel, comp):
+def ttest_add3d(accel, comp):
 
     c_3d.fill(0)
 

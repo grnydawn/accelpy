@@ -83,5 +83,6 @@ from .accel import Accel, AccelBase
 from .cpp import CppAccel
 from .fortran import FortranAccel
 from .hip import HipAccel
+from .cuda import CudaAccel
 
 del _load_config, _unload_config, atexit
