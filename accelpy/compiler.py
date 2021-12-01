@@ -86,8 +86,8 @@ class Compiler(Object):
                         compiler=self.path, option=option, outfile=outfile,
                         infile=codepath)
 
-        print(build_cmd)
-        import pdb; pdb.set_trace()
+        #print(build_cmd)
+        #import pdb; pdb.set_trace()
         out = shellcmd(build_cmd)
 
         if out.returncode != 0:
@@ -169,6 +169,12 @@ class FortranCompiler(Compiler):
 class CppCppCompiler(CppCompiler):
 
     accel = "cpp"
+    opt_version = "--version"
+
+
+class HipCppCompiler(CppCompiler):
+
+    accel = "hip"
     opt_version = "--version"
 
 
@@ -439,9 +445,8 @@ class AmdFlangFortranFortranCompiler(FortranFortranCompiler):
 
         return opts
 
-class AmdHipCppCompiler(CppCppCompiler):
+class AmdHipCppCompiler(HipCppCompiler):
 
-    accel = "hip"
     vendor = "amd"
 
     def __init__(self, path=None, option=None):

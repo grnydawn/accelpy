@@ -74,9 +74,9 @@ set_argnames(("x", "y"), "z")
 
 [hip]
 
-    int i = blockIdx.x;
-    int j = blockIdx.y;
-    int k = threadIdx.x;
+    int i = ACCELPY_WORKER_ID0;
+    int j = ACCELPY_WORKER_ID1;
+    int k = ACCELPY_WORKER_ID2;
 
     if (i < x.shape(0) && j < x.shape(1) && k < x.shape(2))
         z(i, j, k) = x(i, j, k) + y(i, j, k);
@@ -128,7 +128,7 @@ a_2d = np.reshape(np.arange(100, dtype=np.float64), (4, 25))
 b_2d = np.reshape(np.arange(100, dtype=np.float64) * 2, (25, 4))
 c_2d = np.reshape(np.zeros(16, dtype=np.float64), (4, 4))
 
-def ttest_first():
+def test_first():
 
     c_1d.fill(0)
 
@@ -192,14 +192,14 @@ def ttest_matmul(accel, comp):
 
 
 @pytest.mark.parametrize("accel, comp", test_accels)
-def ttest_add3d(accel, comp):
+def test_add3d(accel, comp):
 
     c_3d.fill(0)
 
     accel = Accel(order_vecadd3d, (a_3d, b_3d), c_3d,
                     kind=[accel], compile=[comp])
 
-    accel.run(N3)
+    accel.run(a_3d.shape)
 
     accel.stop()
 
