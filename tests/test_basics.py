@@ -9,13 +9,13 @@ test_accels = (
 #    ("cpp", "gnu"),
 #    ("cpp", "cray"),
 #    ("cpp", "amd"),
-#    ("cpp", "ibm"),
+    ("cpp", "ibm"),
 #    ("cpp", "pgi"),
 #    ("cpp", "intel"),
 #    ("fortran","gnu"),
 #    ("fortran", "cray"),
 #    ("fortran", "amd"),
-#    ("fortran", "ibm"),
+    ("fortran", "ibm"),
 #    ("fortran", "pgi"),
 #    ("fortran", "intel"),
 #    ("hip", "amd"),
@@ -129,7 +129,7 @@ a_2d = np.reshape(np.arange(100, dtype=np.float64), (4, 25))
 b_2d = np.reshape(np.arange(100, dtype=np.float64) * 2, (25, 4))
 c_2d = np.reshape(np.zeros(16, dtype=np.float64), (4, 4))
 
-def ttest_first():
+def test_first():
 
     c_1d.fill(0)
 
@@ -148,16 +148,6 @@ def ttest_first():
     accel_fortran.run(a_1d.size)
 
     accel_fortran.stop()
-
-    assert np.array_equal(c_1d, a_1d + b_1d)
-
-    c_1d.fill(0)
-
-    accel_hip = HipAccel(order_vecadd1d, (a_1d, b_1d), c_1d)
-
-    accel_hip.run(a_1d.size)
-
-    accel_hip.stop()
 
     assert np.array_equal(c_1d, a_1d + b_1d)
 
@@ -193,7 +183,7 @@ def ttest_matmul(accel, comp):
 
 
 @pytest.mark.parametrize("accel, comp", test_accels)
-def ttest_add3d(accel, comp):
+def test_add3d(accel, comp):
 
     c_3d.fill(0)
 
