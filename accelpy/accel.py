@@ -217,7 +217,8 @@ class AccelBase(Object):
                     raise Exception("D2H copy test faild.")
 
                 if not all(numpy.equal(self._testdata[0]["data"], self._testdata[1]["data"])):
-                    raise Exception("data integrity check failure")
+                    raise Exception("accel test result mismatch: %s != %s" %
+                        (str(self._testdata[0]["data"]), str(self._testdata[1]["data"])))
 
                 return lib
 
@@ -301,7 +302,14 @@ class AccelBase(Object):
 
     def run(self, *workers, device=0, channel=0, timeout=None, inputs=None, outputs=None):
 
+        # TODO: workers in a team directly share resources such as memory or io. A worker is corresponding to a thread in openmp or worker in openacc
+        # TODO: workers in a different team need some additional work to share a resouce. A team is correspondng to process or gang in openacc or block in cuda
+        # TODO: if an accel does not support those concept ( for example, openmp does not have a concept of process within) then the setting silently ignored
+        # TODO: if workers passes the max limit of the device, the exact value might be silently adjusted.
+        # TODO: unused concpet will be provided to the order code through possibly macros
+        # TODO: Use compiler macros instead of passing values to support workers, teams, and assignments
         # compilation should be done first
+
         self._thread_compile.join()
 
         worker_triple = self._get_worker_triple(*workers)
@@ -324,6 +332,8 @@ class AccelBase(Object):
 
         # run accel
         run_id = len(self._threads_run)
+
+        # TODO: use lock to support multiple accelerators uses device simultaneously.
 
         thread_run = threading.Thread(target=self._start_accel,
                             args=(run_id, device, channel, worker_triple))

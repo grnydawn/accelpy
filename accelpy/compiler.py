@@ -185,6 +185,12 @@ class CudaCppCompiler(CppCompiler):
     opt_version = "--version"
 
 
+class OpenaccCppCompiler(CppCompiler):
+
+    accel = "openacc_cpp"
+    opt_version = "--version"
+
+
 class FortranFortranCompiler(FortranCompiler):
 
     accel = "fortran"
@@ -198,7 +204,7 @@ class FortranFortranCompiler(FortranCompiler):
 class GnuCppCppCompiler(CppCppCompiler):
 
     vendor = "gnu"
-    opt_openmp = "--fopenmp"
+    #opt_openmp = "--fopenmp"
 
     def __init__(self, path=None, option=None):
 
@@ -240,7 +246,7 @@ class GnuCppCppCompiler(CppCppCompiler):
 class GnuFortranFortranCompiler(FortranFortranCompiler):
 
     vendor = "gnu"
-    opt_openmp = "-fopenmp"
+    #opt_openmp = "-fopenmp"
     opt_moddir = "-J %s"
 
     def __init__(self, path=None, option=None):
@@ -287,7 +293,7 @@ class GnuFortranFortranCompiler(FortranFortranCompiler):
 class CrayClangCppCppCompiler(CppCppCompiler):
 
     vendor = "cray"
-    opt_openmp = "-h omp"
+    #opt_openmp = "-h omp"
 
     def __init__(self, path=None, option=None):
 
@@ -331,7 +337,7 @@ class CrayClangCppCppCompiler(CppCppCompiler):
 class CrayFortranFortranCompiler(FortranFortranCompiler):
 
     vendor = "cray"
-    opt_openmp = "-h omp"
+    #opt_openmp = "-h omp"
     opt_moddir = "-J %s"
 
     def __init__(self, path=None, option=None):
@@ -378,7 +384,7 @@ class CrayFortranFortranCompiler(FortranFortranCompiler):
 class AmdClangCppCppCompiler(CppCppCompiler):
 
     vendor = "amd"
-    opt_openmp = "-fopenmp"
+    #opt_openmp = "-fopenmp"
 
     def __init__(self, path=None, option=None):
 
@@ -415,7 +421,7 @@ class AmdClangCppCppCompiler(CppCppCompiler):
 class AmdFlangFortranFortranCompiler(FortranFortranCompiler):
 
     vendor = "amd"
-    opt_openmp = "-fopenmp"
+    #opt_openmp = "-fopenmp"
     opt_moddir = "-J %s"
 
     def __init__(self, path=None, option=None):
@@ -495,7 +501,7 @@ class AmdHipCppCompiler(HipCppCompiler):
 class IbmXlCppCppCompiler(CppCppCompiler):
 
     vendor = "ibm"
-    opt_openmp = "-qsmp=omp"
+    #opt_openmp = "-qsmp=omp"
     opt_version = "-qversion"
 
     def __init__(self, path=None, option=None):
@@ -536,7 +542,7 @@ class IbmXlCppCppCompiler(CppCppCompiler):
 class IbmXlFortranFortranCompiler(FortranFortranCompiler):
 
     vendor = "ibm"
-    opt_openmp = "-qsmp=omp"
+    #opt_openmp = "-qsmp=omp"
     opt_moddir = "-qmoddir=%s"
     opt_version = "-qversion"
 
@@ -645,7 +651,7 @@ class NvidiaCudaCppCompiler(CudaCppCompiler):
 class PgiCppCppCompiler(CppCppCompiler):
 
     vendor = "pgi"
-    opt_openmp = "-mp"
+    #opt_openmp = "-mp"
 
     def __init__(self, path=None, option=None):
 
@@ -682,7 +688,7 @@ class PgiCppCppCompiler(CppCppCompiler):
 class PgiFortranFortranCompiler(FortranFortranCompiler):
 
     vendor = "pgi"
-    opt_openmp = "-mp"
+    #opt_openmp = "-mp"
     opt_moddir = "-module %s"
 
     def __init__(self, path=None, option=None):
@@ -720,6 +726,44 @@ class PgiFortranFortranCompiler(FortranFortranCompiler):
         return opts
 
 
+class PgiOpenaccCppCompiler(OpenaccCppCompiler):
+
+    vendor = "pgi"
+    #opt_openmp = "-mp"
+
+    def __init__(self, path=None, option=None):
+
+        if path:
+            pass
+
+        elif which("pgc++"):
+            path = "pgc++"
+
+        super(PgiOpenaccCppCompiler, self).__init__(path, option)
+
+    def parse_version(self, stdout):
+
+        items = stdout.strip().split()
+
+        if sys.platform == "linux":
+            if items[0] == b'pgc++':
+                return items[1].decode().split(".")
+            raise Exception("Unknown version syntaxt: %s" % str(items[:1]))
+
+        else:
+            raise Exception("'%s' platform is not supported yet." % sys.platform)
+
+    def get_option(self):
+
+        if sys.platform == "linux":
+            opts = "-shared -fpic -acc " + super(PgiOpenaccCppCompiler, self).get_option()
+
+        else:
+            raise Exception("'%s' platform is not supported yet." % sys.platform)
+
+        return opts
+
+
 ###################
 # Intel Compilers
 ###################
@@ -727,7 +771,7 @@ class PgiFortranFortranCompiler(FortranFortranCompiler):
 class IntelCppCppCompiler(CppCppCompiler):
 
     vendor = "intel"
-    opt_openmp = "-qopenmp"
+    #opt_openmp = "-qopenmp"
 
     def __init__(self, path=None, option=None):
 
@@ -764,7 +808,7 @@ class IntelCppCppCompiler(CppCppCompiler):
 class IntelFortranFortranCompiler(FortranFortranCompiler):
 
     vendor = "intel"
-    opt_openmp = "-qopenmp"
+    #opt_openmp = "-qopenmp"
     opt_moddir = "-module %s"
 
     def __init__(self, path=None, option=None):
@@ -804,7 +848,7 @@ class IntelFortranFortranCompiler(FortranFortranCompiler):
 
 # priorities
 _lang_priority = ["fortran", "cpp"]
-_accel_priority = ["hip", "cuda", "fortran", "cpp"]
+_accel_priority = ["openacc_cpp", "hip", "cuda", "fortran", "cpp"]
 _vendor_priority = ["cray", "amd", "nvidia", "intel", "pgi", "ibm", "gnu"]
 
 def _langsort(l):

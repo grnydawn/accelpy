@@ -1,9 +1,4 @@
-"""accelpy Cuda Accelerator module"""
-
-# TODO: prevent maxlimit violations such as max thread per block
-# TODO: expose current(possibly modified) configuration from workers/teams/assignments => may precompile cuda utility shared lib
-# TODO: load cudart shared lib and uses several apis
-# TODO: support multi-device and streams
+"""accelpy OpenAcc C++ Accelerator module"""
 
 
 from accelpy.accel import AccelBase, get_compilers
@@ -30,13 +25,15 @@ extern "C" int64_t accelpy_start(  \\
         int64_t * assign_x, int64_t * assign_y, int64_t * assign_z) {{
 
     int64_t res;
+    int64_t ngangs, nworkers, lenvector;
 
-    const dim3 TEAM_SIZE = dim3(*team_x, *team_y, *team_z);
-    const dim3 MEMBER_SIZE = dim3(*thread_x, *thread_y, *thread_z);
+    ngangs = (*team_x) * (*team_y) * (*team_z);
+    nworkers = (*thread_x) * (*thread_y) * (*thread_z);
+    lenvector = (*assign_x) * (*assign_y) * (*assign_z);
 
-    accelpy_kernel<<<TEAM_SIZE, MEMBER_SIZE>>>({launch_args});
+    printf("%d, %d, %d \\n", ngangs, nworkers, lenvector);
 
-    res = 0;
+    res = accelpy_kernel(ngangs, nworkers, lenvector);
 
     return res;
 }}
@@ -45,6 +42,8 @@ extern "C" int64_t accelpy_stop() {{
 
     int64_t res;
 
+{datadeletes}
+
     res = 0;
 
     return res;
@@ -52,43 +51,42 @@ extern "C" int64_t accelpy_stop() {{
 """
 
 t_varclass = """
-class dev_{vartype} {{
+class {vartype} {{
 public:
     {dtype} * data;
     int64_t * _attrs; // size, ndim, itemsize, shape, strides
 
-    __device__ {dtype} & operator() ({oparg}) {{
+    {dtype} & operator() ({oparg}) {{
+        int64_t * s = &(_attrs[3+_attrs[1]]);
+        return data[{offset}];
+    }}
+    {dtype} operator() ({oparg}) const {{
         int64_t * s = &(_attrs[3+_attrs[1]]);
         return data[{offset}];
     }}
 
-    __device__ {dtype} operator() ({oparg}) const {{
-        int64_t * s = &(_attrs[3+_attrs[1]]);
-        return data[{offset}];
+    int size() {{
+        return _attrs[0];
     }}
 
-    __device__ int size() {{
-        return (int) _attrs[0];
+    int ndim() {{
+        return _attrs[1];
     }}
 
-    __device__ int ndim() {{
-        return (int) _attrs[1];
+    int itemsize() {{
+        return _attrs[2];
     }}
 
-    __device__ int itemsize() {{
-        return (int) _attrs[2];
+    int shape(int dim) {{
+        return _attrs[3+dim];
     }}
 
-    __device__ int shape(int dim) {{
-        return (int) _attrs[3+dim];
+    int stride(int dim) {{
+        return _attrs[3+_attrs[1]+dim];
     }}
 
-    __device__ int stride(int dim) {{
-        return (int) _attrs[3+_attrs[1]+dim];
-    }}
-
-    __device__ int unravel_index(int tid, int dim) {{
-        int q, r=tid, s;
+    int unravel_index(int tid, int dim) {{
+        int64_t q, r=tid, s;
         for (int i = 0; i < dim + 1; i++) {{
             s = stride(i);
             q = r / s;
@@ -104,11 +102,13 @@ t_h2acopy = """
 extern "C" int64_t {funcname}(int64_t * attrsize, int64_t * _attrs, void * data) {{
     int64_t res;
 
-    cudaMalloc((void **)&dev_{varname}.data, _attrs[0] * sizeof({dtype}));
-    cudaMalloc((void **)&dev_{varname}._attrs, (*attrsize) * sizeof(int64_t));
 
-    cudaMemcpy(dev_{varname}.data, data, _attrs[0] * sizeof({dtype}), cudaMemcpyHostToDevice);
-    cudaMemcpy(dev_{varname}._attrs, _attrs, (*attrsize) * sizeof(int64_t), cudaMemcpyHostToDevice );
+    {varname}.data = ({dtype} *) data;
+    {varname}._attrs = _attrs;
+
+    #pragma acc enter data copyin({varname})
+    #pragma acc enter data copyin({varname}.data[0:_attrs[0]])
+    #pragma acc enter data copyin({varname}._attrs[0:(*attrsize)])
 
     res = 0;
 
@@ -120,10 +120,13 @@ t_h2amalloc = """
 extern "C" int64_t {funcname}(int64_t * attrsize, int64_t * _attrs, void * data) {{
     int64_t res;
 
-    cudaMalloc((void **)&dev_{varname}.data, _attrs[0] * sizeof({dtype}));
-    cudaMalloc((void **)&dev_{varname}._attrs, (*attrsize) * sizeof(int64_t));
 
-    cudaMemcpy(dev_{varname}._attrs, _attrs, (*attrsize) * sizeof(int64_t), cudaMemcpyHostToDevice);
+    {varname}.data = ({dtype} *) data;
+    {varname}._attrs = _attrs;
+
+    #pragma acc enter data copyin({varname})
+    #pragma acc enter data create({varname}.data[0:_attrs[0]])
+    #pragma acc enter data copyin({varname}._attrs[0:(*attrsize)])
 
     res = 0;
 
@@ -135,7 +138,7 @@ t_a2hcopy = """
 extern "C" int64_t {funcname}(int64_t * attrsize, int64_t * _attrs, void * data) {{
     int64_t res;
 
-    cudaMemcpy(data, dev_{varname}.data, _attrs[0] * sizeof({dtype}), cudaMemcpyDeviceToHost);
+    #pragma acc exit data copyout({varname}.data[0:_attrs[0]])
 
     res = 0;
 
@@ -144,24 +147,14 @@ extern "C" int64_t {funcname}(int64_t * attrsize, int64_t * _attrs, void * data)
 """
 
 t_testfunc = """
-__global__ void accelpy_test_kernel(dev_{vartype_in} {varin}, dev_{vartype_out} {varout}){{
-
-    int ACCELPY_WORKER_ID0 = blockIdx.x * blockDim.x + threadIdx.x;
-    int ACCELPY_WORKER_ID1 = blockIdx.y * blockDim.y + threadIdx.y;
-    int ACCELPY_WORKER_ID2 = blockIdx.z * blockDim.z + threadIdx.z;
-
-    int id = ACCELPY_WORKER_ID0;
-    if(id < {varin}.size()) {varout}(id) = {varin}(id);
-
-}}
-
 extern "C" int64_t accelpy_test_run() {{
     int64_t res;
-
-    const dim3 TEAM_SIZE = dim3(1);
-    const dim3 MEMBER_SIZE = dim3({nworkers});
-
-    accelpy_test_kernel<<<TEAM_SIZE, MEMBER_SIZE>>>(dev_{varin}, dev_{varout});
+    
+    #pragma acc parallel num_gangs(1) num_workers({nworkers}) vector_length(1)
+    #pragma acc loop gang worker vector
+    for (int id = 0; id < {varin}.shape(0); id++) {{
+        {varout}(id) = {varin}(id);
+    }}
 
     res = 0;
 
@@ -170,19 +163,26 @@ extern "C" int64_t accelpy_test_run() {{
 """
 
 t_kernel = """
-__global__ void accelpy_kernel({kernel_args}){{
+extern "C" int64_t accelpy_kernel(){{
 
-    int ACCELPY_WORKER_ID0 = blockIdx.x * blockDim.x + threadIdx.x;
-    int ACCELPY_WORKER_ID1 = blockIdx.y * blockDim.y + threadIdx.y;
-    int ACCELPY_WORKER_ID2 = blockIdx.z * blockDim.z + threadIdx.z;
+    int64_t res;
+
+    printf("%d, %d, %d \\n", ngangs, nworkers, lenvector);
+
+    #pragma acc parallel num_gangs(ACCELPY_OPENACC_NGANGS) num_workers(ACCELPY_OPENACC_NWORKERS) \\
+            vector_length(ACCELPY_OPENACC_LENVECTOR)
 
     {order}
+
+    res = 0;
+
+    return res;
 }}
 """
 
-class CudaAccel(AccelBase):
+class OpenaccCppAccel(AccelBase):
 
-    name = "cuda"
+    name = "openacc_cpp"
     lang = "cpp"
 
     # dtype: ( C type name, ctype )
@@ -228,6 +228,19 @@ class CudaAccel(AccelBase):
 
         return "\n\n".join(varclasses)
 
+    def gen_vardefs(self, inputs, outputs):
+
+        out = []
+
+        for arg in inputs+outputs:
+
+            ndim, dname = self.get_argpair(arg)
+            vartype = self.get_vartype(arg)
+
+            out.append("%s %s = %s();" % (vartype, arg["curname"], vartype))
+
+        return "\n".join(out)
+
     def gen_datacopies(self, inputs, outputs):
 
         out = []
@@ -237,7 +250,7 @@ class CudaAccel(AccelBase):
             dtype = self.get_dtype(input)
             funcname = self.getname_h2acopy(input)
 
-            out.append("dev_%s dev_%s = dev_%s();" % (vartype, input["curname"], vartype))
+            out.append("%s %s = %s();" % (vartype, input["curname"], vartype))
             out.append(t_h2acopy.format(funcname=funcname, varname=input["curname"], dtype=dtype))
 
         for output in outputs:
@@ -245,16 +258,13 @@ class CudaAccel(AccelBase):
             dtype = self.get_dtype(output)
             funcname = self.getname_h2amalloc(output)
 
-            out.append("dev_%s dev_%s = dev_%s();" % (vartype, output["curname"], vartype))
-            out.append(t_h2amalloc.format(funcname=funcname, varname=output["curname"],
-                        dtype=dtype))
+            out.append("%s %s = %s();" % (vartype, output["curname"], vartype))
+            out.append(t_h2amalloc.format(funcname=funcname, varname=output["curname"], dtype=dtype))
 
         for output in outputs:
             funcname = self.getname_a2hcopy(output)
-            dtype = self.get_dtype(output)
 
-            out.append(t_a2hcopy.format(funcname=funcname, varname=output["curname"],
-                        dtype=dtype))
+            out.append(t_a2hcopy.format(funcname=funcname, varname=output["curname"]))
 
         return "\n".join(out)
 
@@ -273,42 +283,41 @@ class CudaAccel(AccelBase):
         funcname_out = "accelpy_test_h2amalloc"
         funcname_a2h = "accelpy_test_a2hcopy"
 
-        out.append("dev_%s dev_%s = dev_%s();" % (vartype_in, input["curname"], vartype_in))
-        out.append("dev_%s dev_%s = dev_%s();" % (vartype_out, output["curname"], vartype_out))
+        out.append("%s %s = %s();" % (vartype_in, input["curname"], vartype_in))
+        out.append("%s %s = %s();" % (vartype_out, output["curname"], vartype_out))
 
         out.append(t_h2acopy.format(funcname=funcname_in, varname=input["curname"], dtype=dtype_in))
         out.append(t_h2amalloc.format(funcname=funcname_out, varname=output["curname"], dtype=dtype_out))
-        out.append(t_a2hcopy.format(funcname=funcname_a2h, varname=output["curname"], dtype=dtype_out))
+        out.append(t_a2hcopy.format(funcname=funcname_a2h, varname=output["curname"]))
 
         out.append(t_testfunc.format(varin=input["curname"], varout=output["curname"],
-                    vartype_in=vartype_in, vartype_out=vartype_out, nworkers=str(input["data"].size)))
+                    nworkers=str(input["data"].size)))
 
         return "\n".join(out)
 
-    def gen_kernel(self, inputs, outputs):
-
-        args = []
+    def gen_kernel(self):
+        
         order =  self._order.get_section(self.name)
-
-        for data in inputs+outputs:
-            vartype = self.get_vartype(data)
-            args.append("dev_%s %s" % (vartype, data["curname"]))
-
-        return t_kernel.format(order="\n".join(order.body), kernel_args=", ".join(args))
+        return t_kernel.format(order="\n".join(order.body))
 
     def gen_code(self, inputs, outputs):
 
-        args = []
+        datadeletes = []
+
         for data in inputs+outputs:
-            args.append("dev_%s" % data["curname"])
+            #datadeletes.append("#pragma acc exit data delete(%s.data)" % data["curname"])
+            #datadeletes.append("#pragma acc exit data delete(%s._attrs)" % data["curname"])
+            #datadeletes.append("#pragma acc exit data delete(%s)" % data["curname"])
+            pass
 
         main_fmt = {
             "varclasses":self.gen_varclasses(inputs, outputs),
             "testcode":self.gen_testcode(),
             "datacopies":self.gen_datacopies(inputs, outputs),
-            "kernel":self.gen_kernel(inputs, outputs),
-            "launch_args": ", ".join(args)
+            "kernel":self.gen_kernel(),
+            "datadeletes": "\n".join(datadeletes)
         }
+
 
         code = t_main.format(**main_fmt)
 
@@ -328,4 +337,4 @@ class CudaAccel(AccelBase):
     def getname_a2hcopy(self, arg):
         return "accelpy_a2hcopy_%s" % arg["curname"]
 
-CudaAccel.avails[CudaAccel.name] = CudaAccel
+OpenaccCppAccel.avails[OpenaccCppAccel.name] = OpenaccCppAccel

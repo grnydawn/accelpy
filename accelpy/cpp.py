@@ -293,4 +293,4 @@ class CppAccel(AccelBase):
     def getname_a2hcopy(self, arg):
         return "accelpy_a2hcopy_%s" % arg["curname"]
 
-AccelBase.avails[CppAccel.name] = CppAccel
+CppAccel.avails[CppAccel.name] = CppAccel

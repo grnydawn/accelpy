@@ -1,4 +1,9 @@
-"""accelpy C++ Accelerator module"""
+"""accelpy Hip Accelerator module"""
+
+# TODO: prevent maxlimit violations such as max thread per block
+# TODO: expose current(possibly modified) configuration from workers/teams/assignments
+# TODO: load cudart shared lib and uses several apis
+# TODO: support multi-device and streams
 
 
 from accelpy.accel import AccelBase, get_compilers

@@ -9,17 +9,18 @@ test_accels = (
 #    ("cpp", "gnu"),
 #    ("cpp", "cray"),
 #    ("cpp", "amd"),
-    ("cpp", "ibm"),
+#    ("cpp", "ibm"),
 #    ("cpp", "pgi"),
 #    ("cpp", "intel"),
 #    ("fortran","gnu"),
 #    ("fortran", "cray"),
 #    ("fortran", "amd"),
-    ("fortran", "ibm"),
+#    ("fortran", "ibm"),
 #    ("fortran", "pgi"),
 #    ("fortran", "intel"),
 #    ("hip", "amd"),
-    ("cuda", "nvidia"),
+#    ("cuda", "nvidia"),
+    ("openacc_cpp", "pgi"),
 )
 
 #######################
@@ -47,6 +48,12 @@ cpp_enable = True
 [hip, cuda]
     int id = ACCELPY_WORKER_ID0;
     if(id < x.size()) z(id) = x(id) + y(id);
+
+[openacc_cpp]
+    #pragma acc loop gang worker vector
+    for (int id = 0; id < x.shape(0); id++) {
+        z(id) = x(id) + y(id);
+    }
 """
 
 order_vecadd3d = """
@@ -129,7 +136,7 @@ a_2d = np.reshape(np.arange(100, dtype=np.float64), (4, 25))
 b_2d = np.reshape(np.arange(100, dtype=np.float64) * 2, (25, 4))
 c_2d = np.reshape(np.zeros(16, dtype=np.float64), (4, 4))
 
-def test_first():
+def ttest_first():
 
     c_1d.fill(0)
 
@@ -183,7 +190,7 @@ def ttest_matmul(accel, comp):
 
 
 @pytest.mark.parametrize("accel, comp", test_accels)
-def test_add3d(accel, comp):
+def ttest_add3d(accel, comp):
 
     c_3d.fill(0)
 
