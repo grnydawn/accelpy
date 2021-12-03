@@ -20,7 +20,8 @@ test_accels = (
 #    ("fortran", "intel"),
 #    ("hip", "amd"),
 #    ("cuda", "nvidia"),
-    ("openacc_cpp", "pgi"),
+#    ("openacc_cpp", "pgi"),
+    ("openacc_cpp", "gnu"),
 )
 
 #######################

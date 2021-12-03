@@ -71,11 +71,11 @@ class Compiler(Object):
 
     def _compile(self, code, ext, macros):
 
-        opt_macro = []
+        _macros = []
         for k, v in macros.items():
-            opt_macro.append("-D %s=%s" % (k, v) if v else ("-D "+k))
+            _macros.append("-D %s=%s" % (k, v) if v else ("-D "+k))
 
-        opt_macro = " ".join(macros)
+        opt_macro = " ".join(_macros)
         text = (code + opt_macro + self.vendor + "".join(self.version) + ext)
         name =  hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
 
@@ -87,7 +87,7 @@ class Compiler(Object):
 
         option = self.opt_compile_only + " " + self.get_option()
 
-        build_cmd = "{compiler} -Minfo=accel {option} {macro} -o {outfile} {infile}".format(
+        build_cmd = "{compiler} {option} {macro} -o {outfile} {infile}".format(
                         compiler=self.path, option=option, outfile=outfile,
                         infile=codepath, macro=opt_macro)
 
@@ -126,7 +126,8 @@ class Compiler(Object):
         out = shellcmd(build_cmd)
 
         if out.returncode != 0:
-            raise Exception("Compilation fails: %s" % out.stderr)
+            errmsg = str(out.stderr).replace("\\n", "\n")
+            raise Exception("Compilation fails: %s" % errmsg)
 
         if not os.path.isfile(outfile):
             raise Exception("Output is not generated.")
@@ -284,6 +285,49 @@ class GnuFortranFortranCompiler(FortranFortranCompiler):
         elif sys.platform == "linux":
             opts = ("-shared -fPIC %s " % moddir +
                     super(GnuFortranFortranCompiler, self).get_option())
+
+        else:
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
+
+        return opts
+
+
+class GnuOpenaccCppCompiler(OpenaccCppCompiler):
+
+    vendor = "gnu"
+    #opt_openmp = "--fopenmp"
+
+    def __init__(self, path=None, option=None):
+
+        if not path:
+            path = "g++"
+
+        super(GnuOpenaccCppCompiler, self).__init__(path, option)
+
+    def parse_version(self, stdout):
+
+        items = stdout.split()
+        
+        if sys.platform == "darwin":
+            if items[:3] == [b'Apple', b'clang', b'version']:
+                return items[3].decode().split(".")
+            raise Exception("Unknown version syntaxt: %s" % str(items[:3]))
+
+        elif sys.platform == "linux":
+            if items[:2] == [b'g++', b'(GCC)']:
+                return items[2].decode().split(".")
+            raise Exception("Unknown version syntaxt: %s" % str(items[:2]))
+
+        else:
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
+
+    def get_option(self):
+
+        if sys.platform == "darwin":
+            opts = "-dynamiclib -fPIC -fopenacc " + super(GnuOpenaccCppCompiler, self).get_option()
+
+        elif sys.platform == "linux":
+            opts = "-shared -fPIC -fopenacc " + super(GnuOpenaccCppCompiler, self).get_option()
 
         else:
             raise Exception("Platform '%s' is not supported." % str(sys.platform))

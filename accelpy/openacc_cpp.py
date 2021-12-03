@@ -22,19 +22,11 @@ t_main = """
 
 {kernel}
 
-extern "C" int64_t accelpy_start(  \\
-        int64_t * run_id, int64_t * device, int64_t * channel, \\
-        int64_t * thread_x, int64_t * thread_y, int64_t * thread_z, \\
-        int64_t * team_x, int64_t * team_y, int64_t * team_z, \\
-        int64_t * assign_x, int64_t * assign_y, int64_t * assign_z) {{
+extern "C" int64_t accelpy_start() {{
 
     int64_t res;
 
-    const int64_t ngangs = (*team_x) * (*team_y) * (*team_z);
-    const int64_t nworkers = (*thread_x) * (*thread_y) * (*thread_z);
-    const int64_t lenvec = (*assign_x) * (*assign_y) * (*assign_z);
-
-    res = accelpy_kernel((*run_id), (*device), (*channel), ngangs, nworkers, lenvec);
+    res = accelpy_kernel();
 
     return res;
 }}
@@ -131,13 +123,12 @@ extern "C" int64_t accelpy_test_run() {{
 """
 
 t_kernel = """
-extern "C" int64_t accelpy_kernel( \\
-        const int64_t run_id, const int64_t device, const int64_t channel, \\
-        const int64_t ngangs, const int64_t nworkers, const int64_t lenvector){{
+extern "C" int64_t accelpy_kernel(){{
 
     int64_t res;
 
-    #pragma acc parallel num_gangs(ngangs) num_workers(nworkers) vector_length({lenvec})
+    #pragma acc parallel num_gangs(ACCELPY_OPENACC_NGANGS) \\
+        num_workers(ACCELPY_OPENACC_NWORKERS) vector_length(ACCELPY_OPENACC_LENVECTOR)
 
     {order}
 
@@ -267,16 +258,23 @@ class OpenaccCppAccel(AccelBase):
 
         return "\n".join(out)
 
-    def gen_kernel(self, compiler):
+    def gen_kernel(self):
         
         order =  self._order.get_section(self.name)
-        lenvec = "1" if compiler.vendor=="pgi" else "lenvector"
 
-        return t_kernel.format(order="\n".join(order.body), lenvec=lenvec)
+        return t_kernel.format(order="\n".join(order.body))
 
-    def gen_code(self, inputs, outputs, compiler):
+    def gen_code(self, compiler, inputs, outputs, triple, run_id, device, channel):
 
-        self._macros
+        macros = {
+            "ACCELPY_ACCEL_RUNID": str(run_id),
+            "ACCELPY_ACCEL_DEVICE": str(device),
+            "ACCELPY_ACCEL_CHANNEL": str(device),
+            "ACCELPY_OPENACC_RUNID": str(run_id),
+            "ACCELPY_OPENACC_NGANGS": str(triple[0][0]*triple[0][1]*triple[0][2]),
+            "ACCELPY_OPENACC_NWORKERS": str(triple[1][0]*triple[1][1]*triple[1][2]),
+            "ACCELPY_OPENACC_LENVECTOR": str(triple[2][0]*triple[2][1]*triple[2][2]),
+        }
 
         datadeletes = []
 
@@ -288,13 +286,13 @@ class OpenaccCppAccel(AccelBase):
             "varclasses":self.gen_varclasses(inputs, outputs),
             "testcode":self.gen_testcode(),
             "datacopies":self.gen_datacopies(inputs, outputs),
-            "kernel":self.gen_kernel(compiler),
+            "kernel":self.gen_kernel(),
             "datadeletes": "\n".join(datadeletes)
         }
 
         code = t_main.format(**main_fmt)
 
-        return code
+        return code, macros
 
 #    def get_vartype(self, arg, prefix=""):
 #
