@@ -51,7 +51,7 @@ cpp_enable = True
 
 [openacc_cpp]
     #pragma acc loop gang worker vector
-    for (int id = 0; id < x.shape(0); id++) {
+    for (int id = 0; id < x.shape[0]; id++) {
         z(id) = x(id) + y(id);
     }
 """

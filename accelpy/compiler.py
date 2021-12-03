@@ -69,9 +69,14 @@ class Compiler(Object):
 
         self.version = self.parse_version(out.stdout)
 
-    def _compile(self, code, ext):
+    def _compile(self, code, ext, macros):
 
-        text = (code + self.vendor + "".join(self.version) + ext)
+        opt_macro = []
+        for k, v in macros.items():
+            opt_macro.append("-D %s=%s" % (k, v) if v else ("-D "+k))
+
+        opt_macro = " ".join(macros)
+        text = (code + opt_macro + self.vendor + "".join(self.version) + ext)
         name =  hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
 
         codepath = os.path.join(self._blddir, name + "." + self.codeext)
@@ -82,12 +87,12 @@ class Compiler(Object):
 
         option = self.opt_compile_only + " " + self.get_option()
 
-        build_cmd = "{compiler} {option} -o {outfile} {infile}".format(
+        build_cmd = "{compiler} -Minfo=accel {option} {macro} -o {outfile} {infile}".format(
                         compiler=self.path, option=option, outfile=outfile,
-                        infile=codepath)
+                        infile=codepath, macro=opt_macro)
 
-        #print(build_cmd)
-        #import pdb; pdb.set_trace()
+        print(build_cmd)
+        import pdb; pdb.set_trace()
         out = shellcmd(build_cmd)
 
         if out.returncode != 0:
@@ -128,7 +133,7 @@ class Compiler(Object):
 
         return outfile
 
-    def compile(self, code):
+    def compile(self, code, macros):
 
         lib = None
 
@@ -139,11 +144,11 @@ class Compiler(Object):
 
         # build object files
         if isinstance(code, str):
-            objfiles.append(self._compile(code, self.objext))
+            objfiles.append(self._compile(code, self.objext, macros))
 
         elif isinstance(code, (list, tuple)):
             for _c in code:
-                objfiles.append(self._compile(_c, self.objext))
+                objfiles.append(self._compile(_c, self.objext, macros))
 
         libfile = self._link(self.libext, objfiles)
 

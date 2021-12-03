@@ -37,6 +37,7 @@ class AccelBase(Object):
         self._inputs, self._outputs = self._pack_arguments(inputs, outputs)
 
         self._order.update_argnames(self._inputs, self._outputs)
+        self._macros = {}
 
         self._sharedlib = None
         self._threads_run = []
@@ -51,9 +52,8 @@ class AccelBase(Object):
 
         self._sharedlib = self.build_sharedlib(compile=compile)
 
-
     @abc.abstractmethod
-    def gen_code(self, inputs, outputs):
+    def gen_code(self, inputs, outputs, compiler):
         pass
 
     @abc.abstractmethod
@@ -77,17 +77,6 @@ class AccelBase(Object):
     #def len_numpyattrs(self, arg):
 
     #    return 3 + len(arg["data"].shape)*2
-
-    def get_numpyattrs(self, arg):
-
-        data = arg["data"]
-
-        attrs = numpy.array((data.size, data.ndim, data.itemsize) + data.shape +
-                tuple([int(s//data.itemsize) for s in data.strides]), dtype=numpy.int64)
-
-        self._attr_arrays.append(attrs)
-
-        return attrs
 
     def get_ctype(self, arg):
 
@@ -187,15 +176,16 @@ class AccelBase(Object):
 
     def build_sharedlib(self, compile=None):
 
-        code = self.gen_code(self._inputs, self._outputs)
-
         compilers = get_compilers(self.name, compile=compile)
 
         errmsgs = []
 
         for comp in compilers:
             try:
-                lib = comp.compile(code)
+
+                code = self.gen_code(self._inputs, self._outputs, comp)
+
+                lib = comp.compile(code, self._macros)
 
                 if lib is None:
                     continue
@@ -240,16 +230,10 @@ class AccelBase(Object):
         if writable:
             flags.append("writeable")
 
-        attrs = self.get_numpyattrs(arg)
-
         datacopy = getattr(lib, funcname)
         datacopy.restype = c_int64
-        datacopy.argtypes = [
-            POINTER(c_int64),
-            ndpointer(attrs.dtype, flags=",".join(flags)),
-            ndpointer(arg["data"].dtype, flags=",".join(flags))
-            ]
-        res = datacopy(byref(c_int64(attrs.size)), attrs, arg["data"])
+        datacopy.argtypes = [ndpointer(arg["data"].dtype, flags=",".join(flags))]
+        res = datacopy(arg["data"])
 
         return res
 
