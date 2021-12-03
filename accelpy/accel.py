@@ -31,9 +31,21 @@ class AccelBase(Object):
     ]
 
 
-    def __init__(self, order, inputs, outputs, compile=None):
+    def __init__(self, *vargs, kind=None, compile=None):
 
-        self._order = self._get_order(order)
+        self._order = None
+
+        inputs, outputs = [], []
+        for varg in vargs:
+            if isinstance(varg, Order):
+                self._order = varg
+
+            elif self._order is None:
+                inputs.append(varg)
+
+            else:
+                outputs.append(varg)
+
         self._inputs, self._outputs = self._pack_arguments(inputs, outputs)
         self._order.update_argnames(self._inputs, self._outputs)
         self._compile = compile
@@ -67,52 +79,26 @@ class AccelBase(Object):
 
     def _pack_arguments(self, inputs, outputs):
 
-        def _tondarray(d):
-            if isinstance(d, numpy.ndarray):
-                return d
-
-            elif isinstance(d, (list, tuple)):
-                return numpy.asarray(d)
-
-            else:
-                raise Exception("No supported type: %s" % type(d))
-
         resin = []
         resout = []
 
-        if isinstance(inputs, (tuple, list)):
-            for input in inputs:
-                inp = _tondarray(input)
-                resin.append({"data": inp, "id": id(inp), "h2acopy": False})
+        if inputs is None:
+            inputs = []
 
-        else:
-            inp = _tondarray(input)
-            resin = [{"data": inp, "id": id(inp), "h2acopy": False}]
+        if outputs is None:
+            outputs = []
 
-        if isinstance(outputs, (tuple, list)):
-            for output in outputs:
-                outp = _tondarray(output)
-                resout.append({"data": outp, "id": id(outp), "a2hcopy": False})
+        for inp in inputs:
+            if not isinstance(inp, numpy.ndarray):
+                inp = numpy.asarray(inp)
+            resin.append({"data": inp, "id": id(inp), "h2acopy": False})
 
-        else:
-            outp = _tondarray(outputs)
-            resout = [{"data": outp, "id": id(outp), "a2hcopy": False}]
+        for outp in outputs:
+            if not isinstance(outp, numpy.ndarray):
+                outp = numpy.asarray(outp)
+            resout.append({"data": outp, "id": id(outp), "h2acopy": False})
 
         return resin, resout
-
-    def _get_order(self, order):
-
-        if isinstance(order, str):
-            if os.path.isfile(order):
-                with open(order) as fo:
-                    order = Order(fo.read())
-            else:
-                order = Order(order)
-
-        if not isinstance(order, Order):
-            raise ("type '%s' is not valid order type." % type(order))
-
-        return order
 
     def _get_worker_triple(self, *workers):
 
@@ -167,6 +153,10 @@ class AccelBase(Object):
 
                 code, macros = self.gen_code(comp, self._inputs, self._outputs,
                                     wtriple, run_id, device, channel)
+
+                macros["ACCELPY_ACCEL_RUNID"] = str(run_id)
+                macros["ACCELPY_ACCEL_DEVICE"] = str(device)
+                macros["ACCELPY_ACCEL_CHANNEL"] = str(device)
 
                 lib = comp.compile(code, macros)
 
@@ -263,15 +253,17 @@ class AccelBase(Object):
 
         self._threads_run[run_id][3] = lib 
 
+        inputs, outputs = self._pack_arguments(inputs, outputs)
+        self._order.update_argnames(inputs, outputs)
+
         _inputs = inputs if inputs else self._inputs
+        _outputs = outputs if outputs else self._outputs
 
         if _inputs:
             for input in _inputs:
                 if "h2acopy" not in input or not input["h2acopy"]:
                     if self.h2acopy(lib, input, self.getname_h2acopy(input)) != 0:
                         raise Exception("Accel h2a copy failed.")
-
-        _outputs = outputs if outputs else self._outputs
 
         if _outputs:
             for output in _outputs:

@@ -1,5 +1,6 @@
 """accelpy Order module"""
 
+import os
 
 from accelpy.core import Object
 from accelpy.util import _accelpy_builtins, appeval, funcargseval
@@ -27,8 +28,18 @@ class Order(Object):
         # invargs, outvars, kwargs
         self._names = [None, None]
 
-        self._sections = self._parse_order(order)
+        if isinstance(order, str):
+            if os.path.isfile(order):
+                with open(order) as fo:
+                    order = Order(fo.read())
 
+            self._sections = self._parse_order(order)
+
+        elif isinstance(order, Order):
+            self._sections = order._sections 
+
+        else:
+            raise Exception("Wrong order type: %s" % str(order))
 
     def _of_set_argnames(self, *vargs):
 

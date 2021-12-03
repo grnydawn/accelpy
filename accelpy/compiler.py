@@ -91,8 +91,8 @@ class Compiler(Object):
                         compiler=self.path, option=option, outfile=outfile,
                         infile=codepath, macro=opt_macro)
 
-        print(build_cmd)
-        import pdb; pdb.set_trace()
+        #print(build_cmd)
+        #import pdb; pdb.set_trace()
         out = shellcmd(build_cmd)
 
         if out.returncode != 0:
@@ -138,8 +138,8 @@ class Compiler(Object):
 
         lib = None
 
-        for f in os.listdir(self._blddir):
-            os.remove(os.path.join(self._blddir, f))
+        #for f in os.listdir(self._blddir):
+        #    os.remove(os.path.join(self._blddir, f))
 
         objfiles = []
 
@@ -425,6 +425,51 @@ class CrayFortranFortranCompiler(FortranFortranCompiler):
             raise Exception("Platform '%s' is not supported." % str(sys.platform))
 
         return opts
+
+
+class CrayClangOpenaccCppCompiler(OpenaccCppCompiler):
+
+    vendor = "cray"
+    #opt_openmp = "-h omp"
+
+    def __init__(self, path=None, option=None):
+
+        if path:
+            pass
+
+        elif which("CC"):
+            path = "CC"
+
+        elif which("crayCC"):
+            path = "crayCC"
+
+        elif which("clang++"):
+            path = "clang++"
+
+        super(CrayClangOpenaccCppCompiler, self).__init__(path, option)
+
+    def parse_version(self, stdout):
+
+        items = stdout.split()
+
+        if sys.platform == "linux":
+            if items[:3] == [b'Cray', b'clang', b'version']:
+                return items[3].decode().split(".")
+            raise Exception("Unknown version syntaxt: %s" % str(items[:3]))
+
+        else:
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
+
+    def get_option(self):
+
+        if sys.platform == "linux":
+            opts = "-shared -fPIC -h pragma=acc " + super(CrayClangOpenaccCppCompiler, self).get_option()
+
+        else:
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
+
+        return opts
+
 
 ################
 # AMD Compilers

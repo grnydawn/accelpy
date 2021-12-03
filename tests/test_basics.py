@@ -2,18 +2,18 @@
 
 import numpy as np
 import pytest
-from accelpy import Accel, CppAccel, FortranAccel, HipAccel
+from accelpy import Accel, CppAccel, FortranAccel, HipAccel, Order
 
 
 test_accels = (
 #    ("cpp", "gnu"),
-#    ("cpp", "cray"),
+    ("cpp", "cray"),
 #    ("cpp", "amd"),
 #    ("cpp", "ibm"),
 #    ("cpp", "pgi"),
 #    ("cpp", "intel"),
 #    ("fortran","gnu"),
-#    ("fortran", "cray"),
+    ("fortran", "cray"),
 #    ("fortran", "amd"),
 #    ("fortran", "ibm"),
 #    ("fortran", "pgi"),
@@ -21,7 +21,8 @@ test_accels = (
 #    ("hip", "amd"),
 #    ("cuda", "nvidia"),
 #    ("openacc_cpp", "pgi"),
-    ("openacc_cpp", "gnu"),
+#    ("openacc_cpp", "gnu"), # unresolved GNU compiler error
+    ("openacc_cpp", "cray"),
 )
 
 #######################
@@ -165,10 +166,14 @@ def test_add1d(accel, comp):
 
     c_1d.fill(0)
 
-    accel = Accel(order_vecadd1d, (a_1d, b_1d), c_1d,
+    accel = Accel(a_1d, b_1d, Order(order_vecadd1d), c_1d,
                     kind=[accel], compile=[comp])
 
     accel.run(a_1d.size)
+
+    #import pdb; pdb.set_trace()
+    #out = np.zeros(N1, dtype=np.int64)
+    #accel.run(out.size, outputs=[out], device=1)
 
     accel.stop()
 

@@ -79,6 +79,9 @@ def _unload_config():
 # accelerators
 from .accel import Accel, AccelBase
 
+# order
+from .order import Order 
+
 # import accelerator per their priority
 from .cpp import CppAccel
 from .fortran import FortranAccel

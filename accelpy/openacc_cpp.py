@@ -267,9 +267,6 @@ class OpenaccCppAccel(AccelBase):
     def gen_code(self, compiler, inputs, outputs, triple, run_id, device, channel):
 
         macros = {
-            "ACCELPY_ACCEL_RUNID": str(run_id),
-            "ACCELPY_ACCEL_DEVICE": str(device),
-            "ACCELPY_ACCEL_CHANNEL": str(device),
             "ACCELPY_OPENACC_RUNID": str(run_id),
             "ACCELPY_OPENACC_NGANGS": str(triple[0][0]*triple[0][1]*triple[0][2]),
             "ACCELPY_OPENACC_NWORKERS": str(triple[1][0]*triple[1][1]*triple[1][2]),
