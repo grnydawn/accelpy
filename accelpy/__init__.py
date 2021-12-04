@@ -83,11 +83,13 @@ from .accel import Accel, AccelBase
 from .order import Order 
 
 # import accelerator per their priority
-from .cpp import CppAccel
 from .fortran import FortranAccel
+from .openacc_fortran import OpenaccFortranAccel
+from .openmp_fortran import OpenmpFortranAccel
+from .cpp import CppAccel
 from .hip import HipAccel
 from .cuda import CudaAccel
 from .openacc_cpp import OpenaccCppAccel
-from .openacc_fortran import OpenaccFortranAccel
+from .openmp_cpp import OpenmpCppAccel
 
 del _load_config, _unload_config, atexit

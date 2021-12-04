@@ -1,4 +1,4 @@
-"""accelpy C++ Accelerator module"""
+"""accelpy Openmp C++ Accelerator module"""
 
 
 from accelpy.accel import AccelBase, get_compilers
@@ -9,6 +9,7 @@ t_main = """
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <omp.h>
 
 {varclasses}
 
@@ -94,6 +95,8 @@ t_testfunc = """
 extern "C" int64_t accelpy_test_run() {{
     int64_t res;
     
+    #pragma omp parallel for shared({varin}, {varout}) \\
+            num_threads(ACCELPY_WORKER_DIM0 * ACCELPY_WORKER_DIM1 * ACCELPY_WORKER_DIM2)
     for (int id = 0; id < {varin}.shape[0]; id++) {{
         {varout}(id) = {varin}(id);
     }}
@@ -109,7 +112,13 @@ extern "C" int64_t accelpy_kernel(){{
 
     int64_t res;
 
+    #pragma omp parallel shared({varlist}) \\
+            num_threads(ACCELPY_WORKER_DIM0 * ACCELPY_WORKER_DIM1 * ACCELPY_WORKER_DIM2)
+    {{
+
     {order}
+
+    }}
 
     res = 0;
 
@@ -117,9 +126,9 @@ extern "C" int64_t accelpy_kernel(){{
 }}
 """
 
-class CppAccel(AccelBase):
+class OpenmpCppAccel(AccelBase):
 
-    name = "cpp"
+    name = "openmp_cpp"
     lang = "cpp"
 
     # dtype: ( C type name, ctype )
@@ -220,10 +229,16 @@ class CppAccel(AccelBase):
 
         return "\n".join(out)
 
-    def gen_kernel(self):
+    def gen_kernel(self, inputs, outputs):
+
+        varlist = []
+        for arg in inputs+outputs:
+            varlist.append(arg["curname"])
 
         order =  self._order.get_section(self.name)
-        return t_kernel.format(order="\n".join(order.body))
+
+        return t_kernel.format(order="\n".join(order.body),
+                    varlist=",".join(varlist))
 
     def gen_code(self, compiler, inputs, outputs, worker_triple, run_id, device, channel):
 
@@ -233,7 +248,7 @@ class CppAccel(AccelBase):
             "varclasses":self.gen_varclasses(inputs, outputs),
             "testcode":self.gen_testcode(),
             "datacopies":self.gen_datacopies(inputs, outputs),
-            "kernel":self.gen_kernel()
+            "kernel":self.gen_kernel(inputs, outputs)
         }
 
         code = t_main.format(**main_fmt)
@@ -249,4 +264,4 @@ class CppAccel(AccelBase):
     def getname_a2hcopy(self, arg):
         return "accelpy_a2hcopy_%s" % arg["curname"]
 
-CppAccel.avails[CppAccel.name] = CppAccel
+OpenmpCppAccel.avails[OpenmpCppAccel.name] = OpenmpCppAccel

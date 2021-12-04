@@ -1,7 +1,8 @@
-"""accelpy Fortran Accelerator module"""
+"""accelpy Openmp Fortran Accelerator module"""
 
 
 from accelpy.accel import AccelBase, get_compilers
+from accelpy.fortscan import get_firstexec
 from ctypes import c_int32, c_int64, c_float, c_double
 
 t_main = """
@@ -15,11 +16,7 @@ INTEGER (C_INT64_T) FUNCTION accelpy_start() BIND(C, name="accelpy_start")
     USE, INTRINSIC :: ISO_C_BINDING
     IMPLICIT NONE
 
-    INTEGER (C_INT64_T) :: ACCELPY_WORKER_ID
-
-    ACCELPY_WORKER_ID = 0
-    
-    accelpy_start = accelpy_kernel(ACCELPY_WORKER_ID)
+    accelpy_start = accelpy_kernel()
 
 CONTAINS
 
@@ -55,16 +52,18 @@ END MODULE
 """
 
 t_kernel = """
-INTEGER (C_INT64_T) FUNCTION accelpy_kernel(ACCELPY_WORKER_ID)
+INTEGER (C_INT64_T) FUNCTION accelpy_kernel()
     USE, INTRINSIC :: ISO_C_BINDING
     USE accelpy_global, ONLY : {varandattr}
+    USE omp_lib
     IMPLICIT NONE
-
-    INTEGER (C_INT64_T), INTENT(IN) :: ACCELPY_WORKER_ID
 
     {order}
 
+    !$omp end parallel
+
     accelpy_kernel = 0
+
 END FUNCTION
 """
 
@@ -103,9 +102,14 @@ INTEGER (C_INT64_T) FUNCTION accelpy_test_run()  BIND(C, name="accelpy_test_run"
     IMPLICIT NONE
     INTEGER :: id
 
+    !$omp parallel shared({varin}, {varout}) &
+    !$omp& num_threads(ACCELPY_WORKER_DIM0 * ACCELPY_WORKER_DIM1 * ACCELPY_WORKER_DIM2)
+    !$omp do
     DO id=1, {varin}_attr%shape(1)
         {varout}(id) = {varin}(id)
     END DO
+    !$omp end do
+    !$omp end parallel
 
     accelpy_test_run = 0
 
@@ -144,9 +148,9 @@ INTEGER FUNCTION accelpy_unravel_index_type_{varname}(self, tid, dim)
 END FUNCTION
 """
 
-class FortranAccel(AccelBase):
+class OpenmpFortranAccel(AccelBase):
 
-    name = "fortran"
+    name = "openmp_fortran"
     lang = "fortran"
 
     dtypemap = {
@@ -286,14 +290,23 @@ class FortranAccel(AccelBase):
 
     def _gen_kernel(self, inputs, outputs):
 
-        names = []
+        varnames = []
+        attrnames = []
 
         for data in inputs+outputs:
-            names.append(data["curname"])
-            names.append(data["curname"]+"_attr")
+            varnames.append(data["curname"])
+            attrnames.append(data["curname"]+"_attr")
 
         order =  self._order.get_section(self.name)
-        return t_kernel.format(order="\n".join(order.body), varandattr=", ".join(names))
+        firstexec = get_firstexec(order.body)
+
+        mppar = ["!$omp parallel shared(%s) &" % ",".join(varnames),
+                  "!$omp& num_threads(ACCELPY_WORKER_DIM0 * ACCELPY_WORKER_DIM1 * ACCELPY_WORKER_DIM2)"]
+
+        body = order.body[:firstexec] + mppar + order.body[firstexec:]
+
+        return t_kernel.format(order="\n".join(body),
+                varandattr=",".join(varnames+attrnames))
 
     def _gen_varattrs(self, inputs, outputs):
 
@@ -314,4 +327,4 @@ class FortranAccel(AccelBase):
         return "accelpy_a2hcopy_%s" % arg["curname"]
 
 
-FortranAccel.avails[FortranAccel.name] = FortranAccel
+OpenmpFortranAccel.avails[OpenmpFortranAccel.name] = OpenmpFortranAccel
