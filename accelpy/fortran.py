@@ -10,19 +10,10 @@ t_main = """
 
 {datacopies}
 
-INTEGER (C_INT64_T) FUNCTION accelpy_start( &
-        run_id, device, channel, &
-        thread_x, thread_y, thread_z, &
-        team_x, team_y, team_z, &
-        assign_x, assign_y, assign_z) BIND(C, name="accelpy_start")
+INTEGER (C_INT64_T) FUNCTION accelpy_start() BIND(C, name="accelpy_start")
 
     USE, INTRINSIC :: ISO_C_BINDING
     IMPLICIT NONE
-
-    INTEGER (C_INT64_T), INTENT(IN) :: run_id, device, channel
-    INTEGER (C_INT64_T), INTENT(IN) :: thread_x, thread_y, thread_z
-    INTEGER (C_INT64_T), INTENT(IN) :: team_x, team_y, team_z
-    INTEGER (C_INT64_T), INTENT(IN) :: assign_x, assign_y, assign_z
 
     INTEGER (C_INT64_T) :: ACCELPY_WORKER_ID
 
@@ -38,7 +29,6 @@ END FUNCTION
 
 INTEGER (C_INT64_T) FUNCTION accelpy_stop() BIND(C, name="accelpy_stop")
     USE, INTRINSIC :: ISO_C_BINDING
-    USE accelpy_global, ONLY : {varattrs}
     IMPLICIT NONE
 
     accelpy_stop = 0 
@@ -79,17 +69,14 @@ END FUNCTION
 """
 
 t_h2a = """
-INTEGER (C_INT64_T) FUNCTION {funcname} (attrsize, attrs, data) BIND(C, name="{funcname}")
+INTEGER (C_INT64_T) FUNCTION {funcname} (data) BIND(C, name="{funcname}")
     USE, INTRINSIC :: ISO_C_BINDING
-    USE accelpy_global, ONLY : {varname}, {varname}_attr
+    USE accelpy_global, ONLY : {varname}
     IMPLICIT NONE
 
-    INTEGER (C_INT64_T), INTENT(IN) :: attrsize
-    INTEGER (C_INT64_T), DIMENSION(attrsize), INTENT(IN), TARGET :: attrs
     {dtype}, DIMENSION({bound}), INTENT(IN), TARGET :: data
 
     {varname} => data
-    {varname}_attr%attrs => attrs
 
     {funcname} = 0
 
@@ -97,13 +84,11 @@ END FUNCTION
 """
 
 t_a2hcopy = """
-INTEGER (C_INT64_T) FUNCTION {funcname} (attrsize, attrs, data) BIND(C, name="{funcname}")
+INTEGER (C_INT64_T) FUNCTION {funcname} (data) BIND(C, name="{funcname}")
     USE, INTRINSIC :: ISO_C_BINDING
-    USE accelpy_global, ONLY : {varname}, {varname}_attr
+    USE accelpy_global, ONLY : {varname}
     IMPLICIT NONE
 
-    INTEGER (C_INT64_T), INTENT(IN) :: attrsize
-    INTEGER (C_INT64_T), DIMENSION(attrsize), INTENT(IN) :: attrs
     {dtype}, DIMENSION({bound}), INTENT(IN), TARGET :: data
 
     {funcname} = 0
@@ -128,57 +113,24 @@ END FUNCTION
 """
 
 t_typeattr = """
-TYPE :: accelpy_attrtype
-    INTEGER (C_INT64_T), DIMENSION(:), POINTER :: attrs
+TYPE :: type_{varname}
+    INTEGER :: ndim = {ndim}
+    INTEGER :: size = {size}
+    INTEGER, DIMENSION({ndim}) :: shape = (/ {shape} /)
+    INTEGER, DIMENSION({ndim}) :: stride = (/ {stride} /)
 
 CONTAINS
 
-    PROCEDURE :: ndim => accelpy_ndim
-    PROCEDURE :: itemsize => accelpy_itemsize
-    PROCEDURE :: size => accelpy_size
-    PROCEDURE :: shape => accelpy_shape
-    PROCEDURE :: stride => accelpy_stride
-    PROCEDURE :: unravel_index => accelpy_unravel_index
+    PROCEDURE :: unravel_index => accelpy_unravel_index_type_{varname}
 END TYPE
 """
 
 t_procattr = """
-INTEGER (C_INT64_T) FUNCTION accelpy_ndim(self)
-    CLASS(accelpy_attrtype), INTENT(IN) :: self
 
-    accelpy_ndim = self%attrs(2)
-END FUNCTION
-INTEGER (C_INT64_T) FUNCTION accelpy_itemsize(self)
-    CLASS(accelpy_attrtype), INTENT(IN) :: self
-
-    accelpy_itemsize = self%attrs(3)
-END FUNCTION
-
-INTEGER (C_INT64_T) FUNCTION accelpy_size(self)
-    CLASS(accelpy_attrtype), INTENT(IN) :: self
-
-    accelpy_size = self%attrs(1)
-END FUNCTION
-
-INTEGER (C_INT64_T) FUNCTION accelpy_shape(self, dim)
-    CLASS(accelpy_attrtype), INTENT(IN) :: self
-    INTEGER, INTENT(IN) :: dim
-
-    accelpy_shape = self%attrs(3+dim)
-END FUNCTION
-
-INTEGER (C_INT64_T) FUNCTION accelpy_stride(self, dim)
-    CLASS(accelpy_attrtype), INTENT(IN) :: self
-    INTEGER, INTENT(IN) :: dim
-
-    accelpy_stride = self%attrs(3+self%attrs(2)+dim)
-END FUNCTION
-
-INTEGER (C_INT64_T) FUNCTION accelpy_unravel_index(self, tid, dim)
-    CLASS(accelpy_attrtype), INTENT(IN) :: self
+INTEGER FUNCTION accelpy_unravel_index_type_{varname}(self, tid, dim)
+    CLASS(type_{varname}), INTENT(IN) :: self
     INTEGER, INTENT(IN) :: dim, tid
-    INTEGER :: i
-    INTEGER (C_INT64_T) :: q, r, s
+    INTEGER :: i, q, r, s
 
     r = tid-1
 
@@ -188,7 +140,7 @@ INTEGER (C_INT64_T) FUNCTION accelpy_unravel_index(self, tid, dim)
         r = MOD(r, s)
     END DO
 
-    accelpy_unravel_index = q+1
+    accelpy_unravel_index_type_{varname} = q+1
 END FUNCTION
 """
 
@@ -204,33 +156,49 @@ class FortranAccel(AccelBase):
         "float64": ["REAL (C_DOUBLE)", c_double]
     }
 
-    def gen_code(self, inputs, outputs):
+    def gen_code(self, compiler, inputs, outputs, worker_triple, run_id, device, channel):
+
+        macros = {}
 
         module_fmt = {
-            "typeattr": self._get_typeattr(),
+            "typeattr": self._get_typeattr(inputs, outputs),
             "testvars": self._get_testvars(),
             "datavars": self._get_datavars(inputs, outputs),
-            "procattr": self._get_procattr(),
+            "procattr": self._get_procattr(inputs, outputs),
         }
         module = t_module.format(**module_fmt)
 
         main_fmt = {
             "testcode": self._get_testcode(),
             "datacopies":self._gen_datacopies(inputs, outputs),
-            "kernel":self._gen_kernel(inputs, outputs),
-            "varattrs":self._gen_varattrs(inputs, outputs)
+            "kernel":self._gen_kernel(inputs, outputs)
         }
         main = t_main.format(**main_fmt)
 
-        return [module, main]
+        return [module, main], macros
 
-    def _get_procattr(self):
+    def _get_procattr(self, inputs, outputs):
 
-        return t_procattr
+        out = []
 
-    def _get_typeattr(self):
+        for arg in self._testdata+inputs+outputs:
+            data = arg["data"]
+            out.append(t_procattr.format(varname=arg["curname"]))
 
-        return t_typeattr
+        return "\n".join(out)
+
+    def _get_typeattr(self, inputs, outputs):
+
+        out = []
+
+        for arg in self._testdata+inputs+outputs:
+            data = arg["data"]
+            
+            out.append(t_typeattr.format(varname=arg["curname"], ndim=str(data.ndim),
+                        size=str(data.size), shape=self.get_shapestr(arg),
+                        stride=self.get_stridestr(arg)))
+
+        return "\n".join(out)
 
     def _get_testvars(self):
 
@@ -244,7 +212,7 @@ class FortranAccel(AccelBase):
                             if ndim > 0 else "")
 
             out.append("%s, %s :: %s" % (dtype, dimension, arg["curname"]))
-            out.append("TYPE(accelpy_attrtype) :: %s_attr" % arg["curname"])
+            out.append("TYPE(type_{name}) :: {name}_attr".format(name=arg["curname"]))
 
         return "\n".join(out)
 
@@ -256,7 +224,7 @@ class FortranAccel(AccelBase):
             dtype = self.get_dtype(data)
             bound = ",".join([":"]*data["data"].ndim)
             out.append("%s, DIMENSION(%s), POINTER :: %s" % (dtype, bound, data["curname"]))
-            out.append("TYPE(accelpy_attrtype) :: %s_attr" % data["curname"])
+            out.append("TYPE(type_{name}) :: {name}_attr".format(name=data["curname"]))
 
         return "\n".join(out)
 
@@ -272,8 +240,8 @@ class FortranAccel(AccelBase):
         funcname_in = "accelpy_test_h2acopy"
         funcname_out = "accelpy_test_h2amalloc"
         funcname_a2h = "accelpy_test_a2hcopy"
-        bound_in = ",".join(["attrs(%d)"%(d+4) for d in range(input["data"].ndim)])
-        bound_out = ",".join(["attrs(%d)"%(d+4) for d in range(output["data"].ndim)])
+        bound_in = ",".join([str(s) for s in input["data"].shape])
+        bound_out = ",".join([str(s) for s in output["data"].shape])
 
         out.append(t_h2a.format(funcname=funcname_in, bound=bound_in,
                     varname=input["curname"], dtype=dtype_in))
@@ -294,7 +262,7 @@ class FortranAccel(AccelBase):
         for input in inputs:
             dtype = self.get_dtype(input)
             funcname = self.getname_h2acopy(input)
-            bound = ",".join(["attrs(%d)"%(d+4) for d in range(input["data"].ndim)])
+            bound = ",".join([str(s) for s in input["data"].shape])
 
             out.append(t_h2a.format(funcname=funcname, varname=input["curname"],
                         bound=bound, dtype=dtype))
@@ -302,14 +270,14 @@ class FortranAccel(AccelBase):
         for output in outputs:
             dtype = self.get_dtype(output)
             funcname = self.getname_h2amalloc(output)
-            bound = ",".join(["attrs(%d)"%(d+4) for d in range(output["data"].ndim)])
+            bound = ",".join([str(s) for s in output["data"].shape])
 
             out.append(t_h2a.format(funcname=funcname, varname=output["curname"],
                         bound=bound, dtype=dtype))
 
         for output in outputs:
             funcname = self.getname_a2hcopy(output)
-            bound = ",".join(["attrs(%d)"%(d+4) for d in range(output["data"].ndim)])
+            bound = ",".join([str(s) for s in output["data"].shape])
 
             out.append(t_a2hcopy.format(funcname=funcname, varname=output["curname"],
                         bound=bound, dtype=dtype))

@@ -10,10 +10,6 @@ t_main = """
 #include <stdio.h>
 #include <stdint.h>
 
-//int ACCELPY_OPENACC_NGANGS;
-//int ACCELPY_OPENACC_NWORKERS;
-//int ACCELPY_OPENACC_LENVECTOR;
-
 {varclasses}
 
 {testcode}
@@ -51,7 +47,7 @@ public:
     const unsigned int size = {size};
     const unsigned int ndim = {ndim};
     const unsigned int shape[{ndim}] = {shape};
-    const unsigned int strides[{ndim}] = {strides};
+    const unsigned int stride[{ndim}] = {stride};
 
     {dtype} & operator() ({oparg}) {{
         return data[{offset}];
@@ -152,13 +148,6 @@ class OpenaccCppAccel(AccelBase):
         "float64": ["double", c_double]
     }
 
-    def get_shapestr(self, arg):
-        return ",".join([str(s) for s in arg["data"].shape])
-
-    def get_stridestr(self, arg):
-        return ",".join([str(int(s//arg["data"].itemsize)) for s
-                in arg["data"].strides])
-
     def gen_varclasses(self, inputs, outputs):
 
         varclasses = []
@@ -168,14 +157,14 @@ class OpenaccCppAccel(AccelBase):
             dtype = self.get_dtype(arg)
 
             oparg = ", ".join(["int dim%d"%d for d in range(ndim)])
-            offset = "+".join(["strides[%d]*dim%d"%(d,d) for d in range(ndim)])
+            offset = "+".join(["stride[%d]*dim%d"%(d,d) for d in range(ndim)])
 
             varclasses_fmt = {
                 "clsname": "type_" + arg["curname"],
                 "size": str(arg["data"].size),
                 "ndim": str(ndim),
                 "shape": "{%s}" % self.get_shapestr(arg),
-                "strides": "{%s}" % self.get_stridestr(arg),
+                "stride": "{%s}" % self.get_stridestr(arg),
                 "dtype": dtype,
                 "offset":offset,
                 "oparg":oparg
@@ -184,16 +173,6 @@ class OpenaccCppAccel(AccelBase):
             varclasses.append(t_varclass.format(**varclasses_fmt))
 
         return "\n\n".join(varclasses)
-
-#    def gen_vardefs(self, inputs, outputs):
-#
-#        out = []
-#
-#        for arg in inputs+outputs:
-#            out.append("type_{name} {name} = type_{name}();".format(
-#                        name=arg["curname"]))
-#
-#        return "\n".join(out)
 
     def gen_datacopies(self, inputs, outputs):
 

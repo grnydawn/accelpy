@@ -77,6 +77,13 @@ class AccelBase(Object):
 
         return self.dtypemap[arg["data"].dtype.name][1]
 
+    def get_shapestr(self, arg):
+        return ",".join([str(s) for s in arg["data"].shape])
+
+    def get_stridestr(self, arg):
+        return ",".join([str(int(s//arg["data"].itemsize)) for s
+                in arg["data"].strides])
+
     def _pack_arguments(self, inputs, outputs):
 
         resin = []

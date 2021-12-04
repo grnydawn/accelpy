@@ -36,7 +36,7 @@ set_argnames(("x", "y"), "z")
 cpp_enable = True
 
 [cpp: enable=cpp_enable]
-    for (int id = 0; id < x.shape(0); id++) {
+    for (int id = 0; id < x.shape[0]; id++) {
         z(id) = x(id) + y(id);
     }
 
@@ -49,7 +49,7 @@ cpp_enable = True
 
 [hip, cuda]
     int id = ACCELPY_WORKER_ID0;
-    if(id < x.size()) z(id) = x(id) + y(id);
+    if(id < x.size) z(id) = x(id) + y(id);
 
 [openacc_cpp]
     #pragma acc loop gang worker vector
@@ -63,9 +63,9 @@ order_vecadd3d = """
 set_argnames(("x", "y"), "z")
 
 [cpp]
-    for (int i = 0; i < x.shape(0); i++) {
-        for (int j = 0; j < x.shape(1); j++) {
-            for (int k = 0; k < x.shape(2); k++) {
+    for (int i = 0; i < x.shape[0]; i++) {
+        for (int j = 0; j < x.shape[1]; j++) {
+            for (int k = 0; k < x.shape[2]; k++) {
                 z(i, j, k) = x(i, j, k) + y(i, j, k);
             }
         }
@@ -88,8 +88,22 @@ set_argnames(("x", "y"), "z")
     int j = ACCELPY_WORKER_ID1;
     int k = ACCELPY_WORKER_ID2;
 
-    if (i < x.shape(0) && j < x.shape(1) && k < x.shape(2))
+    if (i < x.shape[0] && j < x.shape[1] && k < x.shape[2])
         z(i, j, k) = x(i, j, k) + y(i, j, k);
+
+[openacc_cpp]
+
+    #pragma acc loop gang
+    for (int i = 0; i < x.shape[0]; i++) {
+        #pragma acc loop worker
+        for (int j = 0; j < x.shape[1]; j++) {
+            #pragma acc loop vector
+            for (int k = 0; k < x.shape[2]; k++) {
+                z(i, j, k) = x(i, j, k) + y(i, j, k);
+            }
+        }
+    }
+
 """
 
 order_matmul = """
@@ -98,10 +112,10 @@ set_argnames(("X", "Y"), "Z")
 
 [cpp]
 
-    for (int i = 0; i < X.shape(0); i++) {
-        for (int j = 0; j < Y.shape(1); j++) {
+    for (int i = 0; i < X.shape[0]; i++) {
+        for (int j = 0; j < Y.shape[1]; j++) {
             Z(i, j) = 0.0;
-            for (int k = 0; k < Y.shape(0); k++) {
+            for (int k = 0; k < Y.shape[0]; k++) {
                 Z(i, j) += X(i, k) * Y(k, j);
             }
         }
@@ -118,6 +132,20 @@ set_argnames(("X", "Y"), "Z")
             END DO
         END DO
     END DO
+
+[openacc_cpp]
+
+    #pragma acc loop gang
+    for (int i = 0; i < X.shape[0]; i++) {
+        #pragma acc loop worker
+        for (int j = 0; j < Y.shape[1]; j++) {
+            Z(i, j) = 0.0;
+            for (int k = 0; k < Y.shape[0]; k++) {
+                Z(i, j) += X(i, k) * Y(k, j);
+            }
+        }
+    }
+
 """
 
 #######################
@@ -138,11 +166,11 @@ a_2d = np.reshape(np.arange(100, dtype=np.float64), (4, 25))
 b_2d = np.reshape(np.arange(100, dtype=np.float64) * 2, (25, 4))
 c_2d = np.reshape(np.zeros(16, dtype=np.float64), (4, 4))
 
-def ttest_first():
+def test_first():
 
     c_1d.fill(0)
 
-    accel_cpp = CppAccel(order_vecadd1d, (a_1d, b_1d), c_1d)
+    accel_cpp = CppAccel(a_1d, b_1d, Order(order_vecadd1d), c_1d)
 
     accel_cpp.run(a_1d.size)
 
@@ -152,7 +180,7 @@ def ttest_first():
 
     c_1d.fill(0)
 
-    accel_fortran = FortranAccel(order_vecadd1d, (a_1d, b_1d), c_1d)
+    accel_fortran = FortranAccel(a_1d, b_1d, Order(order_vecadd1d), c_1d)
 
     accel_fortran.run(a_1d.size)
 
@@ -181,11 +209,11 @@ def test_add1d(accel, comp):
 
 
 @pytest.mark.parametrize("accel, comp", test_accels)
-def ttest_matmul(accel, comp):
+def test_matmul(accel, comp):
 
     c_2d.fill(0)
 
-    accel = Accel(order_matmul, (a_2d, b_2d), c_2d,
+    accel = Accel(a_2d, b_2d, Order(order_matmul), c_2d,
                     kind=[accel], compile=[comp])
 
     accel.run()
@@ -196,11 +224,11 @@ def ttest_matmul(accel, comp):
 
 
 @pytest.mark.parametrize("accel, comp", test_accels)
-def ttest_add3d(accel, comp):
+def test_add3d(accel, comp):
 
     c_3d.fill(0)
 
-    accel = Accel(order_vecadd3d, (a_3d, b_3d), c_3d,
+    accel = Accel(a_3d, b_3d, Order(order_vecadd3d), c_3d,
                     kind=[accel], compile=[comp])
 
     accel.run(a_3d.shape)
