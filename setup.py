@@ -3,16 +3,17 @@
 def main():
 
     from setuptools import setup, find_packages
+    from accelpy.core import name, version, description, long_description, author
 
     install_requires = ["numpy"]
     console_scripts = ["accelpy=accelpy.__main__:main"]
 
     setup(
-        name="accelpy",
-        version="0.3.0",
-        description="Scalable Accelerator Interface in Python",
-        long_description="Scalable Accelerator Interface in Python",
-        author="Youngsung Kim",
+        name=name,
+        version=version,
+        description=description,
+        long_description=long_description,
+        author=author,
         author_email="youngsung.kim.act2@gmail.com",
         classifiers=[
             "Development Status :: 3 - Alpha",

@@ -76,9 +76,9 @@ doc: ## generate Sphinx HTML docsumentation, including API docs
 	#rm -f doc/${NAME}.rst
 	#rm -f doc/modules.rst
 	#sphinx-apidocs -o doc/ ${NAME}
-	$(MAKE) -C doc clean
-	$(MAKE) -C doc html
-	$(BROWSER) doc/build/html/index.html
+	$(MAKE) -C docs clean
+	$(MAKE) -C docs html
+	$(BROWSER) docs/build/html/index.html
 
 servedoc: doc ## compile the docss watching for changes
 	watchmedo shell-command -p '*.rst' -c '$(MAKE) -C doc html' -R -D .

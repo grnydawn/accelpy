@@ -3,14 +3,11 @@
 
 import abc
 
-
 name            = "accelpy"
 version         = "0.3.0"
 description     = "Scalable Accelerator Interface in Python"
-long_description = """
-T.B.D.
-"""
-
+long_description = "Scalable Accelerator Interface in Python"
+author          = "Youngsung Kim"
 
 class Object(abc.ABC):
 
