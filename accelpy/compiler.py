@@ -282,19 +282,22 @@ class GnuFortranCompiler(FortranCompiler):
         else:
             raise Exception("Platform '%s' is not supported." % str(sys.platform))
 
+    def get_option(self):
+
+        moddir = self.opt_moddir % self._blddir
+        return  moddir + " " + super(GnuFortranCompiler, self).get_option()
+
 
 class GnuFortranFortranCompiler(FortranFortranCompiler, GnuFortranCompiler):
 
     def get_option(self):
 
-        moddir = self.opt_moddir % self._blddir
-
         if sys.platform == "darwin":
-            opts = ("-dynamiclib -fPIC %s " % moddir +
+            opts = ("-dynamiclib -fPIC " +
                     super(GnuFortranFortranCompiler, self).get_option())
 
         elif sys.platform == "linux":
-            opts = ("-shared -fPIC %s " % moddir +
+            opts = ("-shared -fPIC " +
                     super(GnuFortranFortranCompiler, self).get_option())
 
         else:
@@ -312,6 +315,22 @@ class GnuOpenaccCppCompiler(OpenaccCppCompiler, GnuCppCompiler):
 
         elif sys.platform == "linux":
             opts = "-shared -fPIC -fopenacc " + super(GnuOpenaccCppCompiler, self).get_option()
+
+        else:
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
+
+        return opts
+
+
+class GnuOpenaccFortranCompiler(OpenaccFortranCompiler, GnuFortranCompiler):
+
+    def get_option(self):
+
+        if sys.platform == "darwin":
+            opts = "-dynamiclib -fPIC -fopenacc " + super(GnuOpenaccFortranCompiler, self).get_option()
+
+        elif sys.platform == "linux":
+            opts = "-shared -fPIC -fopenacc " + super(GnuOpenaccFortranCompiler, self).get_option()
 
         else:
             raise Exception("Platform '%s' is not supported." % str(sys.platform))
@@ -403,14 +422,18 @@ class CrayFortranCompiler(FortranCompiler):
         else:
             raise Exception("Platform '%s' is not supported." % str(sys.platform))
 
+    def get_option(self):
+
+        moddir = self.opt_moddir % self._blddir
+        return moddir + " " + super(CrayFortranCompiler, self).get_option()
+
 
 class CrayFortranFortranCompiler(FortranFortranCompiler, CrayFortranCompiler):
 
     def get_option(self):
 
         if sys.platform == "linux":
-            moddir = self.opt_moddir % self._blddir
-            opts = ("-shared -fPIC %s " % moddir +
+            opts = ("-shared -fPIC " +
                     super(CrayFortranFortranCompiler, self).get_option())
 
         else:
@@ -426,6 +449,19 @@ class CrayClangOpenaccCppCompiler(OpenaccCppCompiler, CrayClangCppCompiler):
         if sys.platform == "linux":
             opts = "-shared -fPIC -h pragma=acc " + super(CrayClangOpenaccCppCompiler, self).get_option()
 
+        else:
+            raise Exception("Platform '%s' is not supported." % str(sys.platform))
+
+        return opts
+
+
+class CrayOpenaccFortranCompiler(OpenaccFortranCompiler, CrayFortranCompiler):
+
+    def get_option(self):
+
+        if sys.platform == "linux":
+            opts = ("-shared -fPIC -h acc,noomp " +
+                    super(CrayOpenaccFortranCompiler, self).get_option())
         else:
             raise Exception("Platform '%s' is not supported." % str(sys.platform))
 
@@ -507,14 +543,18 @@ class AmdFlangFortranCompiler(FortranCompiler):
         else:
             raise Exception("Platform '%s' is not supported." % str(sys.platform))
 
+    def get_option(self):
+
+        moddir = self.opt_moddir % self._blddir
+        return moddir + " " + super(AmdFlangFortranCompiler, self).get_option()
+
 
 class AmdFlangFortranFortranCompiler(FortranFortranCompiler, AmdFlangFortranCompiler):
 
     def get_option(self):
 
         if sys.platform == "linux":
-            moddir = self.opt_moddir % self._blddir
-            opts = ("-shared -fPIC %s " % moddir +
+            opts = ("-shared -fPIC " +
                     super(AmdFlangFortranFortranCompiler, self).get_option())
 
         else:
@@ -659,14 +699,18 @@ class IbmXlFortranCompiler(FortranCompiler):
         else:
             raise Exception("'%s' platform is not supported yet." % sys.platform)
 
+    def get_option(self):
+
+        moddir = self.opt_moddir % self._blddir
+        return moddir + " " + super(IbmXlFortranCompiler, self).get_option()
+
 
 class IbmXlFortranFortranCompiler(FortranFortranCompiler, IbmXlFortranCompiler):
 
     def get_option(self):
 
         if sys.platform == "linux":
-            moddir = self.opt_moddir % self._blddir
-            opts = ("-qmkshrobj -qpic %s " % moddir +
+            opts = ("-qmkshrobj -qpic " +
                     super(IbmXlFortranFortranCompiler, self).get_option())
 
         else:
@@ -780,6 +824,11 @@ class PgiFortranCompiler(FortranCompiler):
         else:
             raise Exception("'%s' platform is not supported yet." % sys.platform)
 
+    def get_option(self):
+
+        moddir = self.opt_moddir % self._blddir
+        return moddir + " " + super(PgiFortranCompiler, self).get_option()
+
 
 class PgiCppCppCompiler(CppCppCompiler, PgiCppCompiler):
 
@@ -799,8 +848,7 @@ class PgiFortranFortranCompiler(FortranFortranCompiler, PgiFortranCompiler):
     def get_option(self):
 
         if sys.platform == "linux":
-            moddir = self.opt_moddir % self._blddir
-            opts = ("-shared -fpic %s " % moddir +
+            opts = ("-shared -fpic " +
                     super(PgiFortranFortranCompiler, self).get_option())
 
         else:
@@ -911,14 +959,18 @@ class IntelFortranCompiler(FortranCompiler):
         else:
             raise Exception("'%s' platform is not supported yet." % sys.platform)
 
+    def get_option(self):
+
+        moddir = self.opt_moddir % self._blddir
+        return moddir + " " + super(IntelFortranCompiler, self).get_option()
+
 
 class IntelFortranFortranCompiler(FortranFortranCompiler, IntelFortranCompiler):
 
     def get_option(self):
 
         if sys.platform == "linux":
-            moddir = self.opt_moddir % self._blddir
-            opts = ("-shared -fpic %s " % moddir +
+            opts = ("-shared -fpic " +
                     super(IntelFortranFortranCompiler, self).get_option())
 
         else:
@@ -965,3 +1017,19 @@ def sort_compilers():
                 Compiler.avails[lang][accel][vendor] = vendorsubc
 
 sort_compilers()
+
+
+#CRAY	
+#
+#MODULES: PrgEnv-cray craype-accel-nvidia35 cudatoolkit (libsci_acc is automatically included) craype-accel-host for host cpu code 
+#FORTRAN FLAGS: -h acc,noomp #OpenACC -h noacc,omp #OpenMP4.x -fpic -dynamic -lcudart -G2
+#C FLAGLS: -h pragma=acc -h nopragma=omp -fpic -dynamic -lcudart -Gp 
+#HELP FLAGS: -rm -h msgs
+#
+# 
+#PGI	
+#
+#MODULES: PrgEnv-pgi cudatoolkit
+#FORTRAN FLAGSS: -acc -ta=nvidia or -ta=multicore for host cpu code -lcudart -mcmodel=medium
+#C FLAGS: -acc -ta=nvidia -lcudart -mcmodel=medium
+#HELP FLAGS: -Minfo=accel
