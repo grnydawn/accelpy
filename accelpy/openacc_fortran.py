@@ -152,12 +152,7 @@ class OpenaccFortranAccel(AccelBase):
 
     def gen_code(self, compiler, inputs, outputs, triple, run_id, device, channel):
 
-        macros = {
-            "ACCELPY_OPENACC_RUNID": str(run_id),
-            "ACCELPY_OPENACC_NGANGS": str(triple[0][0]*triple[0][1]*triple[0][2]),
-            "ACCELPY_OPENACC_NWORKERS": str(triple[1][0]*triple[1][1]*triple[1][2]),
-            "ACCELPY_OPENACC_LENVECTOR": str(triple[2][0]*triple[2][1]*triple[2][2]),
-        }
+        macros = {}
 
         module_fmt = {
             "typeattr": self._get_typeattr(inputs, outputs),
@@ -283,9 +278,9 @@ class OpenaccFortranAccel(AccelBase):
         order =  self._order.get_section(self.name)
         firstexec = get_firstexec(order.body)
 
-        accpar = ["!$acc parallel num_gangs(ACCELPY_OPENACC_NGANGS) &",
-                  "!$acc& num_workers(ACCELPY_OPENACC_NWORKERS) &",
-                  "!$acc& vector_length(ACCELPY_OPENACC_LENVECTOR)"]
+        accpar = ["!$acc parallel num_gangs(ACCELPY_TEAM_DIM0 * ACCELPY_TEAM_DIM1 * ACCELPY_TEAM_DIM2) &",
+                  "!$acc& num_workers(ACCELPY_WORKER_DIM0 * ACCELPY_WORKER_DIM1 * ACCELPY_WORKER_DIM2) &",
+                  "!$acc& vector_length(ACCELPY_ASSIGN_DIM0 * ACCELPY_ASSIGN_DIM1 * ACCELPY_ASSIGN_DIM2)"]
 
         body = order.body[:firstexec] + accpar + order.body[firstexec:]
 

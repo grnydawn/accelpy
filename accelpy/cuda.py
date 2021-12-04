@@ -27,8 +27,8 @@ extern "C" int64_t accelpy_start() {{
 
     int64_t res;
 
-    const dim3 teams = dim3(ACCELPY_CUDA_TEAM0, ACCELPY_CUDA_TEAM1, ACCELPY_CUDA_TEAM2);
-    const dim3 workers = dim3(ACCELPY_CUDA_WORKER0, ACCELPY_CUDA_WORKER1, ACCELPY_CUDA_WORKER2);
+    const dim3 teams = dim3(ACCELPY_TEAM_DIM0, ACCELPY_TEAM_DIM1, ACCELPY_TEAM_DIM2);
+    const dim3 workers = dim3(ACCELPY_WORKER_DIM0, ACCELPY_WORKER_DIM1, ACCELPY_WORKER_DIM2);
 
     accelpy_kernel<<<teams, workers>>>({launch_args});
 
@@ -258,15 +258,7 @@ class CudaAccel(AccelBase):
 
     def gen_code(self, compiler, inputs, outputs, triple, run_id, device, channel):
 
-        macros = {
-            "ACCELPY_CUDA_RUNID": str(run_id),
-            "ACCELPY_CUDA_TEAM0": str(triple[0][0]),
-            "ACCELPY_CUDA_TEAM1": str(triple[0][1]),
-            "ACCELPY_CUDA_TEAM2": str(triple[0][2]),
-            "ACCELPY_CUDA_WORKER0": str(triple[1][0]),
-            "ACCELPY_CUDA_WORKER1": str(triple[1][1]),
-            "ACCELPY_CUDA_WORKER2": str(triple[1][2]),
-        }
+        macros = {}
 
         args = []
         for data in inputs+outputs:

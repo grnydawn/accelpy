@@ -6,25 +6,25 @@ from accelpy import Accel, CppAccel, FortranAccel, HipAccel, Order
 
 
 test_accels = (
-#    ("cpp", "gnu"),
+    ("cpp", "gnu"),
 #    ("cpp", "cray"),
 #    ("cpp", "amd"),
 #    ("cpp", "ibm"),
 #    ("cpp", "pgi"),
-    ("cpp", "intel"),
+#    ("cpp", "intel"),
 #    ("fortran","gnu"),
 #    ("fortran", "cray"),
 #    ("fortran", "amd"),
 #    ("fortran", "ibm"),
 #    ("fortran", "pgi"),
-    ("fortran", "intel"),
+#    ("fortran", "intel"),
 #    ("hip", "amd"),
 #    ("cuda", "nvidia"),
 #    ("openacc_cpp", "pgi"),
-#    ("openacc_cpp", "gnu"), # unresolved GNU compiler error on Summit
+#    ("openacc_cpp", "gnu"), # GNU compiler error on Summit
 #    ("openacc_cpp", "cray"),
 #    ("openacc_fortran", "pgi"),
-#    ("openacc_fortran", "gnu"), # unresolved GNU compiler error on Summit
+#    ("openacc_fortran", "gnu"), # GNU compiler error on Summit
 #    ("openacc_fortran", "cray"),
 )
 

@@ -28,8 +28,8 @@ extern "C" int64_t accelpy_start() {{
 
     int64_t res;
 
-    const dim3 teams = dim3(ACCELPY_HIP_TEAM_ARGS);
-    const dim3 workers = dim3(ACCELPY_HIP_WORKER_ARGS);
+    const dim3 teams = dim3(ACCELPY_TEAM_DIM0, ACCELPY_TEAM_DIM1, ACCELPY_TEAM_DIM2);
+    const dim3 workers = dim3(ACCELPY_WORKER_DIM0, ACCELPY_WORKER_DIM1, ACCELPY_WORKER_DIM2);
 
     accelpy_kernel<<<teams, workers>>>({launch_args});
 
@@ -259,11 +259,7 @@ class HipAccel(AccelBase):
 
     def gen_code(self, compiler, inputs, outputs, triple, run_id, device, channel):
 
-        macros = {
-            "ACCELPY_HIP_RUNID": str(run_id),
-            "ACCELPY_HIP_TEAM_ARGS": ",".join([str(t) for t in triple[0]]),
-            "ACCELPY_HIP_WORKER_ARGS": ",".join([str(t) for t in triple[1]]),
-        }
+        macros = {}
 
 
         args = []

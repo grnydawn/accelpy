@@ -161,9 +161,18 @@ class AccelBase(Object):
                 code, macros = self.gen_code(comp, self._inputs, self._outputs,
                                     wtriple, run_id, device, channel)
 
-                macros["ACCELPY_ACCEL_RUNID"] = str(run_id)
-                macros["ACCELPY_ACCEL_DEVICE"] = str(device)
-                macros["ACCELPY_ACCEL_CHANNEL"] = str(device)
+                macros["ACCELPY_ACCEL_RUNID"] = run_id
+                macros["ACCELPY_ACCEL_DEVICE"] = device
+                macros["ACCELPY_ACCEL_CHANNEL"] = channel
+                macros["ACCELPY_TEAM_DIM0"] = wtriple[0][0]
+                macros["ACCELPY_TEAM_DIM1"] = wtriple[0][1]
+                macros["ACCELPY_TEAM_DIM2"] = wtriple[0][2]
+                macros["ACCELPY_WORKER_DIM0"] = wtriple[1][0]
+                macros["ACCELPY_WORKER_DIM1"] = wtriple[1][1]
+                macros["ACCELPY_WORKER_DIM2"] = wtriple[1][2]
+                macros["ACCELPY_ASSIGN_DIM0"] = wtriple[2][0]
+                macros["ACCELPY_ASSIGN_DIM1"] = wtriple[2][1]
+                macros["ACCELPY_ASSIGN_DIM2"] = wtriple[2][2]
 
                 lib = comp.compile(code, macros)
 

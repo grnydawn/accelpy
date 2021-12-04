@@ -123,10 +123,14 @@ extern "C" int64_t accelpy_kernel(){{
 
     int64_t res;
 
-    #pragma acc parallel num_gangs(ACCELPY_OPENACC_NGANGS) \\
-        num_workers(ACCELPY_OPENACC_NWORKERS) vector_length(ACCELPY_OPENACC_LENVECTOR)
+    #pragma acc parallel num_gangs(ACCELPY_TEAM_DIM0 * ACCELPY_TEAM_DIM1 * ACCELPY_TEAM_DIM2) \\
+                 num_workers(ACCELPY_WORKER_DIM0 * ACCELPY_WORKER_DIM1 * ACCELPY_WORKER_DIM2) \\
+               vector_length(ACCELPY_ASSIGN_DIM0 * ACCELPY_ASSIGN_DIM1 * ACCELPY_ASSIGN_DIM2)
+    {{
 
     {order}
+
+    }}
 
     res = 0;
 
