@@ -166,6 +166,7 @@ class CppCompiler(Compiler):
     lang = "cpp"
     codeext = "cpp"
 
+
 class FortranCompiler(Compiler):
 
     lang = "fortran"
@@ -175,41 +176,37 @@ class FortranCompiler(Compiler):
 class CppCppCompiler(CppCompiler):
 
     accel = "cpp"
-    opt_version = "--version"
 
 
 class HipCppCompiler(CppCompiler):
 
     accel = "hip"
-    opt_version = "--version"
 
 
 class CudaCppCompiler(CppCompiler):
 
     accel = "cuda"
     codeext = "cu"
-    opt_version = "--version"
 
 
 class OpenaccCppCompiler(CppCompiler):
 
     accel = "openacc_cpp"
-    opt_version = "--version"
 
 
 class FortranFortranCompiler(FortranCompiler):
 
     accel = "fortran"
-    opt_version = "--version"
 
 
 ################
 # GNU Compilers
 ################
 
-class GnuCppCppCompiler(CppCppCompiler):
+class GnuCppCompiler(CppCompiler):
 
     vendor = "gnu"
+    opt_version = "--version"
     #opt_openmp = "--fopenmp"
 
     def __init__(self, path=None, option=None):
@@ -217,7 +214,7 @@ class GnuCppCppCompiler(CppCppCompiler):
         if not path:
             path = "g++"
 
-        super(GnuCppCppCompiler, self).__init__(path, option)
+        super(GnuCppCompiler, self).__init__(path, option)
 
     def parse_version(self, stdout):
 
@@ -236,6 +233,9 @@ class GnuCppCppCompiler(CppCppCompiler):
         else:
             raise Exception("Platform '%s' is not supported." % str(sys.platform))
 
+
+class GnuCppCppCompiler(CppCppCompiler, GnuCppCompiler):
+
     def get_option(self):
 
         if sys.platform == "darwin":
@@ -249,9 +249,11 @@ class GnuCppCppCompiler(CppCppCompiler):
 
         return opts
 
-class GnuFortranFortranCompiler(FortranFortranCompiler):
+
+class GnuFortranCompiler(FortranCompiler):
 
     vendor = "gnu"
+    opt_version = "--version"
     #opt_openmp = "-fopenmp"
     opt_moddir = "-J %s"
 
@@ -260,7 +262,7 @@ class GnuFortranFortranCompiler(FortranFortranCompiler):
         if not path:
             path = "gfortran"
 
-        super(GnuFortranFortranCompiler, self).__init__(path, option)
+        super(GnuFortranCompiler, self).__init__(path, option)
 
     def parse_version(self, stdout):
 
@@ -273,6 +275,9 @@ class GnuFortranFortranCompiler(FortranFortranCompiler):
 
         else:
             raise Exception("Platform '%s' is not supported." % str(sys.platform))
+
+
+class GnuFortranFortranCompiler(FortranFortranCompiler, GnuFortranCompiler):
 
     def get_option(self):
 
@@ -292,34 +297,7 @@ class GnuFortranFortranCompiler(FortranFortranCompiler):
         return opts
 
 
-class GnuOpenaccCppCompiler(OpenaccCppCompiler):
-
-    vendor = "gnu"
-    #opt_openmp = "--fopenmp"
-
-    def __init__(self, path=None, option=None):
-
-        if not path:
-            path = "g++"
-
-        super(GnuOpenaccCppCompiler, self).__init__(path, option)
-
-    def parse_version(self, stdout):
-
-        items = stdout.split()
-        
-        if sys.platform == "darwin":
-            if items[:3] == [b'Apple', b'clang', b'version']:
-                return items[3].decode().split(".")
-            raise Exception("Unknown version syntaxt: %s" % str(items[:3]))
-
-        elif sys.platform == "linux":
-            if items[:2] == [b'g++', b'(GCC)']:
-                return items[2].decode().split(".")
-            raise Exception("Unknown version syntaxt: %s" % str(items[:2]))
-
-        else:
-            raise Exception("Platform '%s' is not supported." % str(sys.platform))
+class GnuOpenaccCppCompiler(OpenaccCppCompiler, GnuCppCompiler):
 
     def get_option(self):
 
@@ -339,9 +317,10 @@ class GnuOpenaccCppCompiler(OpenaccCppCompiler):
 # Cray Compilers
 ################
 
-class CrayClangCppCppCompiler(CppCppCompiler):
+class CrayClangCppCompiler(CppCompiler):
 
     vendor = "cray"
+    opt_version = "--version"
     #opt_openmp = "-h omp"
 
     def __init__(self, path=None, option=None):
@@ -358,7 +337,7 @@ class CrayClangCppCppCompiler(CppCppCompiler):
         elif which("clang++"):
             path = "clang++"
 
-        super(CrayClangCppCppCompiler, self).__init__(path, option)
+        super(CrayClangCppCompiler, self).__init__(path, option)
 
     def parse_version(self, stdout):
 
@@ -372,6 +351,9 @@ class CrayClangCppCppCompiler(CppCppCompiler):
         else:
             raise Exception("Platform '%s' is not supported." % str(sys.platform))
 
+
+class CrayClangCppCppCompiler(CppCppCompiler, CrayClangCppCompiler):
+
     def get_option(self):
 
         if sys.platform == "linux":
@@ -383,9 +365,10 @@ class CrayClangCppCppCompiler(CppCppCompiler):
         return opts
 
 
-class CrayFortranFortranCompiler(FortranFortranCompiler):
+class CrayFortranCompiler(FortranCompiler):
 
     vendor = "cray"
+    opt_version = "--version"
     #opt_openmp = "-h omp"
     opt_moddir = "-J %s"
 
@@ -400,7 +383,7 @@ class CrayFortranFortranCompiler(FortranFortranCompiler):
         elif which("crayftn"):
             path = "crayftn"
 
-        super(CrayFortranFortranCompiler, self).__init__(path, option)
+        super(CrayFortranCompiler, self).__init__(path, option)
 
     def parse_version(self, stdout):
 
@@ -413,6 +396,9 @@ class CrayFortranFortranCompiler(FortranFortranCompiler):
 
         else:
             raise Exception("Platform '%s' is not supported." % str(sys.platform))
+
+
+class CrayFortranFortranCompiler(FortranFortranCompiler, CrayFortranCompiler):
 
     def get_option(self):
 
@@ -427,38 +413,7 @@ class CrayFortranFortranCompiler(FortranFortranCompiler):
         return opts
 
 
-class CrayClangOpenaccCppCompiler(OpenaccCppCompiler):
-
-    vendor = "cray"
-    #opt_openmp = "-h omp"
-
-    def __init__(self, path=None, option=None):
-
-        if path:
-            pass
-
-        elif which("CC"):
-            path = "CC"
-
-        elif which("crayCC"):
-            path = "crayCC"
-
-        elif which("clang++"):
-            path = "clang++"
-
-        super(CrayClangOpenaccCppCompiler, self).__init__(path, option)
-
-    def parse_version(self, stdout):
-
-        items = stdout.split()
-
-        if sys.platform == "linux":
-            if items[:3] == [b'Cray', b'clang', b'version']:
-                return items[3].decode().split(".")
-            raise Exception("Unknown version syntaxt: %s" % str(items[:3]))
-
-        else:
-            raise Exception("Platform '%s' is not supported." % str(sys.platform))
+class CrayClangOpenaccCppCompiler(OpenaccCppCompiler, CrayClangCppCompiler):
 
     def get_option(self):
 
@@ -475,9 +430,10 @@ class CrayClangOpenaccCppCompiler(OpenaccCppCompiler):
 # AMD Compilers
 ################
 
-class AmdClangCppCppCompiler(CppCppCompiler):
+class AmdClangCppCompiler(CppCompiler):
 
     vendor = "amd"
+    opt_version = "--version"
     #opt_openmp = "-fopenmp"
 
     def __init__(self, path=None, option=None):
@@ -488,7 +444,7 @@ class AmdClangCppCppCompiler(CppCppCompiler):
         elif which("clang++"):
             path = "clang++"
 
-        super(AmdClangCppCppCompiler, self).__init__(path, option)
+        super(AmdClangCppCompiler, self).__init__(path, option)
 
     def parse_version(self, stdout):
 
@@ -502,6 +458,9 @@ class AmdClangCppCppCompiler(CppCppCompiler):
         else:
             raise Exception("Platform '%s' is not supported." % str(sys.platform))
 
+
+class AmdClangCppCppCompiler(CppCppCompiler, AmdClangCppCompiler):
+
     def get_option(self):
 
         if sys.platform == "linux":
@@ -512,9 +471,11 @@ class AmdClangCppCppCompiler(CppCppCompiler):
 
         return opts
 
-class AmdFlangFortranFortranCompiler(FortranFortranCompiler):
+
+class AmdFlangFortranCompiler(FortranCompiler):
 
     vendor = "amd"
+    opt_version = "--version"
     #opt_openmp = "-fopenmp"
     opt_moddir = "-J %s"
 
@@ -526,7 +487,7 @@ class AmdFlangFortranFortranCompiler(FortranFortranCompiler):
         elif which("flang"):
             path = "flang"
 
-        super(AmdFlangFortranFortranCompiler, self).__init__(path, option)
+        super(AmdFlangFortranCompiler, self).__init__(path, option)
 
     def parse_version(self, stdout):
 
@@ -540,6 +501,9 @@ class AmdFlangFortranFortranCompiler(FortranFortranCompiler):
         else:
             raise Exception("Platform '%s' is not supported." % str(sys.platform))
 
+
+class AmdFlangFortranFortranCompiler(FortranFortranCompiler, AmdFlangFortranCompiler):
+
     def get_option(self):
 
         if sys.platform == "linux":
@@ -552,9 +516,11 @@ class AmdFlangFortranFortranCompiler(FortranFortranCompiler):
 
         return opts
 
+
 class AmdHipCppCompiler(HipCppCompiler):
 
     vendor = "amd"
+    opt_version = "--version"
 
     def __init__(self, path=None, option=None):
 
@@ -592,7 +558,7 @@ class AmdHipCppCompiler(HipCppCompiler):
 # IBM XL Compilers
 ###################
 
-class IbmXlCppCppCompiler(CppCppCompiler):
+class IbmXlCppCompiler(CppCompiler):
 
     vendor = "ibm"
     #opt_openmp = "-qsmp=omp"
@@ -609,7 +575,7 @@ class IbmXlCppCppCompiler(CppCppCompiler):
         elif which("xlc++"):
             path = "xlc++"
 
-        super(IbmXlCppCppCompiler, self).__init__(path, option)
+        super(IbmXlCppCompiler, self).__init__(path, option)
 
     def parse_version(self, stdout):
 
@@ -623,6 +589,9 @@ class IbmXlCppCppCompiler(CppCppCompiler):
         else:
             raise Exception("'%s' platform is not supported yet." % sys.platform)
 
+
+class IbmXlCppCppCompiler(CppCppCompiler, IbmXlCppCompiler):
+
     def get_option(self):
 
         if sys.platform == "linux":
@@ -633,7 +602,8 @@ class IbmXlCppCppCompiler(CppCppCompiler):
 
         return opts
 
-class IbmXlFortranFortranCompiler(FortranFortranCompiler):
+
+class IbmXlFortranCompiler(FortranCompiler):
 
     vendor = "ibm"
     #opt_openmp = "-qsmp=omp"
@@ -669,7 +639,7 @@ class IbmXlFortranFortranCompiler(FortranFortranCompiler):
         elif which("xlf90"):
             path = "xlf90"
 
-        super(IbmXlFortranFortranCompiler, self).__init__(path, option)
+        super(IbmXlFortranCompiler, self).__init__(path, option)
 
     def parse_version(self, stdout):
 
@@ -682,6 +652,9 @@ class IbmXlFortranFortranCompiler(FortranFortranCompiler):
 
         else:
             raise Exception("'%s' platform is not supported yet." % sys.platform)
+
+
+class IbmXlFortranFortranCompiler(FortranFortranCompiler, IbmXlFortranCompiler):
 
     def get_option(self):
 
@@ -703,6 +676,7 @@ class IbmXlFortranFortranCompiler(FortranFortranCompiler):
 class NvidiaCudaCppCompiler(CudaCppCompiler):
 
     vendor = "nvidia"
+    opt_version = "--version"
 
     def __init__(self, path=None, option=None):
 
@@ -742,9 +716,10 @@ class NvidiaCudaCppCompiler(CudaCppCompiler):
 # PGI Compilers
 ###################
 
-class PgiCppCppCompiler(CppCppCompiler):
+class PgiCppCompiler(CppCompiler):
 
     vendor = "pgi"
+    opt_version = "--version"
     #opt_openmp = "-mp"
 
     def __init__(self, path=None, option=None):
@@ -755,7 +730,7 @@ class PgiCppCppCompiler(CppCppCompiler):
         elif which("pgc++"):
             path = "pgc++"
 
-        super(PgiCppCppCompiler, self).__init__(path, option)
+        super(PgiCppCompiler, self).__init__(path, option)
 
     def parse_version(self, stdout):
 
@@ -769,19 +744,11 @@ class PgiCppCppCompiler(CppCppCompiler):
         else:
             raise Exception("'%s' platform is not supported yet." % sys.platform)
 
-    def get_option(self):
 
-        if sys.platform == "linux":
-            opts = "-shared -fpic " + super(PgiCppCppCompiler, self).get_option()
-
-        else:
-            raise Exception("'%s' platform is not supported yet." % sys.platform)
-
-        return opts
-
-class PgiFortranFortranCompiler(FortranFortranCompiler):
+class PgiFortranCompiler(FortranCompiler):
 
     vendor = "pgi"
+    opt_version = "--version"
     #opt_openmp = "-mp"
     opt_moddir = "-module %s"
 
@@ -793,7 +760,7 @@ class PgiFortranFortranCompiler(FortranFortranCompiler):
         elif which("pgfortran"):
             path = "pgfortran"
 
-        super(PgiFortranFortranCompiler, self).__init__(path, option)
+        super(PgiFortranCompiler, self).__init__(path, option)
 
     def parse_version(self, stdout):
 
@@ -806,6 +773,22 @@ class PgiFortranFortranCompiler(FortranFortranCompiler):
 
         else:
             raise Exception("'%s' platform is not supported yet." % sys.platform)
+
+
+class PgiCppCppCompiler(CppCppCompiler, PgiCppCompiler):
+
+    def get_option(self):
+
+        if sys.platform == "linux":
+            opts = "-shared -fpic " + super(PgiCppCppCompiler, self).get_option()
+
+        else:
+            raise Exception("'%s' platform is not supported yet." % sys.platform)
+
+        return opts
+
+
+class PgiFortranFortranCompiler(FortranFortranCompiler, PgiFortranCompiler):
 
     def get_option(self):
 
@@ -820,32 +803,7 @@ class PgiFortranFortranCompiler(FortranFortranCompiler):
         return opts
 
 
-class PgiOpenaccCppCompiler(OpenaccCppCompiler):
-
-    vendor = "pgi"
-    #opt_openmp = "-mp"
-
-    def __init__(self, path=None, option=None):
-
-        if path:
-            pass
-
-        elif which("pgc++"):
-            path = "pgc++"
-
-        super(PgiOpenaccCppCompiler, self).__init__(path, option)
-
-    def parse_version(self, stdout):
-
-        items = stdout.strip().split()
-
-        if sys.platform == "linux":
-            if items[0] == b'pgc++':
-                return items[1].decode().split(".")
-            raise Exception("Unknown version syntaxt: %s" % str(items[:1]))
-
-        else:
-            raise Exception("'%s' platform is not supported yet." % sys.platform)
+class PgiOpenaccCppCompiler(OpenaccCppCompiler, PgiCppCompiler):
 
     def get_option(self):
 
@@ -862,9 +820,10 @@ class PgiOpenaccCppCompiler(OpenaccCppCompiler):
 # Intel Compilers
 ###################
 
-class IntelCppCppCompiler(CppCppCompiler):
+class IntelCppCompiler(CppCompiler):
 
     vendor = "intel"
+    opt_version = "--version"
     #opt_openmp = "-qopenmp"
 
     def __init__(self, path=None, option=None):
@@ -875,7 +834,7 @@ class IntelCppCppCompiler(CppCppCompiler):
         elif which("icpc"):
             path = "icpc"
 
-        super(IntelCppCppCompiler, self).__init__(path, option)
+        super(IntelCppCompiler, self).__init__(path, option)
 
     def parse_version(self, stdout):
 
@@ -889,6 +848,10 @@ class IntelCppCppCompiler(CppCppCompiler):
         else:
             raise Exception("'%s' platform is not supported yet." % sys.platform)
 
+
+class IntelCppCppCompiler(CppCppCompiler, IntelCppCompiler):
+
+
     def get_option(self):
 
         if sys.platform == "linux":
@@ -899,9 +862,11 @@ class IntelCppCppCompiler(CppCppCompiler):
 
         return opts
 
-class IntelFortranFortranCompiler(FortranFortranCompiler):
+
+class IntelFortranCompiler(FortranCompiler):
 
     vendor = "intel"
+    opt_version = "--version"
     #opt_openmp = "-qopenmp"
     opt_moddir = "-module %s"
 
@@ -927,6 +892,9 @@ class IntelFortranFortranCompiler(FortranFortranCompiler):
         else:
             raise Exception("'%s' platform is not supported yet." % sys.platform)
 
+
+class IntelFortranFortranCompiler(FortranFortranCompiler, IntelFortranCompiler):
+
     def get_option(self):
 
         if sys.platform == "linux":
@@ -942,26 +910,39 @@ class IntelFortranFortranCompiler(FortranFortranCompiler):
 
 # priorities
 _lang_priority = ["fortran", "cpp"]
-_accel_priority = ["openacc_cpp", "hip", "cuda", "fortran", "cpp"]
+_accel_priority = ["openacc_fortran", "openacc_cpp", "hip", "cuda", "fortran", "cpp"]
 _vendor_priority = ["cray", "amd", "nvidia", "intel", "pgi", "ibm", "gnu"]
 
-def _langsort(l):
-    return _lang_priority.index(l.lang)
+def sort_compilers():
 
-def _accelsort(a):
-    return _accel_priority.index(a.accel)
+    def _langsort(l):
+        return _lang_priority.index(l.lang)
 
-def _vendorsort(v):
-    return _vendor_priority.index(v.vendor)
+    def _accelsort(a):
+        if hasattr(a, "accel"):
+            return _accel_priority.index(a.accel)
 
-for langsubc in sorted(Compiler.__subclasses__(), key=_langsort):
-    lang = langsubc.lang
-    Compiler.avails[lang] = OrderedDict()
+        else:
+            return -1
 
-    for accelsubc in sorted(langsubc.__subclasses__(), key=_accelsort):
-        accel = accelsubc.accel
-        Compiler.avails[lang][accel] = OrderedDict()
+    def _vendorsort(v):
+        return _vendor_priority.index(v.vendor)
 
-        for vendorsubc in sorted(accelsubc.__subclasses__(), key=_vendorsort):
-            vendor = vendorsubc.vendor
-            Compiler.avails[lang][accel][vendor] = vendorsubc
+    Compiler.avails = OrderedDict()
+
+    for langsubc in sorted(Compiler.__subclasses__(), key=_langsort):
+        lang = langsubc.lang
+        Compiler.avails[lang] = OrderedDict()
+
+        for accelsubc in sorted(langsubc.__subclasses__(), key=_accelsort):
+            if not hasattr(accelsubc, "accel"):
+                continue
+
+            accel = accelsubc.accel
+            Compiler.avails[lang][accel] = OrderedDict()
+
+            for vendorsubc in sorted(accelsubc.__subclasses__(), key=_vendorsort):
+                vendor = vendorsubc.vendor
+                Compiler.avails[lang][accel][vendor] = vendorsubc
+
+sort_compilers()

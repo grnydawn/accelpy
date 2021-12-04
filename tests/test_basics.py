@@ -8,21 +8,22 @@ from accelpy import Accel, CppAccel, FortranAccel, HipAccel, Order
 test_accels = (
 #    ("cpp", "gnu"),
 #    ("cpp", "cray"),
-#    ("cpp", "amd"),
+    ("cpp", "amd"),
 #    ("cpp", "ibm"),
-    ("cpp", "pgi"),
+#    ("cpp", "pgi"),
 #    ("cpp", "intel"),
 #    ("fortran","gnu"),
 #    ("fortran", "cray"),
-#    ("fortran", "amd"),
+    ("fortran", "amd"),
 #    ("fortran", "ibm"),
-    ("fortran", "pgi"),
+#    ("fortran", "pgi"),
 #    ("fortran", "intel"),
-#    ("hip", "amd"),
-    ("cuda", "nvidia"),
-    ("openacc_cpp", "pgi"),
-#    ("openacc_cpp", "gnu"), # unresolved GNU compiler error
+    ("hip", "amd"),
+#    ("cuda", "nvidia"),
+#    ("openacc_cpp", "pgi"),
+#    ("openacc_cpp", "gnu"), # unresolved GNU compiler error on Summit
 #    ("openacc_cpp", "cray"),
+#    ("openacc_fortran", "pgi"),
 )
 
 #######################
@@ -56,6 +57,16 @@ cpp_enable = True
     for (int id = 0; id < x.shape[0]; id++) {
         z(id) = x(id) + y(id);
     }
+
+[openacc_fortran]
+    INTEGER id
+
+    #pragma acc loop gang worker vector
+    DO id=1, x_attr%shape(1)
+        z(id) = x(id) + y(id)
+    END DO
+
+
 """
 
 order_vecadd3d = """
@@ -221,7 +232,7 @@ def test_add1d(accel, comp):
 
 
 @pytest.mark.parametrize("accel, comp", test_accels)
-def test_matmul(accel, comp):
+def ttest_matmul(accel, comp):
 
     c_2d.fill(0)
 
@@ -236,7 +247,7 @@ def test_matmul(accel, comp):
 
 
 @pytest.mark.parametrize("accel, comp", test_accels)
-def test_add3d(accel, comp):
+def ttest_add3d(accel, comp):
 
     c_3d.fill(0)
 
