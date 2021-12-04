@@ -11,7 +11,7 @@
 Welcome to accelpy's documentation!
 ===================================
 
-**accelpy** is a light-weight accelerator interface that allows a gradual migration of time-consuming code to various accelerators such as GPU through multiple programming models including Cuda, Hip, OpenAcc, OpenMp, C++, and Fortran.
+**accelpy** is a light-weight Python accelerator interface that allows a gradual migration of time-consuming code to various accelerators such as GPU through multiple programming models including Cuda, Hip, OpenAcc, OpenMp, C++, and Fortran.
 
 An example of adding two vectors in Cuda, Hip, OpenAcc, or OpenMp:
 
