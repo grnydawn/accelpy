@@ -18,7 +18,7 @@ test_accels = (
 #    ("fortran", "ibm"),
 #    ("fortran", "pgi"),
 #    ("fortran", "intel"),
-#    ("hip", "amd"),
+    ("hip", "amd"),
 #    ("cuda", "nvidia"),
 #    ("openacc_cpp", "pgi"),
 #    ("openacc_cpp", "gnu"), # unresolved GNU compiler error
@@ -48,7 +48,7 @@ cpp_enable = True
     END DO
 
 [hip, cuda]
-    int id = ACCELPY_WORKER_ID0;
+    int id = blockIdx.x * blockDim.x + threadIdx.x;
     if(id < x.size) z(id) = x(id) + y(id);
 
 [openacc_cpp]
@@ -84,9 +84,9 @@ set_argnames(("x", "y"), "z")
 
 [hip, cuda]
 
-    int i = ACCELPY_WORKER_ID0;
-    int j = ACCELPY_WORKER_ID1;
-    int k = ACCELPY_WORKER_ID2;
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
 
     if (i < x.shape[0] && j < x.shape[1] && k < x.shape[2])
         z(i, j, k) = x(i, j, k) + y(i, j, k);
@@ -133,6 +133,18 @@ set_argnames(("X", "Y"), "Z")
         END DO
     END DO
 
+[hip, cuda]
+
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (i < X.shape[0] && j < Y.shape[1]) {
+        Z(i, j) = 0.0;
+        for (int k = 0; k < Y.shape[0]; k++) {
+            Z(i, j) += X(i, k) * Y(k, j);
+        }
+    }
+
 [openacc_cpp]
 
     #pragma acc loop gang
@@ -166,7 +178,7 @@ a_2d = np.reshape(np.arange(100, dtype=np.float64), (4, 25))
 b_2d = np.reshape(np.arange(100, dtype=np.float64) * 2, (25, 4))
 c_2d = np.reshape(np.zeros(16, dtype=np.float64), (4, 4))
 
-def test_first():
+def ttest_first():
 
     c_1d.fill(0)
 
@@ -216,7 +228,7 @@ def test_matmul(accel, comp):
     accel = Accel(a_2d, b_2d, Order(order_matmul), c_2d,
                     kind=[accel], compile=[comp])
 
-    accel.run()
+    accel.run(c_2d.shape)
 
     accel.stop()
 

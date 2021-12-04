@@ -243,11 +243,6 @@ class CppAccel(AccelBase):
 
         return code, macros
 
-    def get_vartype(self, arg, prefix=""):
-
-        dtype = self.get_dtype(arg)
-        return "%s%s_dim%d" % (prefix, dtype, arg["data"].ndim)
-
     def getname_h2amalloc(self, arg):
         return "accelpy_h2amalloc_%s" % arg["curname"]
 
