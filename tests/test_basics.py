@@ -8,22 +8,22 @@ from accelpy import Accel, CppAccel, FortranAccel, HipAccel, Order
 test_accels = (
 #    ("cpp", "gnu"),
 #    ("cpp", "cray"),
-    ("cpp", "amd"),
+#    ("cpp", "amd"),
 #    ("cpp", "ibm"),
 #    ("cpp", "pgi"),
 #    ("cpp", "intel"),
 #    ("fortran","gnu"),
 #    ("fortran", "cray"),
-    ("fortran", "amd"),
+#    ("fortran", "amd"),
 #    ("fortran", "ibm"),
 #    ("fortran", "pgi"),
 #    ("fortran", "intel"),
-    ("hip", "amd"),
+#    ("hip", "amd"),
 #    ("cuda", "nvidia"),
 #    ("openacc_cpp", "pgi"),
 #    ("openacc_cpp", "gnu"), # unresolved GNU compiler error on Summit
 #    ("openacc_cpp", "cray"),
-#    ("openacc_fortran", "pgi"),
+    ("openacc_fortran", "pgi"),
 )
 
 #######################
@@ -61,10 +61,11 @@ cpp_enable = True
 [openacc_fortran]
     INTEGER id
 
-    #pragma acc loop gang worker vector
+    !$acc loop gang worker vector
     DO id=1, x_attr%shape(1)
         z(id) = x(id) + y(id)
     END DO
+    !$acc end loop
 
 
 """
@@ -114,6 +115,20 @@ set_argnames(("x", "y"), "z")
             }
         }
     }
+
+[openacc_fortran]
+    INTEGER i, j, k
+
+    !$acc loop gang
+    DO i=1, x_attr%shape(1)
+        !$acc loop worker
+        DO j=1, x_attr%shape(2)
+            !$acc loop vector
+            DO k=1, x_attr%shape(3)
+                z(i, j, k) = x(i, j, k) + y(i, j, k)
+            END DO
+        END DO
+    END DO
 
 """
 
@@ -169,6 +184,20 @@ set_argnames(("X", "Y"), "Z")
         }
     }
 
+[openacc_fortran]
+    INTEGER i, j, k
+
+    !$acc loop gang
+    DO i=1, X_attr%shape(1)
+        !$acc loop worker
+        DO j=1, Y_attr%shape(2)
+            Z(i, j) = 0
+            DO k=1, Y_attr%shape(1)
+                Z(i, j) = Z(i, j) + X(i, k) * Y(k, j)
+            END DO
+        END DO
+    END DO
+
 """
 
 #######################
@@ -189,7 +218,7 @@ a_2d = np.reshape(np.arange(100, dtype=np.float64), (4, 25))
 b_2d = np.reshape(np.arange(100, dtype=np.float64) * 2, (25, 4))
 c_2d = np.reshape(np.zeros(16, dtype=np.float64), (4, 4))
 
-def ttest_first():
+def test_first():
 
     c_1d.fill(0)
 
@@ -232,7 +261,7 @@ def test_add1d(accel, comp):
 
 
 @pytest.mark.parametrize("accel, comp", test_accels)
-def ttest_matmul(accel, comp):
+def test_matmul(accel, comp):
 
     c_2d.fill(0)
 
@@ -247,7 +276,7 @@ def ttest_matmul(accel, comp):
 
 
 @pytest.mark.parametrize("accel, comp", test_accels)
-def ttest_add3d(accel, comp):
+def test_add3d(accel, comp):
 
     c_3d.fill(0)
 

@@ -88,5 +88,6 @@ from .fortran import FortranAccel
 from .hip import HipAccel
 from .cuda import CudaAccel
 from .openacc_cpp import OpenaccCppAccel
+from .openacc_fortran import OpenaccFortranAccel
 
 del _load_config, _unload_config, atexit

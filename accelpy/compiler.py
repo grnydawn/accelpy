@@ -87,6 +87,7 @@ class Compiler(Object):
 
         option = self.opt_compile_only + " " + self.get_option()
 
+        # PGI infoopt :  -Minfo=acc
         build_cmd = "{compiler} {option} {macro} -o {outfile} {infile}".format(
                         compiler=self.path, option=option, outfile=outfile,
                         infile=codepath, macro=opt_macro)
@@ -197,6 +198,11 @@ class OpenaccCppCompiler(CppCompiler):
 class FortranFortranCompiler(FortranCompiler):
 
     accel = "fortran"
+
+
+class OpenaccFortranCompiler(FortranCompiler):
+
+    accel = "openacc_fortran"
 
 
 ################
@@ -809,6 +815,19 @@ class PgiOpenaccCppCompiler(OpenaccCppCompiler, PgiCppCompiler):
 
         if sys.platform == "linux":
             opts = "-shared -fpic -acc " + super(PgiOpenaccCppCompiler, self).get_option()
+
+        else:
+            raise Exception("'%s' platform is not supported yet." % sys.platform)
+
+        return opts
+
+
+class PgiOpenaccFortranCompiler(OpenaccFortranCompiler, PgiFortranCompiler):
+
+    def get_option(self):
+
+        if sys.platform == "linux":
+            opts = "-shared -fpic -acc " + super(PgiOpenaccFortranCompiler, self).get_option()
 
         else:
             raise Exception("'%s' platform is not supported yet." % sys.platform)
