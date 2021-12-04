@@ -945,7 +945,7 @@ class IntelFortranCompiler(FortranCompiler):
         elif which("ifort"):
             path = "ifort"
 
-        super(IntelFortranFortranCompiler, self).__init__(path, option)
+        super(IntelFortranCompiler, self).__init__(path, option)
 
     def parse_version(self, stdout):
 
