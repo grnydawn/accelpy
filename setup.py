@@ -9,7 +9,7 @@ def main():
 
     setup(
         name="accelpy",
-        version="0.2.1",
+        version="0.3.0",
         description="Scalable Accelerator Interface in Python",
         long_description="Scalable Accelerator Interface in Python",
         author="Youngsung Kim",
