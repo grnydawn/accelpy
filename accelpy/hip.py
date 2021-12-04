@@ -181,53 +181,6 @@ class HipAccel(AccelBase):
             varclasses.append(t_varclass.format(**varclasses_fmt))
 
         return "\n\n".join(varclasses)
-#
-#    def gen_varclasses(self, inputs, outputs):
-#
-#        varclasses = []
-#        types = {}
-#
-#        for arg in self._testdata+inputs+outputs:
-#
-#            ndim = arg["data"].ndim
-#            dtype = self.get_dtype(arg)
-#
-#            if dtype not in types:
-#                dtypes = {}
-#                types[dtype] = dtypes
-#            else:
-#                dtypes = types[dtype]
-#
-#            if ndim not in dtypes:
-#
-#                oparg = ", ".join(["int dim%d"%d for d in range(ndim)])
-#                offset = "+".join(["s[%d]*dim%d"%(d,d) for d in range(ndim)])
-#
-#                varclasses_fmt = {
-#                    "vartype": self.get_vartype(arg),
-#                    "dtype": dtype,
-#                    "offset":offset,
-#                    "oparg":oparg
-#                }
-#
-#                varclasses.append(t_varclass.format(**varclasses_fmt))
-#
-#                dtypes[ndim] = True
-#
-#        return "\n\n".join(varclasses)
-
-#    def gen_vardefs(self, inputs, outputs):
-#
-#        out = []
-#
-#        for arg in inputs+outputs:
-#
-#            ndim, dname = self.get_argpair(arg)
-#            vartype = self.get_vartype(arg)
-#
-#            out.append("dev_%s dev_%s = dev_%s();" % (vartype, arg["curname"], vartype))
-#
-#        return "\n".join(out)
 
     def gen_datacopies(self, inputs, outputs):
 
@@ -262,36 +215,6 @@ class HipAccel(AccelBase):
 
         return "\n".join(out)
 
-#
-#    def gen_datacopies(self, inputs, outputs):
-#
-#        out = []
-#
-#        for input in inputs:
-#            vartype = self.get_vartype(input)
-#            dtype = self.get_dtype(input)
-#            funcname = self.getname_h2acopy(input)
-#
-#            out.append("dev_%s dev_%s = dev_%s();" % (vartype, input["curname"], vartype))
-#            out.append(t_h2acopy.format(funcname=funcname, varname=input["curname"], dtype=dtype))
-#
-#        for output in outputs:
-#            vartype = self.get_vartype(output)
-#            dtype = self.get_dtype(output)
-#            funcname = self.getname_h2amalloc(output)
-#
-#            out.append("dev_%s dev_%s = dev_%s();" % (vartype, output["curname"], vartype))
-#            out.append(t_h2amalloc.format(funcname=funcname, varname=output["curname"],
-#                        dtype=dtype))
-#
-#        for output in outputs:
-#            funcname = self.getname_a2hcopy(output)
-#            dtype = self.get_dtype(output)
-#
-#            out.append(t_a2hcopy.format(funcname=funcname, varname=output["curname"],
-#                        dtype=dtype))
-#
-#        return "\n".join(out)
 
     def gen_testcode(self):
 

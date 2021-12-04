@@ -73,7 +73,7 @@ class Compiler(Object):
 
         _macros = []
         for k, v in macros.items():
-            _macros.append("-D %s=%s" % (k, v) if v else ("-D "+k))
+            _macros.append("-D %s=\"%s\"" % (k, v) if v else ("-D "+k))
 
         opt_macro = " ".join(_macros)
         text = (code + opt_macro + self.vendor + "".join(self.version) + ext)

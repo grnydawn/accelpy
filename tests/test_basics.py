@@ -7,22 +7,22 @@ from accelpy import Accel, CppAccel, FortranAccel, HipAccel, Order
 
 test_accels = (
 #    ("cpp", "gnu"),
-    ("cpp", "cray"),
+#    ("cpp", "cray"),
 #    ("cpp", "amd"),
 #    ("cpp", "ibm"),
-#    ("cpp", "pgi"),
+    ("cpp", "pgi"),
 #    ("cpp", "intel"),
 #    ("fortran","gnu"),
-    ("fortran", "cray"),
+#    ("fortran", "cray"),
 #    ("fortran", "amd"),
 #    ("fortran", "ibm"),
-#    ("fortran", "pgi"),
+    ("fortran", "pgi"),
 #    ("fortran", "intel"),
-    ("hip", "amd"),
-#    ("cuda", "nvidia"),
-#    ("openacc_cpp", "pgi"),
+#    ("hip", "amd"),
+    ("cuda", "nvidia"),
+    ("openacc_cpp", "pgi"),
 #    ("openacc_cpp", "gnu"), # unresolved GNU compiler error
-    ("openacc_cpp", "cray"),
+#    ("openacc_cpp", "cray"),
 )
 
 #######################
