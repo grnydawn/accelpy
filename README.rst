@@ -12,7 +12,7 @@ Practically, **accelpy** generates and compiles a source code based on the "orde
 
 An example of adding two vectors in Cuda, Hip, OpenAcc, or OpenMp:
 
-::
+```python
 
         import numpy as np
         from accelpy import Accel, Order
@@ -58,6 +58,7 @@ An example of adding two vectors in Cuda, Hip, OpenAcc, or OpenMp:
         accel.stop()
 
         assert np.array_equal(c, a + b)
+```
 
 Assuming that at least one compiler of the programming models (and a hardware) is available, the "vecadd order" will be compiled and executed on either a GPU or a CPU.
 
