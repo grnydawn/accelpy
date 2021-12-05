@@ -55,7 +55,7 @@ An example of adding two vectors in Cuda, Hip, OpenAcc, or OpenMp:
             !$omp end do
         """
 
-        # create a task to be offloaded to an accelerator
+        # create a task to be offloaded to an accelerator with inputs(a, b) and an output(c)
         accel = Accel(a, b, Order(vecadd), c)
 
         # launch N-parallel work asynchronously
