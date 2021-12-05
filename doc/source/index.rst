@@ -31,7 +31,7 @@ An example of adding two vectors in Cuda, Hip, OpenAcc, or OpenMp:
         b = np.arange(N)                # input b
         c = np.zeros(N, dtype=np.int64) # output c
 
-        # define acceleration task in selectable programming models in either a string or a file
+        # define acceleration task in one or more programming models in either a string or a file
         vecadd = """
         set_argnames(("a", "b"), "c")
 
