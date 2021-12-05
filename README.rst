@@ -13,6 +13,7 @@ Practically, **accelpy** generates and compiles a source code based on the "orde
 An example of adding two vectors in Cuda, Hip, OpenAcc, or OpenMp:
 
 ::
+
         import numpy as np
         from accelpy import Accel, Order
 
