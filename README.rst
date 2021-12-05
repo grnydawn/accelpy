@@ -50,7 +50,7 @@ An example of adding two vectors in Cuda, Hip, OpenAcc, or OpenMp:
         # with an order, inputs(a, b), and an output(c)
         accel = Accel(a, b, Order(vecadd), c)
 
-        # launch N-parallel work asynchronously
+        # asynchronously launch N-parallel work
         accel.run(N)
 
         # do Python work here while accelerator is working
