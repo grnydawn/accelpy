@@ -7,8 +7,8 @@ def main():
 
     install_requires = ["numpy"]
     console_scripts = ["accelpy=accelpy.__main__:main"]
-    keywords = ["GPU", "CPU", "accelerator", "Cuda", "Hip", "OpenAcc",
-                "OpenMP", "C++", "Fortran", "accelpy"]
+    keywords = ["GPU", "CPU", "Accelerator", "Cuda", "Hip",
+                "OpenAcc", "OpenMP", "Numpy", "C++", "Fortran", "accelpy"]
 
     setup(
         name=name,
