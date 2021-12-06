@@ -284,7 +284,7 @@ class OpenaccFortranAccel(AccelBase):
 
         body = order.body[:firstexec] + accpar + order.body[firstexec:]
 
-        return t_kernel.format(order="\n".join(body), varandattr=", ".join(names))
+        return  t_kernel.format(order="\n".join(body), varandattr=", ".join(names))
 
     def _gen_varattrs(self, inputs, outputs):
 

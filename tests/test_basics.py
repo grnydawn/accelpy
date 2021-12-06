@@ -23,7 +23,7 @@ test_accels = (
 #    ("openacc_cpp", "pgi"),
 #    ("openacc_cpp", "gnu"), # GNU compiler error on Summit
 #    ("openacc_cpp", "cray"),
-#    ("openacc_fortran", "pgi"),
+    ("openacc_fortran", "pgi"),
 #    ("openacc_fortran", "gnu"), # GNU compiler error on Summit
 #    ("openacc_fortran", "cray"),
 #    ("openmp_cpp", "gnu"), # GNU compiler error on Summit
@@ -32,7 +32,7 @@ test_accels = (
 #    ("openmp_cpp", "cray"),
 #    ("openmp_cpp", "amd"),
 #    ("openmp_fortran", "gnu"),
-#    ("openmp_fortran", "pgi"),
+    ("openmp_fortran", "pgi"),
 #    ("openmp_fortran", "ibm"),
 #    ("openmp_fortran", "cray"), # OpenMP parallel attempted from non-OpenMP thread On Spock
 #    ("openmp_fortran", "amd"),

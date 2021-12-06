@@ -191,10 +191,10 @@ def get_firstexec(linelist):
         line = lines[lineno]
 
         if line.in_specpart():
-            lastspec = line.srclineno + 1
+            lastspec = line.srclineno
 
         elif line.in_execpart():
-            return lines[line.index-1].srclineno + 1
+            return lines[line.index-1].srclineno
 
         lineno = line.next()
 
