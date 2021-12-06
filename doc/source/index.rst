@@ -11,9 +11,25 @@
 Welcome to accelpy's documentation!
 ===================================
 
-**accelpy** is a light-weight Python accelerator interface that allows a gradual migration of time-consuming code to various accelerators such as GPU, through multiple programming models including Cuda, Hip, OpenAcc, OpenMp, C++, and Fortran.
+**accelpy** is a light-weight Python interface package to native programming models. It makes use of multiple programming models including Cuda, Hip, OpenAcc, OpenMp, C++, and Fortran. **accelpy** provides Python programmers with a stable and Pythonic API for using accelerators, while maximizs its capability and flexibility through offloading the computationally intensitve part to a native code, or kernel.
 
-Conceptually, user defines what an accelerator does by providing **accelpy** with an "order", computational code in multiple native programming models and inputs & outputs. And the user executes the "order" to get results.
+**accelpy** is not the only one that tackles the accelerator programming in Python. Numba transforms Cuda-like Python code into GPU binary. If you are interested in machine learning, you may already use GPUs through PyTorch or TensorFlow. Nvidia provides users with a series of Cuda-python bindings.
+
+**accelpy** has unique features compared to the other similar technologies.
+
+It utilizes currently available accelerator and traditional programming models. Each programming models have matured for decades and gained their own advantages in particular problem domains. Python is awesome programming language but it may be hard to pull all of power of newer hardwares while writing everything in Python, in my opinion. For example, it would be the safe bet that the newest Nvidia GPU feature may be available in Cuda first.
+
+Related to above characteristic of **accelpy**, it is relatively easy to support newer programming models or newer hardware because **accelpy** does not need to create a wheel by itself. It may be a month-long or even a week-long task to support a new programming model at least working version. In other words, **accelpy** is almost future-proof in terms of programmig model.
+
+Using **accelpy** has two sides: Python side and native programming side. In general, each side has differnt programming goals. On Python side, we want usability among others, while performance may be prefered at native programming side. By not mixing those two sides in **accelpy**, user may be better focus on its own goals at each sides. Python programmer using **accelpy** does not need to know the details of the native programming because **accelpy** abstractized the it through simple models of input & output data, accelerator, and order( native programming representation )
+
+
+
+Maintaining multple sources in one application to support multiple hardware is painful and expensive. Adding preprocessing blocks for each hardware in source files makes it hard to read and Traditional approache to achieve this is to he
+- practical solution to one-source multiuse: gradual migration, dynamic backup mechanism
+- algorithm hot-swap (not supported yet)
+
+To use **accelpy**, conceptually, user defines what an accelerator does by providing **accelpy** with an "order", computational code in multiple native programming models and inputs & outputs. And the user executes the "order" to get results.
 
 Practically, **accelpy** generates and compiles a source code based on the "order" and inputs & outputs to build a shared library. Once the shared library is built, **accelpy** sends the input data to accelerator, runs the "order" in the generated shared library, and finally receives the result from executing the "order" to the output variable(s). In other words, **accelpy** takes the responsibility of native code interface, data movement between host and accelerator, and accelerator execution control.
 
