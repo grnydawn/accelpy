@@ -81,6 +81,18 @@ extern "C" int64_t {funcname}(void * data) {{
 }}
 """
 
+t_h2a_scalar = """
+extern "C" int64_t {funcname}(void * data) {{
+    int64_t res;
+
+    {varname} = *({dtype} *) data;
+
+    res = 0;
+
+    return res;
+}}
+"""
+
 t_a2h = """
 extern "C" int64_t {funcname}(void * data) {{
     int64_t res;
@@ -146,23 +158,25 @@ class OpenmpCppAccel(AccelBase):
         for arg in self._testdata+inputs+outputs:
 
             ndim = arg["data"].ndim
-            dtype = self.get_dtype(arg)
 
-            oparg = ", ".join(["int dim%d"%d for d in range(ndim)])
-            offset = "+".join(["stride[%d]*dim%d"%(d,d) for d in range(ndim)])
+            if ndim > 0:
+                dtype = self.get_dtype(arg)
 
-            varclasses_fmt = {
-                "clsname": "type_" + arg["curname"],
-                "size": str(arg["data"].size),
-                "ndim": str(ndim),
-                "shape": "{%s}" % self.get_shapestr(arg),
-                "stride": "{%s}" % self.get_stridestr(arg),
-                "dtype": dtype,
-                "offset":offset,
-                "oparg":oparg
-            }
+                oparg = ", ".join(["int dim%d"%d for d in range(ndim)])
+                offset = "+".join(["stride[%d]*dim%d"%(d,d) for d in range(ndim)])
 
-            varclasses.append(t_varclass.format(**varclasses_fmt))
+                varclasses_fmt = {
+                    "clsname": "type_" + arg["curname"],
+                    "size": str(arg["data"].size),
+                    "ndim": str(ndim),
+                    "shape": "{%s}" % self.get_shapestr(arg),
+                    "stride": "{%s}" % self.get_stridestr(arg),
+                    "dtype": dtype,
+                    "offset":offset,
+                    "oparg":oparg
+                }
+
+                varclasses.append(t_varclass.format(**varclasses_fmt))
 
         return "\n\n".join(varclasses)
 
@@ -171,29 +185,49 @@ class OpenmpCppAccel(AccelBase):
         out = []
 
         for input in inputs:
+            ndim = input["data"].ndim
             dtype = self.get_dtype(input)
             funcname = self.getname_h2acopy(input)
 
-            out.append("type_{name} {name} = type_{name}();".format(
-                        name=input["curname"]))
+            if ndim == 0:
+                out.append("%s %s;" % (dtype, input["curname"]))
+                out.append(t_h2a_scalar.format(funcname=funcname,
+                        varname=input["curname"], dtype=dtype))
 
-            out.append(t_h2a.format(funcname=funcname,
+            else:
+                out.append("type_{name} {name} = type_{name}();".format(
+                        name=input["curname"]))
+                out.append(t_h2a.format(funcname=funcname,
                         varname=input["curname"], dtype=dtype))
 
         for output in outputs:
+            ndim = output["data"].ndim
             dtype = self.get_dtype(output)
             funcname = self.getname_h2amalloc(output)
 
-            out.append("type_{name} {name} = type_{name}();".format(
-                        name=output["curname"]))
 
-            out.append(t_h2a.format(funcname=funcname,
+            if ndim == 0:
+                out.append("%s %s;" % (dtype, output["curname"]))
+
+                out.append(t_h2a_scalar.format(funcname=funcname,
+                        varname=output["curname"], dtype=dtype))
+
+            else:
+                out.append("type_{name} {name} = type_{name}();".format(
+                        name=output["curname"]))
+                out.append(t_h2a.format(funcname=funcname,
                         varname=output["curname"], dtype=dtype))
 
         for output in outputs:
+            ndim = output["data"].ndim
             funcname = self.getname_a2hcopy(output)
 
-            out.append(t_a2h.format(funcname=funcname,
+            if ndim == 0:
+                out.append(t_a2h.format(funcname=funcname,
+                        varname=output["curname"]))
+
+            else:
+                out.append(t_a2h.format(funcname=funcname,
                         varname=output["curname"]))
 
         return "\n".join(out)

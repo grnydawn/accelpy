@@ -102,18 +102,6 @@ extern "C" int64_t {funcname}(void * data) {{
 }}
 """
 
-t_a2h_scalar = """
-extern "C" int64_t {funcname}(void * data) {{
-    int64_t res;
-
-    data = &{varname};
-
-    res = 0;
-
-    return res;
-}}
-"""
-
 t_testfunc = """
 extern "C" int64_t accelpy_test_run() {{
     int64_t res;
@@ -228,9 +216,8 @@ class CppAccel(AccelBase):
             funcname = self.getname_a2hcopy(output)
 
             if ndim == 0:
-                out.append(t_a2h_scalar.format(funcname=funcname,
+                out.append(t_a2h.format(funcname=funcname,
                         varname=output["curname"]))
-
 
             else:
                 out.append(t_a2h.format(funcname=funcname,

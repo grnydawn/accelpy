@@ -18,9 +18,20 @@ test_accels = (
 #    ("fortran","gnu"),
 #    ("fortran", "cray"),
 #    ("fortran", "amd"),
-    ("fortran", "ibm"),
+#    ("fortran", "ibm"),
 #    ("fortran", "pgi"),
 #    ("fortran", "intel"),
+#    ("openmp_cpp", "gnu"), # GNU compiler error on Summit
+#    ("openmp_cpp", "pgi"),
+    ("openmp_cpp", "ibm"),
+#    ("openmp_cpp", "cray"),
+#    ("openmp_cpp", "amd"),
+#    ("openmp_fortran", "gnu"),
+#    ("openmp_fortran", "pgi"),
+    ("openmp_fortran", "ibm"),
+#    ("openmp_fortran", "cray"), # OpenMP parallel attempted from non-OpenMP thread On Spock
+#    ("openmp_fortran", "amd"),
+
 )
 
 order_sum = """
@@ -31,7 +42,13 @@ set_argnames(("a", "b", "c"), ("out",))
     out(0) = a + b + c;
 
 [fortran]
-    out(1) = a + b + c;
+    out(1) = a + b + c
+
+[openmp_cpp]
+    out(0) = a + b + c;
+
+[openmp_fortran]
+    out(1) = a + b + c
 
 """
 
