@@ -62,6 +62,9 @@ test: ## run tests quickly with the default Python: --tb=short
 	#pytest ./tests -s -vv --pyargs accelpy
 	pytest ./tests -s -v --pyargs accelpy --tb=short
 
+testone: ## run tests quickly with the default Python: --tb=short
+	pytest ./tests/${FILE} -s -vv --pyargs accelpy
+
 test-all: ## run tests on every Python version with tox
 	tox
 

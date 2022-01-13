@@ -96,14 +96,21 @@ class AccelBase(Object):
             outputs = []
 
         for inp in inputs:
-            if not isinstance(inp, numpy.ndarray):
-                inp = numpy.asarray(inp)
-            resin.append({"data": inp, "id": id(inp), "h2acopy": False})
+            if isinstance(inp, numpy.ndarray):
+                resin.append({"data": inp, "id": id(inp), "h2acopy": False})
+
+            else:
+                newinp = numpy.asarray(inp)
+                resin.append({"data": newinp, "id": id(newinp), "h2acopy": False,
+                            "orgdata": inp})
 
         for outp in outputs:
-            if not isinstance(outp, numpy.ndarray):
-                outp = numpy.asarray(outp)
-            resout.append({"data": outp, "id": id(outp), "h2acopy": False})
+            if isinstance(outp, numpy.ndarray):
+                resout.append({"data": outp, "id": id(outp), "h2acopy": False})
+            else:
+                newoutp = numpy.asarray(outp)
+                resout.append({"data": newoutp, "id": id(newoutp), "h2acopy": False,
+                            "orgdata": outp})
 
         return resin, resout
 
@@ -153,6 +160,7 @@ class AccelBase(Object):
     def build_sharedlib(self, run_id, device, channel, wtriple):
 
         compilers = get_compilers(self.name, compile=self._compile)
+
         errmsgs = []
 
         for comp in compilers:
@@ -247,6 +255,10 @@ class AccelBase(Object):
 
         if res == 0:
             arg["a2hcopy"] = True
+
+        if "orgdata" in arg:
+            for i, d in enumerate(arg["data"]):
+                arg["orgdata"][i] = d
 
         return res
 
@@ -390,18 +402,28 @@ def Accel(*vargs, **kwargs):
 
     kind = kwargs.pop("kind", None)
 
+    order = None
+    for varg in vargs:
+        if isinstance(varg, Order):
+            order = varg
+            break
+
+    if order is None:
+        raise Exception("No order is found")
+
     if isinstance(kind, str):
         return AccelBase.avails[kind](*vargs, **kwargs)
 
     elif kind is None or isinstance(kind, (list, tuple)):
 
         if kind is None:
-            kind = AccelBasel.avails.keys()
+            kind = AccelBase.avails.keys()
 
         errmsgs = []
 
         for k in kind:
             try:
+                order.get_section(k)
                 accel = AccelBase.avails[k](*vargs, **kwargs)
                 return accel 
 
