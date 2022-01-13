@@ -23,14 +23,22 @@ test_accels = (
 #    ("fortran", "intel"),
 #    ("openmp_cpp", "gnu"), # GNU compiler error on Summit
 #    ("openmp_cpp", "pgi"),
-    ("openmp_cpp", "ibm"),
+#    ("openmp_cpp", "ibm"),
 #    ("openmp_cpp", "cray"),
 #    ("openmp_cpp", "amd"),
 #    ("openmp_fortran", "gnu"),
 #    ("openmp_fortran", "pgi"),
-    ("openmp_fortran", "ibm"),
+#    ("openmp_fortran", "ibm"),
 #    ("openmp_fortran", "cray"), # OpenMP parallel attempted from non-OpenMP thread On Spock
 #    ("openmp_fortran", "amd"),
+#    ("openacc_cpp", "pgi"),
+#    ("openacc_cpp", "gnu"), # GNU compiler error on Summit
+#    ("openacc_cpp", "cray"),
+#    ("openacc_fortran", "pgi"),
+#    ("openacc_fortran", "gnu"), # GNU compiler error on Summit
+#    ("openacc_fortran", "cray"),
+#    ("hip", "amd"),
+    ("cuda", "nvidia"),
 
 )
 
@@ -49,6 +57,15 @@ set_argnames(("a", "b", "c"), ("out",))
 
 [openmp_fortran]
     out(1) = a + b + c
+
+[openacc_cpp]
+    out(0) = a + b + c;
+
+[openacc_fortran]
+    out(1) = a + b + c
+
+[cuda]
+    out(0) = a + b + c;
 
 """
 

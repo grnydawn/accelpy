@@ -77,6 +77,22 @@ INTEGER (C_INT64_T) FUNCTION {funcname} (data) BIND(C, name="{funcname}")
 END FUNCTION
 """
 
+t_h2a_scalar = """
+INTEGER (C_INT64_T) FUNCTION {funcname} (data) BIND(C, name="{funcname}")
+    USE, INTRINSIC :: ISO_C_BINDING
+    USE accelpy_global, ONLY : {varname}
+    IMPLICIT NONE
+
+    {dtype}, DIMENSION(1), INTENT(IN) :: data
+
+    {varname} = data(1)
+
+    {funcname} = 0
+
+END FUNCTION
+"""
+
+
 t_h2amalloc = """
 INTEGER (C_INT64_T) FUNCTION {funcname} (data) BIND(C, name="{funcname}")
     USE, INTRINSIC :: ISO_C_BINDING
@@ -99,9 +115,22 @@ INTEGER (C_INT64_T) FUNCTION {funcname} (data) BIND(C, name="{funcname}")
     USE accelpy_global, ONLY : {varname}
     IMPLICIT NONE
 
-    {dtype}, DIMENSION({bound}), INTENT(IN), TARGET :: data
+    {dtype}, DIMENSION({bound}), INTENT(OUT) :: data
 
     !$acc exit data copyout({varname})
+
+    {funcname} = 0
+
+END FUNCTION
+"""
+
+t_a2hcopy_scalar = """
+INTEGER (C_INT64_T) FUNCTION {funcname} (data) BIND(C, name="{funcname}")
+    USE, INTRINSIC :: ISO_C_BINDING
+    USE accelpy_global, ONLY : {varname}
+    IMPLICIT NONE
+
+    {dtype}, DIMENSION(1), INTENT(OUT) :: data
 
     {funcname} = 0
 
@@ -176,9 +205,11 @@ class OpenaccFortranAccel(AccelBase):
 
         for arg in self._testdata+inputs+outputs:
             data = arg["data"]
-            
-            out.append(t_typeattr.format(varname=arg["curname"], ndim=str(data.ndim),
-                        size=str(data.size), shape=self.get_shapestr(arg),
+
+            if data.ndim > 0:
+                out.append(t_typeattr.format(varname=arg["curname"],
+                        ndim=str(data.ndim), size=str(data.size),
+                        shape=self.get_shapestr(arg),
                         stride=self.get_stridestr(arg)))
 
         return "\n".join(out)
@@ -204,10 +235,16 @@ class OpenaccFortranAccel(AccelBase):
         out = []
 
         for data in inputs+outputs:
+            ndim = data["data"].ndim
             dtype = self.get_dtype(data)
-            bound = ",".join([":"]*data["data"].ndim)
-            out.append("%s, DIMENSION(%s), POINTER :: %s" % (dtype, bound, data["curname"]))
-            out.append("TYPE(type_{name}) :: {name}_attr".format(name=data["curname"]))
+
+            if ndim > 0:
+                bound = ",".join([":"]*ndim)
+                out.append("%s, DIMENSION(%s), POINTER :: %s" % (dtype, bound, data["curname"]))
+                out.append("TYPE(type_{name}) :: {name}_attr".format(name=data["curname"]))
+
+            else:
+                out.append("%s :: %s" % (dtype, data["curname"]))
 
         return "\n".join(out)
 
@@ -233,7 +270,8 @@ class OpenaccFortranAccel(AccelBase):
         out.append(t_a2hcopy.format(funcname=funcname_a2h, bound=bound_out,
                     varname=output["curname"], dtype=dtype_out))
 
-        out.append(t_testfunc.format(varin=input["curname"], size=str(output["data"].size),
+        out.append(t_testfunc.format(varin=input["curname"],
+                    size=str(output["data"].size),
                     varout=output["curname"]))
 
         return "\n".join(out)
@@ -245,25 +283,43 @@ class OpenaccFortranAccel(AccelBase):
         for input in inputs:
             dtype = self.get_dtype(input)
             funcname = self.getname_h2acopy(input)
-            bound = ",".join([str(s) for s in input["data"].shape])
+            ndim = input["data"].ndim
 
-            out.append(t_h2acopy.format(funcname=funcname, varname=input["curname"],
+            if ndim > 0:
+                bound = ",".join([str(s) for s in input["data"].shape])
+                out.append(t_h2acopy.format(funcname=funcname, varname=input["curname"],
                         bound=bound, dtype=dtype))
+            else:
+                out.append(t_h2a_scalar.format(funcname=funcname,
+                            varname=input["curname"], dtype=dtype))
 
         for output in outputs:
             dtype = self.get_dtype(output)
             funcname = self.getname_h2amalloc(output)
-            bound = ",".join([str(s) for s in output["data"].shape])
+            ndim = output["data"].ndim
 
-            out.append(t_h2amalloc.format(funcname=funcname, varname=output["curname"],
+            if ndim > 0:
+                bound = ",".join([str(s) for s in output["data"].shape])
+                out.append(t_h2amalloc.format(funcname=funcname, varname=output["curname"],
                         bound=bound, dtype=dtype))
+
+            else:
+                out.append(t_h2a_scalar.format(funcname=funcname,
+                        varname=output["curname"], dtype=dtype))
 
         for output in outputs:
+            dtype = self.get_dtype(output)
             funcname = self.getname_a2hcopy(output)
-            bound = ",".join([str(s) for s in output["data"].shape])
+            ndim = output["data"].ndim
 
-            out.append(t_a2hcopy.format(funcname=funcname, varname=output["curname"],
+            if ndim > 0:
+                bound = ",".join([str(s) for s in output["data"].shape])
+                out.append(t_a2hcopy.format(funcname=funcname, varname=output["curname"],
                         bound=bound, dtype=dtype))
+
+            else:
+                out.append(t_a2hcopy_scalar.format(funcname=funcname,
+                        varname=output["curname"], dtype=dtype))
 
         return "\n".join(out)
 
@@ -273,7 +329,9 @@ class OpenaccFortranAccel(AccelBase):
 
         for data in inputs+outputs:
             names.append(data["curname"])
-            names.append(data["curname"]+"_attr")
+
+            if data["data"].ndim > 0:
+                names.append(data["curname"]+"_attr")
 
         order =  self._order.get_section(self.name)
         firstexec = get_firstexec(order.body)

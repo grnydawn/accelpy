@@ -189,7 +189,6 @@ class CppAccel(AccelBase):
             else:
                 out.append("type_{name} {name} = type_{name}();".format(
                         name=input["curname"]))
-
                 out.append(t_h2a.format(funcname=funcname,
                         varname=input["curname"], dtype=dtype))
 
@@ -200,14 +199,12 @@ class CppAccel(AccelBase):
 
             if ndim == 0:
                 out.append("%s %s;" % (dtype, output["curname"]))
-
                 out.append(t_h2a_scalar.format(funcname=funcname,
                         varname=output["curname"], dtype=dtype))
 
             else:
                 out.append("type_{name} {name} = type_{name}();".format(
                         name=output["curname"]))
-
                 out.append(t_h2a.format(funcname=funcname,
                         varname=output["curname"], dtype=dtype))
 
@@ -233,7 +230,7 @@ class CppAccel(AccelBase):
         output = self._testdata[1]
 
         dtype_in = self.get_dtype(input)
-        dtype_out = self.get_dtype(input)
+        dtype_out = self.get_dtype(output)
         funcname_in = "accelpy_test_h2acopy"
         funcname_out = "accelpy_test_h2amalloc"
         funcname_a2h = "accelpy_test_a2hcopy"
@@ -259,6 +256,7 @@ class CppAccel(AccelBase):
     def gen_kernel(self):
 
         order =  self._order.get_section(self.name)
+
         return t_kernel.format(order="\n".join(order.body))
 
     def gen_code(self, compiler, inputs, outputs, worker_triple, run_id, device, channel):
