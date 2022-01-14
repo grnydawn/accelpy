@@ -37,8 +37,8 @@ test_accels = (
 #    ("openacc_fortran", "pgi"),
 #    ("openacc_fortran", "gnu"), # GNU compiler error on Summit
 #    ("openacc_fortran", "cray"),
-#    ("hip", "amd"),
-    ("cuda", "nvidia"),
+    ("hip", "amd"),
+#    ("cuda", "nvidia"),
 
 )
 
@@ -65,6 +65,9 @@ set_argnames(("a", "b", "c"), ("out",))
     out(1) = a + b + c
 
 [cuda]
+    out(0) = a + b + c;
+
+[hip]
     out(0) = a + b + c;
 
 """

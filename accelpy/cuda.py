@@ -197,6 +197,7 @@ class CudaAccel(AccelBase):
         return "\n\n".join(varclasses)
 
     def gen_datacopies(self, inputs, outputs):
+
         out = []
 
         for input in inputs:
@@ -206,7 +207,6 @@ class CudaAccel(AccelBase):
 
             if ndim == 0:
                 out.append("%s %s;" % (dtype, input["curname"]))
-
                 out.append(t_h2a_scalar.format(funcname=funcname,
                         varname=input["curname"], dtype=dtype))
 
@@ -275,7 +275,6 @@ class CudaAccel(AccelBase):
 
         out.append(t_testfunc.format(varin=input["curname"],
                     varout=output["curname"], nworkers=str(input["data"].size)))
-
 
         return "\n".join(out)
 
