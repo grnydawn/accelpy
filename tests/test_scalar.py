@@ -9,35 +9,35 @@ from accelpy import Accel, Order
 # Order definitions
 #######################
 test_accels = (
-#    ("cpp", "gnu"),
+    ("cpp", "gnu"),
 #    ("cpp", "cray"),
 #    ("cpp", "amd"),
 #    ("cpp", "ibm"),
 #    ("cpp", "pgi"),
 #    ("cpp", "intel"),
-#    ("fortran","gnu"),
+    ("fortran","gnu"),
 #    ("fortran", "cray"),
 #    ("fortran", "amd"),
 #    ("fortran", "ibm"),
 #    ("fortran", "pgi"),
 #    ("fortran", "intel"),
-#    ("openmp_cpp", "gnu"), # GNU compiler error on Summit
+    ("openmp_cpp", "gnu"), # GNU compiler error on Summit
 #    ("openmp_cpp", "pgi"),
 #    ("openmp_cpp", "ibm"),
 #    ("openmp_cpp", "cray"),
 #    ("openmp_cpp", "amd"),
-#    ("openmp_fortran", "gnu"),
+    ("openmp_fortran", "gnu"),
 #    ("openmp_fortran", "pgi"),
 #    ("openmp_fortran", "ibm"),
 #    ("openmp_fortran", "cray"), # OpenMP parallel attempted from non-OpenMP thread On Spock
 #    ("openmp_fortran", "amd"),
 #    ("openacc_cpp", "pgi"),
-#    ("openacc_cpp", "gnu"), # GNU compiler error on Summit
+    ("openacc_cpp", "gnu"), # GNU compiler error on Summit
 #    ("openacc_cpp", "cray"),
 #    ("openacc_fortran", "pgi"),
-#    ("openacc_fortran", "gnu"), # GNU compiler error on Summit
+    ("openacc_fortran", "gnu"), # GNU compiler error on Summit
 #    ("openacc_fortran", "cray"),
-    ("hip", "amd"),
+#    ("hip", "amd"),
 #    ("cuda", "nvidia"),
 
 )
