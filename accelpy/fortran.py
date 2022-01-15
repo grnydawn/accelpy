@@ -29,7 +29,10 @@ END FUNCTION
 
 INTEGER (C_INT64_T) FUNCTION accelpy_stop() BIND(C, name="accelpy_stop")
     USE, INTRINSIC :: ISO_C_BINDING
+    USE accelpy_global, ONLY : {vars}
     IMPLICIT NONE
+
+    {nullify}
 
     accelpy_stop = 0 
 
@@ -135,6 +138,14 @@ INTEGER (C_INT64_T) FUNCTION accelpy_test_run()  BIND(C, name="accelpy_test_run"
         {varout}(id) = {varin}(id)
     END DO
 
+    IF (ASSOCIATED({varin})) THEN
+        NULLIFY({varin})
+    END IF
+
+    IF (ASSOCIATED({varout})) THEN
+        NULLIFY({varout})
+    END IF
+
     accelpy_test_run = 0
 
 END FUNCTION
@@ -199,10 +210,15 @@ class FortranAccel(AccelBase):
         main_fmt = {
             "testcode": self._get_testcode(),
             "datacopies":self._gen_datacopies(inputs, outputs),
-            "kernel":self._gen_kernel(inputs, outputs)
+            "kernel":self._gen_kernel(inputs, outputs),
+            "vars":self._gen_usevars(inputs, outputs),
+            "nullify":self._gen_nullify(inputs, outputs)
         }
         main = t_main.format(**main_fmt)
 
+        #print(module)
+        #print(main)
+        #import pdb; pdb.set_trace()
         return [module, main], macros
 
     def _get_procattr(self, inputs, outputs):
@@ -340,6 +356,44 @@ class FortranAccel(AccelBase):
 
         return "\n".join(out)
 
+    def _gen_usevars(self, inputs, outputs):
+
+        names = []
+
+        for data in inputs+outputs:
+
+            if data["data"].ndim > 0:
+                names.append(data["curname"])
+
+        lines = [""]
+        maxlen = 72
+
+        for name in names:
+            if len(lines[-1]) + len(name) > maxlen:            
+
+                lines[-1] += " &"
+                lines.append("        &, %s" % name)
+
+            elif lines[-1] == "":
+                lines[-1] += name
+
+            else:
+                lines[-1] += ", " + name
+
+        return "\n".join(lines)
+
+    def _gen_nullify(self, inputs, outputs):
+
+        lines = []
+
+        for data in inputs+outputs:
+            if data["data"].ndim > 0:
+                lines.append("IF (ASSOCIATED(%s)) THEN" % data["curname"])
+                lines.append("        NULLIFY(%s)" % data["curname"])
+                lines.append("    END IF")
+
+        return "\n".join(lines)
+
     def _gen_kernel(self, inputs, outputs):
 
         names = []
@@ -350,8 +404,24 @@ class FortranAccel(AccelBase):
             if data["data"].ndim > 0:
                 names.append(data["curname"]+"_attr")
 
+        lines = [""]
+        maxlen = 72
+
+        for name in names:
+            if len(lines[-1]) + len(name) > maxlen:            
+
+                lines[-1] += " &"
+                lines.append("        &, %s" % name)
+
+            elif lines[-1] == "":
+                lines[-1] += name
+
+            else:
+                lines[-1] += ", " + name
+                
         order =  self._order.get_section(self.name)
-        return t_kernel.format(order="\n".join(order.body), varandattr=", ".join(names))
+
+        return t_kernel.format(order="\n".join(order.body), varandattr="\n".join(lines))
 
     def _gen_varattrs(self, inputs, outputs):
 

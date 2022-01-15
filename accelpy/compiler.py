@@ -20,6 +20,7 @@ class Compiler(Object):
     libext = "so"
     objext = "o"
     opt_compile_only = "-c"
+    opt_debug = "-O0 -g"
 
     def __init__(self, path, option=None):
 
@@ -69,7 +70,7 @@ class Compiler(Object):
 
         self.version = self.parse_version(out.stdout)
 
-    def _compile(self, code, ext, macros):
+    def _compile(self, code, ext, macros, debug):
 
         _macros = []
         for k, v in macros.items():
@@ -79,13 +80,24 @@ class Compiler(Object):
         text = (code + opt_macro + self.vendor + "".join(self.version) + ext)
         name =  hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
 
-        codepath = os.path.join(self._blddir, name + "." + self.codeext)
+        filename = name + "." + self.codeext
+        codepath = os.path.join(self._blddir, filename)
         with open(codepath, "w") as f:
             f.write(code)
 
+        if debug:
+            debugdir = "_accelpy_debug_"
+
+            if not os.path.isdir(debugdir):
+                os.makedirs(debugdir)
+
+            with open(os.path.join(debugdir, filename), "w") as f:
+                f.write(code)
+
         outfile = os.path.join(self._blddir, name + "." + ext)
 
-        option = self.opt_compile_only + " " + self.get_option()
+        option = self.opt_debug + " " if debug else ""
+        option += self.opt_compile_only + " " + self.get_option()
 
         # PGI infoopt :  -Minfo=acc
         build_cmd = "{compiler} {option} {macro} -o {outfile} {infile}".format(
@@ -135,7 +147,7 @@ class Compiler(Object):
 
         return outfile
 
-    def compile(self, code, macros):
+    def compile(self, code, macros, debug):
 
         lib = None
 
@@ -146,11 +158,11 @@ class Compiler(Object):
 
         # build object files
         if isinstance(code, str):
-            objfiles.append(self._compile(code, self.objext, macros))
+            objfiles.append(self._compile(code, self.objext, macros, debug))
 
         elif isinstance(code, (list, tuple)):
             for _c in code:
-                objfiles.append(self._compile(_c, self.objext, macros))
+                objfiles.append(self._compile(_c, self.objext, macros, debug))
 
         libfile = self._link(self.libext, objfiles)
 
@@ -283,7 +295,7 @@ class GnuFortranCompiler(FortranCompiler):
         items = stdout.split()
         
         if sys.platform in ("darwin", "linux"):
-            if items[:3] == [b'GNU', b'Fortran', b'(GCC)']:
+            if items[:2] == [b'GNU', b'Fortran']:
                 return items[3].decode().split(".")
             raise Exception("Unknown compiler version syntax: %s" % str(items[:3]))
 

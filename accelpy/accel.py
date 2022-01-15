@@ -31,8 +31,9 @@ class AccelBase(Object):
     ]
 
 
-    def __init__(self, *vargs, kind=None, compile=None):
+    def __init__(self, *vargs, kind=None, compile=None, debug=False):
 
+        self._debug = debug
         self._order = None
 
         inputs, outputs = [], []
@@ -182,7 +183,7 @@ class AccelBase(Object):
                 macros["ACCELPY_ASSIGN_DIM1"] = wtriple[2][1]
                 macros["ACCELPY_ASSIGN_DIM2"] = wtriple[2][2]
 
-                lib = comp.compile(code, macros)
+                lib = comp.compile(code, macros, self._debug)
 
                 if lib is None:
                     continue
@@ -207,7 +208,7 @@ class AccelBase(Object):
                     raise Exception("accel test result mismatch: %s != %s" %
                         (str(self._testdata[0]["data"]), str(self._testdata[1]["data"])))
 
-                return lib
+                return lib, comp.lang
 
             except Exception as err:
                 errmsgs.append(str(err))
@@ -219,7 +220,14 @@ class AccelBase(Object):
         if lib is None:
             return -1
 
-        flags = ["contiguous"]
+        if self.lang == "cpp":
+            flags = ["c_contiguous"]
+
+        elif self.lang == "fortran":
+            flags = ["f_contiguous"]
+
+        else:
+            raise Exception("Unknown language: %s" % lang)
 
         if writable:
             flags.append("writeable")
@@ -227,6 +235,7 @@ class AccelBase(Object):
         datacopy = getattr(lib, funcname)
         datacopy.restype = c_int64
         datacopy.argtypes = [ndpointer(arg["data"].dtype, flags=",".join(flags))]
+
         res = datacopy(arg["data"])
 
         return res
@@ -274,7 +283,7 @@ class AccelBase(Object):
 
         worker_triple = self._get_worker_triple(*workers)
 
-        lib = self.build_sharedlib(run_id, device, channel, worker_triple)
+        lib, self.lang = self.build_sharedlib(run_id, device, channel, worker_triple)
 
         if lib is None:
             raise Exception("Can not build shared library")
