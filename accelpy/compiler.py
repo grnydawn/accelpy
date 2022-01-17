@@ -23,8 +23,6 @@ class Compiler(Object):
 
     def __init__(self, path, option=None):
 
-        self._blddir = _config["blddir"]
-
         self.version = []
 
         if isinstance(path, str):
@@ -80,8 +78,8 @@ class Compiler(Object):
         name =  hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
 
         filename = name + "." + self.codeext
-        codepath = os.path.join(self._blddir, filename)
-        outfile = os.path.join(self._blddir, name + "." + ext)
+        codepath = os.path.join(_config["blddir"], filename)
+        outfile = os.path.join(_config["blddir"], name + "." + ext)
 
         if not os.path.isfile(codepath):
             with open(codepath, "w") as f:
@@ -108,6 +106,7 @@ class Compiler(Object):
 
             #print(build_cmd)
             #import pdb; pdb.set_trace()
+
             out = shellcmd(build_cmd)
 
             if out.returncode != 0:
@@ -128,7 +127,7 @@ class Compiler(Object):
         text = (self.vendor + "".join(self.version) + ext + "".join(objhashes))
         name =  hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
 
-        outfile = os.path.join(self._blddir, name + "." + ext)
+        outfile = os.path.join(_config["blddir"], name + "." + ext)
         option = self.get_option()
 
         build_cmd = "{compiler} {option} -o {outfile} {objfiles}".format(
@@ -151,9 +150,6 @@ class Compiler(Object):
     def compile(self, code, macros, debug):
 
         lib = None
-
-        #for f in os.listdir(self._blddir):
-        #    os.remove(os.path.join(self._blddir, f))
 
         objfiles = []
 
@@ -298,7 +294,7 @@ class GnuFortranCompiler(FortranCompiler):
 
     def get_option(self):
 
-        moddir = self.opt_moddir % self._blddir
+        moddir = self.opt_moddir % _config["blddir"]
 
         if sys.platform == "darwin":
             opts = ("-dynamiclib -fPIC %s " % moddir  +
@@ -442,7 +438,7 @@ class CrayFortranCompiler(FortranCompiler):
     def get_option(self):
 
         if sys.platform == "linux":
-            moddir = self.opt_moddir % self._blddir
+            moddir = self.opt_moddir % _config["blddir"]
             opts = ("-shared -fPIC %s " % moddir +
                     super(CrayFortranCompiler, self).get_option())
         else:
@@ -549,7 +545,7 @@ class AmdFlangFortranCompiler(FortranCompiler):
     def get_option(self):
 
         if sys.platform == "linux":
-            moddir = self.opt_moddir % self._blddir
+            moddir = self.opt_moddir % _config["blddir"]
             opts = ("-shared -fPIC %s " % moddir +
                     super(AmdFlangFortranCompiler, self).get_option())
 
@@ -713,7 +709,7 @@ class IbmXlFortranCompiler(FortranCompiler):
     def get_option(self):
 
         if sys.platform == "linux":
-            moddir = self.opt_moddir % self._blddir
+            moddir = self.opt_moddir % _config["blddir"]
             opts = ("-qmkshrobj -qpic %s " % moddir +
                     super(IbmXlFortranCompiler, self).get_option())
 
@@ -851,7 +847,7 @@ class PgiFortranCompiler(FortranCompiler):
     def get_option(self):
 
         if sys.platform == "linux":
-            moddir = self.opt_moddir % self._blddir
+            moddir = self.opt_moddir % _config["blddir"]
             opts = ("-shared -fpic %s " % moddir +
                     super(PgiFortranCompiler, self).get_option())
 
@@ -973,7 +969,7 @@ class IntelFortranCompiler(FortranCompiler):
     def get_option(self):
 
         if sys.platform == "linux":
-            moddir = self.opt_moddir % self._blddir
+            moddir = self.opt_moddir % _config["blddir"]
             return ("-shared -fpic %s " % moddir +
                     super(IntelFortranCompiler, self).get_option())
         else:

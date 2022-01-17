@@ -36,10 +36,9 @@ class AccelBase(Object):
     ]
 
 
-    def __init__(self, *vargs, kind=None, compile=None, master=True, debug=False):
+    def __init__(self, *vargs, kind=None, compile=None, debug=False):
 
         self._debug = debug
-        self._master = master
         self._order = None
 
         inputs, outputs = [], []
@@ -172,111 +171,111 @@ class AccelBase(Object):
         errmsgs = []
         compilers = get_compilers(self.name, compile=self._compile)
 
-        if self._master:
+        if not os.path.isdir(_config["blddir"]):
+            _config["blddir"] = tempfile.mkdtemp()
 
-            if not os.path.isdir(_config["blddir"]):
-                _config["blddir"] = tempfile.mkdtemp()
+        for comp in compilers:
+            cachedir = os.path.join(_config["libdir"], comp.vendor, cachekey[:2])
+            cachelib = os.path.join(cachedir, cachekey[2:]+"."+comp.libext)
 
-            for comp in compilers:
-                cachedir = os.path.join(_config["libdir"], comp.vendor, cachekey[:2])
-                cachelib = os.path.join(cachedir, cachekey[2:]+"."+comp.libext)
+            try:
+                os.makedirs(cachedir)
 
+            except FileExistsError:
+                pass
 
-                if not os.path.isdir(cachedir):
-                    os.makedirs(cachedir)
+            if os.path.isfile(cachelib):
 
-                if os.path.isfile(cachelib):
+                libdir, libname = os.path.split(cachelib)
+                name, _ = os.path.splitext(libname)
 
-                    libdir, libname = os.path.split(cachelib)
-                    name, _ = os.path.splitext(libname)
+                lib = load_library(name, libdir)
 
-                    lib = load_library(name, libdir)
+                if lib is None:
+                    continue
 
-                    if lib is None:
-                        continue
+                return lib, comp.lang
 
-                    return lib, comp.lang
- 
-                try:
-                    code, macros = self.gen_code(comp, self._inputs, self._outputs,
-                                        wtriple, run_id, device, channel)
+            try:
+                code, macros = self.gen_code(comp, self._inputs, self._outputs,
+                                    wtriple, run_id, device, channel)
 
-                    macros["ACCELPY_ACCEL_RUNID"] = run_id
-                    macros["ACCELPY_ACCEL_DEVICE"] = device
-                    macros["ACCELPY_ACCEL_CHANNEL"] = channel
-                    macros["ACCELPY_TEAM_DIM0"] = wtriple[0][0]
-                    macros["ACCELPY_TEAM_DIM1"] = wtriple[0][1]
-                    macros["ACCELPY_TEAM_DIM2"] = wtriple[0][2]
-                    macros["ACCELPY_WORKER_DIM0"] = wtriple[1][0]
-                    macros["ACCELPY_WORKER_DIM1"] = wtriple[1][1]
-                    macros["ACCELPY_WORKER_DIM2"] = wtriple[1][2]
-                    macros["ACCELPY_ASSIGN_DIM0"] = wtriple[2][0]
-                    macros["ACCELPY_ASSIGN_DIM1"] = wtriple[2][1]
-                    macros["ACCELPY_ASSIGN_DIM2"] = wtriple[2][2]
+                macros["ACCELPY_ACCEL_RUNID"] = run_id
+                macros["ACCELPY_ACCEL_DEVICE"] = device
+                macros["ACCELPY_ACCEL_CHANNEL"] = channel
+                macros["ACCELPY_TEAM_DIM0"] = wtriple[0][0]
+                macros["ACCELPY_TEAM_DIM1"] = wtriple[0][1]
+                macros["ACCELPY_TEAM_DIM2"] = wtriple[0][2]
+                macros["ACCELPY_WORKER_DIM0"] = wtriple[1][0]
+                macros["ACCELPY_WORKER_DIM1"] = wtriple[1][1]
+                macros["ACCELPY_WORKER_DIM2"] = wtriple[1][2]
+                macros["ACCELPY_ASSIGN_DIM0"] = wtriple[2][0]
+                macros["ACCELPY_ASSIGN_DIM1"] = wtriple[2][1]
+                macros["ACCELPY_ASSIGN_DIM2"] = wtriple[2][2]
 
-                    libfile = comp.compile(code, macros, self._debug)
+                libfile = comp.compile(code, macros, self._debug)
 
-                    libdir, libname = os.path.split(libfile)
-                    name, _ = os.path.splitext(libname)
+                libdir, libname = os.path.split(libfile)
+                name, _ = os.path.splitext(libname)
 
-                    lib = load_library(name, libdir)
+                lib = load_library(name, libdir)
 
-                    if lib is None:
-                        continue
+                if lib is None:
+                    continue
 
-                    if self.h2acopy(lib, self._testdata[0], "accelpy_test_h2acopy") != 0:
-                        raise Exception("H2D copy test faild.")
+                if self.h2acopy(lib, self._testdata[0], "accelpy_test_h2acopy") != 0:
+                    raise Exception("H2D copy test faild.")
 
-                    self._testdata[1]["data"].fill(0.0)
+                self._testdata[1]["data"].fill(0.0)
 
-                    if self.h2amalloc(lib, self._testdata[1], "accelpy_test_h2amalloc",
-                            writable=True) != 0:
-                        raise Exception("H2D malloc test faild.")
+                if self.h2amalloc(lib, self._testdata[1], "accelpy_test_h2amalloc",
+                        writable=True) != 0:
+                    raise Exception("H2D malloc test faild.")
 
-                    testrun = getattr(lib, "accelpy_test_run")
-                    if testrun() != 0:
-                        raise Exception("testrun faild.")
+                testrun = getattr(lib, "accelpy_test_run")
+                if testrun() != 0:
+                    raise Exception("testrun faild.")
 
-                    if self.a2hcopy(lib, self._testdata[1], "accelpy_test_a2hcopy") != 0:
-                        raise Exception("D2H copy test faild.")
+                if self.a2hcopy(lib, self._testdata[1], "accelpy_test_a2hcopy") != 0:
+                    raise Exception("D2H copy test faild.")
 
-                    if not all(numpy.equal(self._testdata[0]["data"], self._testdata[1]["data"])):
-                        raise Exception("accel test result mismatch: %s != %s" %
-                            (str(self._testdata[0]["data"]), str(self._testdata[1]["data"])))
+                if not all(numpy.equal(self._testdata[0]["data"], self._testdata[1]["data"])):
+                    raise Exception("accel test result mismatch: %s != %s" %
+                        (str(self._testdata[0]["data"]), str(self._testdata[1]["data"])))
 
-                    if not os.path.isfile(cachelib):
-                        shutil.copyfile(libfile, cachelib)
-                        _cache["sharedlib"][cachekey] = (lib, comp.lang)
+                if not os.path.isfile(cachelib):
+                    shutil.copyfile(libfile, cachelib)
+                    _cache["sharedlib"][cachekey] = (lib, comp.lang)
 
-                    return lib, comp.lang
+                return lib, comp.lang
 
-                except Exception as err:
-                    errmsgs.append(str(err))
-
-        else: # not master
-            TIMEOUT = 20
-            start = time.time()
-
-            while time.time() - start < TIMEOUT:
-                for comp in compilers:
-
-                    cachedir = os.path.join(_config["libdir"], comp.vendor, cachekey[:2])
-                    cachelib = os.path.join(cachedir, cachekey[2:]+"."+comp.libext)
-
-                    if os.path.isfile(cachelib):
-
-                        libdir, libname = os.path.split(cachelib)
-                        name, _ = os.path.splitext(libname)
-
-                        lib = load_library(name, libdir)
-
-                        if lib is None:
-                            continue
-                        
-                        _cache["sharedlib"][cachekey] = (lib, comp.lang)
-                        return _cache["sharedlib"][cachekey]
-
-                time.sleep(0.1)
+            except Exception as err:
+                errmsgs.append(str(err))
+#
+#        else: # not master
+#            TIMEOUT = 20
+#            start = time.time()
+#
+#            while time.time() - start < TIMEOUT:
+#                for comp in compilers:
+#
+#                    cachedir = os.path.join(_config["libdir"], comp.vendor, cachekey[:2])
+#                    cachelib = os.path.join(cachedir, cachekey[2:]+"."+comp.libext)
+#
+#                    if os.path.isfile(cachelib):
+#
+#                        libdir, libname = os.path.split(cachelib)
+#                        name, _ = os.path.splitext(libname)
+#
+#                        lib = load_library(name, libdir)
+#
+#                        if lib is None:
+#                            continue
+#                        
+#                        _cache["sharedlib"][cachekey] = (lib, comp.lang)
+#                        return _cache["sharedlib"][cachekey]
+#
+#                time.sleep(0.1)
 
         raise Exception("\n".join(errmsgs))
 
@@ -347,9 +346,21 @@ class AccelBase(Object):
         # compilation should be done first
 
         worker_triple = self._get_worker_triple(*workers)
-        tempstr = str((version, self.name, str(self._compile), self._orderhash,
-                        device, channel, worker_triple))
-        cachekey = hashlib.md5(tempstr.encode("utf-8")).hexdigest()[:10]
+
+        inputs, outputs = self._pack_arguments(inputs, outputs)
+        self._order.update_argnames(inputs, outputs)
+
+        _inputs = inputs if inputs else self._inputs
+        _outputs = outputs if outputs else self._outputs
+
+        keys = [os.uname().release, version, self.name, str(self._compile),
+                    self._orderhash, device, channel, worker_triple]
+
+        for item in _inputs+_outputs:
+            keys.append(item["data"].shape)
+            keys.append(item["data"].dtype)
+
+        cachekey = hashlib.md5(str(keys).encode("utf-8")).hexdigest()[:10]
 
         #lib, self.lang = self.build_sharedlib(run_id, device, channel, worker_triple)
 
@@ -365,12 +376,6 @@ class AccelBase(Object):
             raise Exception("Can not build shared library")
 
         self._threads_run[run_id][3] = lib 
-
-        inputs, outputs = self._pack_arguments(inputs, outputs)
-        self._order.update_argnames(inputs, outputs)
-
-        _inputs = inputs if inputs else self._inputs
-        _outputs = outputs if outputs else self._outputs
 
         if _inputs:
             for input in _inputs:
