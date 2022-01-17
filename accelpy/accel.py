@@ -1,12 +1,12 @@
 """accelpy Accelerator module"""
 
-import os, abc, time, threading, inspect, numpy, hashlib
+import os, sys, abc, time, threading, inspect, numpy, hashlib, shutil, tempfile
 from ctypes import c_int64, POINTER, byref
-from numpy.ctypeslib import ndpointer
+from numpy.ctypeslib import ndpointer, load_library
 from numpy.random import random
 from collections import OrderedDict
 
-from accelpy.core import Object
+from accelpy.core import Object, version
 from accelpy.order import Order
 from accelpy.compiler import Compiler
 from accelpy import _config
@@ -14,6 +14,7 @@ from accelpy import _config
 LEN_TESTDATA = 10
 
 _cache = {
+    "sharedlib": {},
     "test": {}
 }
 
@@ -35,9 +36,10 @@ class AccelBase(Object):
     ]
 
 
-    def __init__(self, *vargs, kind=None, compile=None, debug=False):
+    def __init__(self, *vargs, kind=None, compile=None, master=True, debug=False):
 
         self._debug = debug
+        self._master = master
         self._order = None
 
         inputs, outputs = [], []
@@ -165,40 +167,62 @@ class AccelBase(Object):
             raise Exception("Wrong # of worker initialization: %d" %
                         len(workers))
 
-    def build_sharedlib(self, run_id, device, channel, wtriple):
-
-        compilers = get_compilers(self.name, compile=self._compile)
+    def build_sharedlib(self, run_id, device, channel, wtriple, cachekey):
 
         errmsgs = []
+        compilers = get_compilers(self.name, compile=self._compile)
 
-        for comp in compilers:
-            try:
+        if self._master:
 
-                code, macros = self.gen_code(comp, self._inputs, self._outputs,
-                                    wtriple, run_id, device, channel)
+            if not os.path.isdir(_config["blddir"]):
+                _config["blddir"] = tempfile.mkdtemp()
 
-                macros["ACCELPY_ACCEL_RUNID"] = run_id
-                macros["ACCELPY_ACCEL_DEVICE"] = device
-                macros["ACCELPY_ACCEL_CHANNEL"] = channel
-                macros["ACCELPY_TEAM_DIM0"] = wtriple[0][0]
-                macros["ACCELPY_TEAM_DIM1"] = wtriple[0][1]
-                macros["ACCELPY_TEAM_DIM2"] = wtriple[0][2]
-                macros["ACCELPY_WORKER_DIM0"] = wtriple[1][0]
-                macros["ACCELPY_WORKER_DIM1"] = wtriple[1][1]
-                macros["ACCELPY_WORKER_DIM2"] = wtriple[1][2]
-                macros["ACCELPY_ASSIGN_DIM0"] = wtriple[2][0]
-                macros["ACCELPY_ASSIGN_DIM1"] = wtriple[2][1]
-                macros["ACCELPY_ASSIGN_DIM2"] = wtriple[2][2]
+            for comp in compilers:
+                cachedir = os.path.join(_config["libdir"], comp.vendor, cachekey[:2])
+                cachelib = os.path.join(cachedir, cachekey[2:]+"."+comp.libext)
 
-                lib = comp.compile(code, macros, self._debug)
 
-                if lib is None:
-                    continue
+                if not os.path.isdir(cachedir):
+                    os.makedirs(cachedir)
 
-                libstr = str(lib)
+                if os.path.isfile(cachelib):
 
-                if libstr not in _cache["test"]:
-                    _cache["test"][libstr] = lib
+                    libdir, libname = os.path.split(cachelib)
+                    name, _ = os.path.splitext(libname)
+
+                    lib = load_library(name, libdir)
+
+                    if lib is None:
+                        continue
+
+                    return lib, comp.lang
+ 
+                try:
+                    code, macros = self.gen_code(comp, self._inputs, self._outputs,
+                                        wtriple, run_id, device, channel)
+
+                    macros["ACCELPY_ACCEL_RUNID"] = run_id
+                    macros["ACCELPY_ACCEL_DEVICE"] = device
+                    macros["ACCELPY_ACCEL_CHANNEL"] = channel
+                    macros["ACCELPY_TEAM_DIM0"] = wtriple[0][0]
+                    macros["ACCELPY_TEAM_DIM1"] = wtriple[0][1]
+                    macros["ACCELPY_TEAM_DIM2"] = wtriple[0][2]
+                    macros["ACCELPY_WORKER_DIM0"] = wtriple[1][0]
+                    macros["ACCELPY_WORKER_DIM1"] = wtriple[1][1]
+                    macros["ACCELPY_WORKER_DIM2"] = wtriple[1][2]
+                    macros["ACCELPY_ASSIGN_DIM0"] = wtriple[2][0]
+                    macros["ACCELPY_ASSIGN_DIM1"] = wtriple[2][1]
+                    macros["ACCELPY_ASSIGN_DIM2"] = wtriple[2][2]
+
+                    libfile = comp.compile(code, macros, self._debug)
+
+                    libdir, libname = os.path.split(libfile)
+                    name, _ = os.path.splitext(libname)
+
+                    lib = load_library(name, libdir)
+
+                    if lib is None:
+                        continue
 
                     if self.h2acopy(lib, self._testdata[0], "accelpy_test_h2acopy") != 0:
                         raise Exception("H2D copy test faild.")
@@ -220,10 +244,39 @@ class AccelBase(Object):
                         raise Exception("accel test result mismatch: %s != %s" %
                             (str(self._testdata[0]["data"]), str(self._testdata[1]["data"])))
 
-                return lib, comp.lang
+                    if not os.path.isfile(cachelib):
+                        shutil.copyfile(libfile, cachelib)
+                        _cache["sharedlib"][cachekey] = (lib, comp.lang)
 
-            except Exception as err:
-                errmsgs.append(str(err))
+                    return lib, comp.lang
+
+                except Exception as err:
+                    errmsgs.append(str(err))
+
+        else: # not master
+            TIMEOUT = 20
+            start = time.time()
+
+            while time.time() - start < TIMEOUT:
+                for comp in compilers:
+
+                    cachedir = os.path.join(_config["libdir"], comp.vendor, cachekey[:2])
+                    cachelib = os.path.join(cachedir, cachekey[2:]+"."+comp.libext)
+
+                    if os.path.isfile(cachelib):
+
+                        libdir, libname = os.path.split(cachelib)
+                        name, _ = os.path.splitext(libname)
+
+                        lib = load_library(name, libdir)
+
+                        if lib is None:
+                            continue
+                        
+                        _cache["sharedlib"][cachekey] = (lib, comp.lang)
+                        return _cache["sharedlib"][cachekey]
+
+                time.sleep(0.1)
 
         raise Exception("\n".join(errmsgs))
 
@@ -294,17 +347,19 @@ class AccelBase(Object):
         # compilation should be done first
 
         worker_triple = self._get_worker_triple(*workers)
+        tempstr = str((version, self.name, str(self._compile), self._orderhash,
+                        device, channel, worker_triple))
+        cachekey = hashlib.md5(tempstr.encode("utf-8")).hexdigest()[:10]
 
-        lib, self.lang = self.build_sharedlib(run_id, device, channel, worker_triple)
+        #lib, self.lang = self.build_sharedlib(run_id, device, channel, worker_triple)
 
-#        cachekey = (device, channel, worker_triple)
-#        if cachekey in _cache["sharedlib"]:
-#            lib, self.lang = _cache["sharedlib"][cachekey]
-#
-#        else:
-#            _cache["sharedlib"][cachekey] = self.build_sharedlib(run_id,
-#                                            device, channel, worker_triple)
-#            lib, self.lang = _cache["sharedlib"][cachekey]
+        if cachekey in _cache["sharedlib"]:
+            lib, self.lang = _cache["sharedlib"][cachekey]
+
+        else:
+            _cache["sharedlib"][cachekey] = self.build_sharedlib(run_id,
+                                            device, channel, worker_triple, cachekey)
+            lib, self.lang = _cache["sharedlib"][cachekey]
 
         if lib is None:
             raise Exception("Can not build shared library")

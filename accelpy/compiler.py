@@ -1,7 +1,6 @@
 """accelpy Compiler module"""
 
 import os, sys, abc, time, threading, inspect, hashlib
-from numpy.ctypeslib import load_library
 from numpy import ndarray
 from collections import OrderedDict
 
@@ -24,7 +23,7 @@ class Compiler(Object):
 
     def __init__(self, path, option=None):
 
-        self._blddir = _config["session"]["workdir"]
+        self._blddir = _config["blddir"]
 
         self.version = []
 
@@ -122,7 +121,6 @@ class Compiler(Object):
 
     def _link(self, ext, objfiles):
 
-
         objhashes = []
         for objfile in objfiles:
             objhashes.append(os.path.basename(objfile))
@@ -167,14 +165,7 @@ class Compiler(Object):
             for _c in code:
                 objfiles.append(self._compile(_c, self.objext, macros, debug))
 
-        libfile = self._link(self.libext, objfiles)
-
-        libdir, libname = os.path.split(libfile)
-        name, _ = os.path.splitext(libname)
-
-        lib = load_library(name, libdir)
-
-        return lib
+        return self._link(self.libext, objfiles)
 
 
 class CppCompiler(Compiler):
