@@ -4,6 +4,13 @@
 from accelpy.accel import AccelBase, get_compilers
 from ctypes import c_int32, c_int64, c_float, c_double
 
+
+_cache = {
+    "code": {},
+    "lib": {}
+}
+
+
 t_main = """
 #include <stdlib.h>
 #include <string.h>
@@ -255,24 +262,32 @@ class CppAccel(AccelBase):
 
     def gen_kernel(self):
 
-        order =  self._order.get_section(self.name)
+        #order =  self._order.get_section(self.name)
 
-        return t_kernel.format(order="\n".join(order.body))
+        return t_kernel.format(order="\n".join(self._ordersec.body))
 
     def gen_code(self, compiler, inputs, outputs, worker_triple, run_id, device, channel):
 
-        macros = {}
+        cachekey = (self._orderhash, worker_triple, device, channel)
 
-        main_fmt = {
-            "varclasses":self.gen_varclasses(inputs, outputs),
-            "testcode":self.gen_testcode(),
-            "datacopies":self.gen_datacopies(inputs, outputs),
-            "kernel":self.gen_kernel()
-        }
+        if cachekey in _cache["code"]:
+            return _cache["code"][cachekey]
 
-        code = t_main.format(**main_fmt)
+        else:
+            macros = {}
 
-        return code, macros
+            main_fmt = {
+                "varclasses":self.gen_varclasses(inputs, outputs),
+                "testcode":self.gen_testcode(),
+                "datacopies":self.gen_datacopies(inputs, outputs),
+                "kernel":self.gen_kernel()
+            }
+
+            code = t_main.format(**main_fmt)
+
+            _cache["code"][cachekey] = (code, macros)
+
+            return code, macros
 
     def getname_h2amalloc(self, arg):
         return "accelpy_h2amalloc_%s" % arg["curname"]

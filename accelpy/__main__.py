@@ -1,9 +1,9 @@
 """main entry for accelpy command-line interface"""
   
 
-def main():
-    from accelpy.command import accelpy as app
-    return app()
-
 if __name__ == "__main__":
+
+    import sys
+    from accelpy.command import main
+
     sys.exit(main())

@@ -1,12 +1,52 @@
 "accelpy setup module."
 
+from setuptools import setup, find_packages
+from setuptools.command.develop import develop
+from setuptools.command.install import install
+
+
+def _setcfg():
+    import os, json
+
+    cfgdir = os.path.join(os.path.expanduser("~"), ".accelpy")
+    libdir = os.path.join(cfgdir, "lib")
+    cfgfile = os.path.join(cfgdir, "config")
+
+    if not os.path.isdir(libdir):
+        os.makedirs(libdir)
+
+    config = {
+        "libdir": libdir,
+        "blddir": "",
+        "session": {}
+    }
+
+    with open(cfgfile, "w")  as f:
+        json.dump(config, f)
+
+
+class PostDevelopCommand(develop):
+    """Post-installation for development mode."""
+    def run(self):
+        develop.run(self)
+        # PUT YOUR POST-INSTALL SCRIPT HERE or CALL A FUNCTION
+        _setcfg()
+
+
+class PostInstallCommand(install):
+    """Post-installation for installation mode."""
+    def run(self):
+        install.run(self)
+        # PUT YOUR POST-INSTALL SCRIPT HERE or CALL A FUNCTION
+        _setcfg()
+
+
 def main():
 
-    from setuptools import setup, find_packages
     from accelpy.core import name, version, description, long_description, author
 
     install_requires = ["numpy"]
-    console_scripts = ["accelpy=accelpy.__main__:main"]
+    console_scripts = ["accelpy=accelpy.command:main"]
     keywords = ["GPU", "CPU", "Accelerator", "Cuda", "Hip",
                 "OpenAcc", "OpenMP", "Numpy", "C++", "Fortran", "accelpy"]
 
@@ -28,6 +68,10 @@ def main():
             "Programming Language :: Python :: 3.7",
             "Programming Language :: Python :: 3.8",
         ],
+        cmdclass={
+            'develop': PostDevelopCommand,
+            'install': PostInstallCommand,
+        },
         keywords=keywords,
         packages=find_packages(exclude=["tests"]),
         include_package_data=True,

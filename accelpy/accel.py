@@ -1,6 +1,6 @@
 """accelpy Accelerator module"""
 
-import os, abc, time, threading, inspect, numpy
+import os, abc, time, threading, inspect, numpy, hashlib
 from ctypes import c_int64, POINTER, byref
 from numpy.ctypeslib import ndpointer
 from numpy.random import random
@@ -12,6 +12,10 @@ from accelpy.compiler import Compiler
 from accelpy import _config
 
 LEN_TESTDATA = 10
+
+_cache = {
+    "test": {}
+}
 
 class AccelBase(Object):
     """Accelerator Base Class"""
@@ -49,6 +53,9 @@ class AccelBase(Object):
 
         self._inputs, self._outputs = self._pack_arguments(inputs, outputs)
         self._order.update_argnames(self._inputs, self._outputs)
+        self._ordersec =  self._order.get_section(self.name)
+        self._orderhash =  hashlib.md5("".join(self._ordersec.body).encode("utf-8")
+                            ).hexdigest()[:10]
         self._compile = compile
         self._threads_run = {} # run_id: [thread, state(0:started 1:stopped), start time, sharedlib]
 
@@ -140,19 +147,19 @@ class AccelBase(Object):
 
         # ()
         if len(workers) == 0:
-            return [_n(1), _n(1), _n(1)]
+            return (_n(1), _n(1), _n(1))
 
         # (members)
         elif len(workers) == 1:
-            return [_n(1), _n(workers[0]), _n(1)]
+            return (_n(1), _n(workers[0]), _n(1))
 
         # (members, teams)
         elif len(workers) == 2:
-            return [_n(workers[1]), _n(workers[0]), _n(1)]
+            return (_n(workers[1]), _n(workers[0]), _n(1))
 
         # (members, teams, assignments)
         elif len(workers) == 3:
-            return [_n(workers[1]), _n(workers[0]), _n(workers[2])]
+            return (_n(workers[1]), _n(workers[0]), _n(workers[2]))
 
         else:
             raise Exception("Wrong # of worker initialization: %d" %
@@ -188,25 +195,30 @@ class AccelBase(Object):
                 if lib is None:
                     continue
 
-                if self.h2acopy(lib, self._testdata[0], "accelpy_test_h2acopy") != 0:
-                    raise Exception("H2D copy test faild.")
+                libstr = str(lib)
 
-                self._testdata[1]["data"].fill(0.0)
+                if libstr not in _cache["test"]:
+                    _cache["test"][libstr] = lib
 
-                if self.h2amalloc(lib, self._testdata[1], "accelpy_test_h2amalloc",
-                        writable=True) != 0:
-                    raise Exception("H2D malloc test faild.")
+                    if self.h2acopy(lib, self._testdata[0], "accelpy_test_h2acopy") != 0:
+                        raise Exception("H2D copy test faild.")
 
-                testrun = getattr(lib, "accelpy_test_run")
-                if testrun() != 0:
-                    raise Exception("testrun faild.")
+                    self._testdata[1]["data"].fill(0.0)
 
-                if self.a2hcopy(lib, self._testdata[1], "accelpy_test_a2hcopy") != 0:
-                    raise Exception("D2H copy test faild.")
+                    if self.h2amalloc(lib, self._testdata[1], "accelpy_test_h2amalloc",
+                            writable=True) != 0:
+                        raise Exception("H2D malloc test faild.")
 
-                if not all(numpy.equal(self._testdata[0]["data"], self._testdata[1]["data"])):
-                    raise Exception("accel test result mismatch: %s != %s" %
-                        (str(self._testdata[0]["data"]), str(self._testdata[1]["data"])))
+                    testrun = getattr(lib, "accelpy_test_run")
+                    if testrun() != 0:
+                        raise Exception("testrun faild.")
+
+                    if self.a2hcopy(lib, self._testdata[1], "accelpy_test_a2hcopy") != 0:
+                        raise Exception("D2H copy test faild.")
+
+                    if not all(numpy.equal(self._testdata[0]["data"], self._testdata[1]["data"])):
+                        raise Exception("accel test result mismatch: %s != %s" %
+                            (str(self._testdata[0]["data"]), str(self._testdata[1]["data"])))
 
                 return lib, comp.lang
 
@@ -284,6 +296,15 @@ class AccelBase(Object):
         worker_triple = self._get_worker_triple(*workers)
 
         lib, self.lang = self.build_sharedlib(run_id, device, channel, worker_triple)
+
+#        cachekey = (device, channel, worker_triple)
+#        if cachekey in _cache["sharedlib"]:
+#            lib, self.lang = _cache["sharedlib"][cachekey]
+#
+#        else:
+#            _cache["sharedlib"][cachekey] = self.build_sharedlib(run_id,
+#                                            device, channel, worker_triple)
+#            lib, self.lang = _cache["sharedlib"][cachekey]
 
         if lib is None:
             raise Exception("Can not build shared library")

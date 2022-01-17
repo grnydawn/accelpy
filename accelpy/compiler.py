@@ -82,8 +82,11 @@ class Compiler(Object):
 
         filename = name + "." + self.codeext
         codepath = os.path.join(self._blddir, filename)
-        with open(codepath, "w") as f:
-            f.write(code)
+        outfile = os.path.join(self._blddir, name + "." + ext)
+
+        if not os.path.isfile(codepath):
+            with open(codepath, "w") as f:
+                f.write(code)
 
         if debug:
             debugdir = "_accelpy_debug_"
@@ -94,26 +97,26 @@ class Compiler(Object):
             with open(os.path.join(debugdir, filename), "w") as f:
                 f.write(code)
 
-        outfile = os.path.join(self._blddir, name + "." + ext)
-
-        option = self.opt_debug + " " if debug else ""
-        option += self.opt_compile_only + " " + self.get_option()
-
-        # PGI infoopt :  -Minfo=acc
-        build_cmd = "{compiler} {option} {macro} -o {outfile} {infile}".format(
-                        compiler=self.path, option=option, outfile=outfile,
-                        infile=codepath, macro=opt_macro)
-
-        #print(build_cmd)
-        #import pdb; pdb.set_trace()
-        out = shellcmd(build_cmd)
-
-        if out.returncode != 0:
-            errmsg = str(out.stderr).replace("\\n", "\n")
-            raise Exception("Compilation fails: %s" % errmsg)
-
         if not os.path.isfile(outfile):
-            raise Exception("Output is not generated.")
+
+            option = self.opt_debug + " " if debug else ""
+            option += self.opt_compile_only + " " + self.get_option()
+
+            # PGI infoopt :  -Minfo=acc
+            build_cmd = "{compiler} {option} {macro} -o {outfile} {infile}".format(
+                            compiler=self.path, option=option, outfile=outfile,
+                            infile=codepath, macro=opt_macro)
+
+            #print(build_cmd)
+            #import pdb; pdb.set_trace()
+            out = shellcmd(build_cmd)
+
+            if out.returncode != 0:
+                errmsg = str(out.stderr).replace("\\n", "\n")
+                raise Exception("Compilation fails: %s" % errmsg)
+
+            if not os.path.isfile(outfile):
+                raise Exception("Output is not generated.")
 
         return outfile
 

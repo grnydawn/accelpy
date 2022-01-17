@@ -8,6 +8,12 @@ def _load_config():
     home = os.path.expanduser("~")
 
     cfgdir = os.path.join(home, ".accelpy")
+    redirect = os.path.join(cfgdir, "redirect")
+
+    if os.path.isfile(redirect):
+        with open(redirect) as f:
+            cfgdir = f.read().strip()
+
     if not os.path.isdir(cfgdir):
         os.makedirs(cfgdir)
 
@@ -25,13 +31,13 @@ def _load_config():
 
     else:
         config = {
-    "libdir": libdir,
-    "blddir": "",
-    "session": {
-        "started_at": time.time(),
-        "threads": {}
-    }
-}
+            "libdir": libdir,
+            "blddir": "",
+            "session": {
+                "started_at": time.time(),
+                "threads": {}
+            }
+        }
 
         with open(_cfgfile, "w") as f:
             json.dump(config, f, indent=4)
@@ -43,6 +49,7 @@ def _load_config():
         config["session"]["tmpdir"] = tempfile.mkdtemp()
         config["session"]["workdir"] = config["session"]["tmpdir"]
 
+    config["session"]["libdir"] = config["libdir"]
     config["session"]["started_at"] = time.time()
 
     return config
@@ -69,11 +76,20 @@ def _unload_config():
     home = os.path.expanduser("~")
 
     cfgdir = os.path.join(home, ".accelpy")
+    redirect = os.path.join(cfgdir, "redirect")
+
+    if os.path.isfile(redirect):
+        with open(redirect) as f:
+            cfgdir = f.read().strip()
+
     _cfgfile = os.path.join(cfgdir, "config")
 
-    if os.path.isfile(_cfgfile):
+    try:
         with open(_cfgfile, "w") as f:
             json.dump(_config, f, indent=4)
+
+    except IOError as err:
+        print("Warning: can't write config due to read-only file system: %s" % _cfgfile) 
 
 
 # accelerators
