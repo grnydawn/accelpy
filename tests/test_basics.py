@@ -44,7 +44,7 @@ test_accels = (
 
 order_vecadd1d = """
 
-set_argnames(("x", "y"), "z")
+set_argnames(("x", "y"), ("z",))
 
 cpp_enable = True
 
@@ -101,7 +101,7 @@ cpp_enable = True
 
 order_vecadd3d = """
 
-set_argnames(("x", "y"), "z")
+set_argnames(("x", "y"), ("z",))
 
 [cpp]
     for (int i = 0; i < x.shape[0]; i++) {
@@ -186,7 +186,7 @@ set_argnames(("x", "y"), "z")
 
 order_matmul = """
 
-set_argnames(("X", "Y"), "Z")
+set_argnames(("X", "Y"), ("Z",))
 
 [cpp]
 
