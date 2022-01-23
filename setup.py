@@ -7,42 +7,22 @@ from accelpy.util import init_config
 
 
 def _setcfg():
-    import os, json
+    import os
 
     cfgdir = os.path.join(os.path.expanduser("~"), ".accelpy")
-
     init_config(cfgdir)
-#
-#    libdir = os.path.join(cfgdir, "lib")
-#    cfgfile = os.path.join(cfgdir, "config")
-#
-#    if not os.path.isdir(libdir):
-#        os.makedirs(libdir)
-#
-#    config = {
-#        "libdir": libdir,
-#        "blddir": "",
-#        "session": {}
-#    }
-#
-#    with open(cfgfile, "w")  as f:
-#        json.dump(config, f)
 
 
-class PostDevelopCommand(develop):
-    """Post-installation for development mode."""
+class DevelopCommand(develop):
     def run(self):
+        _setcfg()
         develop.run(self)
-        # PUT YOUR POST-INSTALL SCRIPT HERE or CALL A FUNCTION
-        _setcfg()
 
 
-class PostInstallCommand(install):
-    """Post-installation for installation mode."""
+class InstallCommand(install):
     def run(self):
-        install.run(self)
-        # PUT YOUR POST-INSTALL SCRIPT HERE or CALL A FUNCTION
         _setcfg()
+        install.run(self)
 
 
 def main():
@@ -73,8 +53,8 @@ def main():
             "Programming Language :: Python :: 3.8",
         ],
         cmdclass={
-            'develop': PostDevelopCommand,
-            'install': PostInstallCommand,
+            'develop': DevelopCommand,
+            'install': InstallCommand,
         },
         keywords=keywords,
         packages=find_packages(exclude=["tests"]),
