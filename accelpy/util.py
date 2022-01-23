@@ -68,9 +68,7 @@ def init_config(cfgdir):
         vendor_path = os.path.join(libdir, vendor)
         if not os.path.isdir(vendor_path):
             try:
-                print("AAAAA")
                 os.makedirs(vendor_path)
-                print("BBBBBB")
 
             except FileExistsError:
                 pass
