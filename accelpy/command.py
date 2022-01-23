@@ -1,10 +1,7 @@
 """main entry for accelpy command-line interface"""
 
 import os
-from accelpy import _config
-
-cfgdir = os.path.join(os.path.expanduser("~"), ".accelpy")
-redirect = os.path.join(cfgdir, "redirect")
+from accelpy.util import init_config, get_config, set_config
 
 
 def cmd_config(args):
@@ -12,31 +9,25 @@ def cmd_config(args):
     import json
 
     if args.dir:
+
+        cfgdir = os.path.join(os.path.expanduser("~"), ".accelpy")
+        redirect = os.path.join(cfgdir, "redirect")
+
         with open(redirect, "w") as f:
             f.write(args.dir)
-    else:
-        if os.path.isfile(redirect):
-            with open(redirect) as f:
-                cfgdir = f.read().strip()
 
-        if args.libdir:
-            cfgfile = os.path.join(cfgdir, "config")
-            _config["libdir"] = args.libdir
+        init_config(args.dir)
 
-            with open(cfgfile, "w") as f:
-                json.dump(_config, f, indent=4)
+    elif args.libdir:
+        set_config("libdir", args.libdir, save=True)
 
             
 def cmd_cache(args):
 
     import shutil
 
-    if os.path.isfile(redirect):
-        with open(redirect) as f:
-            cfgdir = f.read().strip()
-
     if args.clear_all:
-        libdir = _config["libdir"]
+        libdir = get_config("libdir")
 
         if os.path.isdir(libdir):
             for item in os.listdir(libdir):

@@ -1,73 +1,5 @@
 """accelpy package"""
 
-import atexit
-
-def _load_config():
-    import os, json, time
-
-    home = os.path.expanduser("~")
-
-    cfgdir = os.path.join(home, ".accelpy")
-    redirect = os.path.join(cfgdir, "redirect")
-
-    if os.path.isfile(redirect):
-        with open(redirect) as f:
-            cfgdir = f.read().strip()
-
-    if not os.path.isdir(cfgdir):
-        os.makedirs(cfgdir)
-
-    libdir = os.path.join(cfgdir, "lib")
-    if not os.path.isdir(libdir):
-        os.makedirs(libdir)
-
-    _cfgfile = os.path.join(cfgdir, "config")
-
-    if os.path.isfile(_cfgfile):
-        with open(_cfgfile) as f:
-            config = json.load(f)
-
-    else:
-        config = {
-            "libdir": libdir,
-            "blddir": "",
-        }
-
-        with open(_cfgfile, "w") as f:
-            json.dump(config, f, indent=4)
-
-    return config
-
-
-_config = _load_config()
-
-
-#@atexit.register
-#def _unload_config():
-#    import os, json, shutil
-#
-#    home = os.path.expanduser("~")
-#
-#    cfgdir = os.path.join(home, ".accelpy")
-#    redirect = os.path.join(cfgdir, "redirect")
-#
-#    if os.path.isfile(redirect):
-#        with open(redirect) as f:
-#            cfgdir = f.read().strip()
-#
-#    if not os.path.isdir(cfgdir):
-#        os.makedirs(cfgdir)
-#
-#    _cfgfile = os.path.join(cfgdir, "config")
-#
-#    try:
-#        with open(_cfgfile, "w") as f:
-#            json.dump(_config, f, indent=4)
-#
-#    except IOError as err:
-#        print("Warning: can't write config due to read-only file system: %s" % _cfgfile) 
-
-
 # accelerators
 from .accel import Accel, AccelBase
 
@@ -83,6 +15,3 @@ from .hip import HipAccel
 from .cuda import CudaAccel
 from .openacc_cpp import OpenaccCppAccel
 from .openmp_cpp import OpenmpCppAccel
-
-#del _load_config, _unload_config, atexit
-del _load_config

@@ -1,12 +1,14 @@
 """accelpy utility module"""
 
-import os, ast
+import os, ast, json
 from subprocess import PIPE, run as subp_run
 
 _builtin_excludes = ["exec", "eval", "breakpoint", "memoryview"]
 
 _accelpy_builtins = dict((k, v) for k, v in __builtins__.items()
                        if k not in _builtin_excludes)
+
+_config = None
 
 def appeval(text, env):
 
@@ -56,3 +58,63 @@ def which(pgm):
         p=os.path.join(p,pgm)
         if os.path.exists(p) and os.access(p,os.X_OK):
             return p
+
+def init_config(cfgdir):
+
+    libdir = os.path.join(cfgdir, "lib")
+    cfgfile = os.path.join(cfgdir, "config")
+
+    for vendor in ["cray", "amd", "nvidia", "intel", "pgi", "ibm", "gnu"]:
+        vendor_path = os.path.join(libdir, vendor)
+        if not os.path.isdir(vendor_path):
+            try:
+                os.makedirs(vendor_path)
+
+            except FileExistsError:
+                pass
+
+    config = {
+        "libdir": libdir,
+        "blddir": "",
+    }
+
+    with open(cfgfile, "w")  as f:
+        json.dump(config, f)
+
+
+def _cfgfile():
+
+    cfgdir = os.path.join(os.path.expanduser("~"), ".accelpy")
+    redirect = os.path.join(cfgdir, "redirect")
+
+    if os.path.isfile(redirect):
+        with open(redirect) as f:
+            cfgdir = f.read().strip()
+
+    return os.path.join(cfgdir, "config")
+
+
+def get_config(key):
+
+    global _config
+
+    if _config is None:
+        with open(_cfgfile()) as f:
+            _config = json.load(f)
+
+    return _config[key]
+
+
+def set_config(key, value, save=False):
+
+    # TODO: multiprocessing check
+
+    if _config is None:
+        raise Exception("config file is not initialized.")
+
+    _config[key] = value
+
+    if save:
+        with open(_cfgfile(), "w") as f:
+            json.dump(_config, f, indent=4)
+

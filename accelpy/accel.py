@@ -9,7 +9,7 @@ from collections import OrderedDict
 from accelpy.core import Object, version
 from accelpy.order import Order
 from accelpy.compiler import Compiler
-from accelpy import _config
+from accelpy.util import get_config, set_config
 
 LEN_TESTDATA = 10
 
@@ -170,12 +170,14 @@ class AccelBase(Object):
 
         errmsgs = []
         compilers = get_compilers(self.name, compile=self._compile)
+        blddir = get_config("blddir")
 
-        if not os.path.isdir(_config["blddir"]):
-            _config["blddir"] = tempfile.mkdtemp()
+        if not os.path.isdir(blddir):
+            set_config("blddir", tempfile.mkdtemp())
 
         for comp in compilers:
-            cachedir = os.path.join(_config["libdir"], comp.vendor, cachekey[:2])
+            libdir = get_config("libdir")
+            cachedir = os.path.join(libdir, comp.vendor, cachekey[:2])
             cachelib = os.path.join(cachedir, cachekey[2:]+"."+comp.libext)
 
             try:

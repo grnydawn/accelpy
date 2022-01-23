@@ -5,8 +5,7 @@ from numpy import ndarray
 from collections import OrderedDict
 
 from accelpy.core import Object
-from accelpy.util import shellcmd, which
-from accelpy import _config
+from accelpy.util import shellcmd, which, get_config
 
 #########################
 # Generic Compilers
@@ -78,21 +77,36 @@ class Compiler(Object):
         name =  hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
 
         filename = name + "." + self.codeext
-        codepath = os.path.join(_config["blddir"], filename)
-        outfile = os.path.join(_config["blddir"], name + "." + ext)
+        codepath = os.path.join(get_config("blddir"), filename)
+        outfile = os.path.join(get_config("blddir"), name + "." + ext)
 
         if not os.path.isfile(codepath):
-            with open(codepath, "w") as f:
-                f.write(code)
+            try:
+                with open(codepath, "w") as f:
+                    f.write(code)
+
+            except FileExistsError:
+                pass
 
         if debug:
             debugdir = "_accelpy_debug_"
 
             if not os.path.isdir(debugdir):
-                os.makedirs(debugdir)
+                try:
+                    os.makedirs(debugdir)
 
-            with open(os.path.join(debugdir, filename), "w") as f:
-                f.write(code)
+                except FileExistsError:
+                    pass
+
+            debugfile = os.path.join(debugdir, filename) 
+
+            if not os.path.isdir(debugfile):
+                try:
+                    with open(debugfile, "w") as f:
+                        f.write(code)
+
+                except FileExistsError:
+                    pass
 
         if not os.path.isfile(outfile):
 
@@ -127,7 +141,7 @@ class Compiler(Object):
         text = (self.vendor + "".join(self.version) + ext + "".join(objhashes))
         name =  hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
 
-        outfile = os.path.join(_config["blddir"], name + "." + ext)
+        outfile = os.path.join(get_config("blddir"), name + "." + ext)
         option = self.get_option()
 
         build_cmd = "{compiler} {option} -o {outfile} {objfiles}".format(
@@ -294,7 +308,7 @@ class GnuFortranCompiler(FortranCompiler):
 
     def get_option(self):
 
-        moddir = self.opt_moddir % _config["blddir"]
+        moddir = self.opt_moddir % get_config("blddir")
 
         if sys.platform == "darwin":
             opts = ("-dynamiclib -fPIC %s " % moddir  +
@@ -438,7 +452,7 @@ class CrayFortranCompiler(FortranCompiler):
     def get_option(self):
 
         if sys.platform == "linux":
-            moddir = self.opt_moddir % _config["blddir"]
+            moddir = self.opt_moddir % get_config("blddir")
             opts = ("-shared -fPIC %s " % moddir +
                     super(CrayFortranCompiler, self).get_option())
         else:
@@ -545,7 +559,7 @@ class AmdFlangFortranCompiler(FortranCompiler):
     def get_option(self):
 
         if sys.platform == "linux":
-            moddir = self.opt_moddir % _config["blddir"]
+            moddir = self.opt_moddir % get_config("blddir")
             opts = ("-shared -fPIC %s " % moddir +
                     super(AmdFlangFortranCompiler, self).get_option())
 
@@ -709,7 +723,7 @@ class IbmXlFortranCompiler(FortranCompiler):
     def get_option(self):
 
         if sys.platform == "linux":
-            moddir = self.opt_moddir % _config["blddir"]
+            moddir = self.opt_moddir % get_config("blddir")
             opts = ("-qmkshrobj -qpic %s " % moddir +
                     super(IbmXlFortranCompiler, self).get_option())
 
@@ -847,7 +861,7 @@ class PgiFortranCompiler(FortranCompiler):
     def get_option(self):
 
         if sys.platform == "linux":
-            moddir = self.opt_moddir % _config["blddir"]
+            moddir = self.opt_moddir % get_config("blddir")
             opts = ("-shared -fpic %s " % moddir +
                     super(PgiFortranCompiler, self).get_option())
 
@@ -969,7 +983,7 @@ class IntelFortranCompiler(FortranCompiler):
     def get_option(self):
 
         if sys.platform == "linux":
-            moddir = self.opt_moddir % _config["blddir"]
+            moddir = self.opt_moddir % get_config("blddir")
             return ("-shared -fpic %s " % moddir +
                     super(IntelFortranCompiler, self).get_option())
         else:

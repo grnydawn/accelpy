@@ -3,26 +3,30 @@
 from setuptools import setup, find_packages
 from setuptools.command.develop import develop
 from setuptools.command.install import install
+from accelpy.util import init_config
 
 
 def _setcfg():
     import os, json
 
     cfgdir = os.path.join(os.path.expanduser("~"), ".accelpy")
-    libdir = os.path.join(cfgdir, "lib")
-    cfgfile = os.path.join(cfgdir, "config")
 
-    if not os.path.isdir(libdir):
-        os.makedirs(libdir)
-
-    config = {
-        "libdir": libdir,
-        "blddir": "",
-        "session": {}
-    }
-
-    with open(cfgfile, "w")  as f:
-        json.dump(config, f)
+    init_config(cfgdir)
+#
+#    libdir = os.path.join(cfgdir, "lib")
+#    cfgfile = os.path.join(cfgdir, "config")
+#
+#    if not os.path.isdir(libdir):
+#        os.makedirs(libdir)
+#
+#    config = {
+#        "libdir": libdir,
+#        "blddir": "",
+#        "session": {}
+#    }
+#
+#    with open(cfgfile, "w")  as f:
+#        json.dump(config, f)
 
 
 class PostDevelopCommand(develop):
