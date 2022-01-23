@@ -91,7 +91,7 @@ release: dist ## package and upload a release
 
 dist: clean ## builds source and wheel package
 	${PY} setup.py sdist
-	${PY} setup.py bdist_wheel --universal
+	#${PY} setup.py bdist_wheel --universal
 	ls -l dist
 
 install: clean ## install the package to the active Python's site-packages

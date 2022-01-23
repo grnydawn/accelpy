@@ -59,7 +59,7 @@ def which(pgm):
         if os.path.exists(p) and os.access(p,os.X_OK):
             return p
 
-def init_config(cfgdir):
+def init_config(cfgdir, overwrite=False):
 
     libdir = os.path.join(cfgdir, "lib")
     cfgfile = os.path.join(cfgdir, "config")
@@ -78,8 +78,9 @@ def init_config(cfgdir):
         "blddir": "",
     }
 
-    with open(cfgfile, "w")  as f:
-        json.dump(config, f)
+    if overwrite or not os.path.isfile(cfgfile):
+        with open(cfgfile, "w")  as f:
+            json.dump(config, f)
 
 
 def _cfgfile():
