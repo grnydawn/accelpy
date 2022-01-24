@@ -24,7 +24,7 @@ An example of adding two vectors in Cuda, Hip, OpenAcc, or OpenMp:
 
         # define acceleration task in one or more programming models in either a string or a file
         vecadd = """
-        set_argnames(("a", "b"), "c")
+        set_argnames(("a", "b"), ("c",))
 
         [hip, cuda]
             int id = blockIdx.x * blockDim.x + threadIdx.x;
