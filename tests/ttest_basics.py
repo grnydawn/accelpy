@@ -7,7 +7,7 @@ from accelpy import Accel, CppAccel, FortranAccel, HipAccel, Order
 
 test_accels = (
 #    ("cpp", "gnu"),
-#    ("cpp", "cray"),
+    ("cpp", "cray"),
 #    ("cpp", "amd"),
 #    ("cpp", "ibm"),
 #    ("cpp", "pgi"),
@@ -18,23 +18,23 @@ test_accels = (
 #    ("fortran", "ibm"),
 #    ("fortran", "pgi"),
 #    ("fortran", "intel"),
-#    ("hip", "amd"),
+    ("hip", "amd"),
 #    ("cuda", "nvidia"),
 #    ("openacc_cpp", "pgi"),
 #    ("openacc_cpp", "gnu"), # GNU compiler error on Summit
-#    ("openacc_cpp", "cray"),
+    ("openacc_cpp", "cray"),
 #    ("openacc_fortran", "pgi"),
 #    ("openacc_fortran", "gnu"), # GNU compiler error on Summit
-#    ("openacc_fortran", "cray"),
+    ("openacc_fortran", "cray"),
 #    ("openmp_cpp", "gnu"), # GNU compiler error on Summit
 #    ("openmp_cpp", "pgi"),
 #    ("openmp_cpp", "ibm"),
-#    ("openmp_cpp", "cray"),
+    ("openmp_cpp", "cray"),
 #    ("openmp_cpp", "amd"),
 #    ("openmp_fortran", "gnu"),
 #    ("openmp_fortran", "pgi"),
 #    ("openmp_fortran", "ibm"),
-#    ("openmp_fortran", "cray"), # OpenMP parallel attempted from non-OpenMP thread On Spock
+    ("openmp_fortran", "cray"), # OpenMP parallel attempted from non-OpenMP thread On Spock
 #    ("openmp_fortran", "amd"),
 )
 
@@ -53,7 +53,7 @@ cpp_enable = True
         z(id) = x(id) + y(id);
     }
 
-[fortran: attrspec_x={'dimension': '1:'}]
+[fortran]
     INTEGER id
 
     DO id=1, x_attr%shape(1)
@@ -297,7 +297,7 @@ a_2d = np.reshape(np.arange(100, dtype=np.float64), (4, 25))
 b_2d = np.reshape(np.arange(100, dtype=np.float64) * 2, (25, 4))
 c_2d = np.reshape(np.zeros(16, dtype=np.float64), (4, 4))
 
-def ttest_first():
+def test_first():
 
     c_1d.fill(0)
 
@@ -325,8 +325,7 @@ def test_add1d(accel, comp):
 
     c_1d.fill(0)
 
-    order = Order(order_vecadd1d, env_order={"len_x": a_1d.size})
-    accel = Accel(a_1d, b_1d, order, c_1d,
+    accel = Accel(a_1d, b_1d, Order(order_vecadd1d), c_1d,
                     kind=[accel], compile=[comp])
 
     accel.run(a_1d.size)
@@ -341,7 +340,7 @@ def test_add1d(accel, comp):
 
 
 @pytest.mark.parametrize("accel, comp", test_accels)
-def ttest_matmul(accel, comp):
+def test_matmul(accel, comp):
 
     c_2d.fill(0)
 
@@ -356,7 +355,7 @@ def ttest_matmul(accel, comp):
 
 
 @pytest.mark.parametrize("accel, comp", test_accels)
-def ttest_add3d(accel, comp):
+def test_add3d(accel, comp):
 
     c_3d.fill(0)
 

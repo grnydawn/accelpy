@@ -119,3 +119,22 @@ def set_config(key, value, save=False):
         with open(_cfgfile(), "w") as f:
             json.dump(_config, f, indent=4)
 
+
+def fortline_pack(items):
+
+    lines = [""]
+    maxlen = 72
+
+    for item in items:
+        if len(lines[-1]) + len(item) > maxlen:            
+
+            lines[-1] += " &"
+            lines.append("        &, %s" % item)
+
+        elif lines[-1] == "":
+            lines[-1] += item
+
+        else:
+            lines[-1] += ", " + item
+
+    return lines

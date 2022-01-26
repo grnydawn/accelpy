@@ -2,6 +2,7 @@
 
 
 from accelpy.accel import AccelBase, get_compilers
+from accelpy.util import fortline_pack
 from ctypes import c_int32, c_int64, c_float, c_double
 
 t_main = """
@@ -13,13 +14,10 @@ t_main = """
 INTEGER (C_INT64_T) FUNCTION accelpy_start() BIND(C, name="accelpy_start")
 
     USE, INTRINSIC :: ISO_C_BINDING
+    USE accelpy_global, ONLY : {varnames}
     IMPLICIT NONE
 
-    INTEGER (C_INT64_T) :: ACCELPY_WORKER_ID
-
-    ACCELPY_WORKER_ID = 0
-    
-    accelpy_start = accelpy_kernel(ACCELPY_WORKER_ID)
+    accelpy_start = accelpy_kernel({varnames})
 
 CONTAINS
 
@@ -58,16 +56,17 @@ END MODULE
 """
 
 t_kernel = """
-INTEGER (C_INT64_T) FUNCTION accelpy_kernel(ACCELPY_WORKER_ID)
+INTEGER (C_INT64_T) FUNCTION accelpy_kernel({varnames})
     USE, INTRINSIC :: ISO_C_BINDING
-    USE accelpy_global, ONLY : {varandattr}
+    USE accelpy_global, ONLY : {varattrs}
     IMPLICIT NONE
 
-    INTEGER (C_INT64_T), INTENT(IN) :: ACCELPY_WORKER_ID
+    {typedecls}
 
     {order}
 
     accelpy_kernel = 0
+
 END FUNCTION
 """
 
@@ -195,9 +194,12 @@ class FortranAccel(AccelBase):
         "float64": ["REAL (C_DOUBLE)", c_double]
     }
 
-    def gen_code(self, compiler, inputs, outputs, worker_triple, run_id, device, channel):
+    def gen_code(self, compiler, inputs, outputs, worker_triple, run_id,
+                 device, channel):
 
         macros = {}
+                
+        order =  self._order.get_section(self.name)
 
         module_fmt = {
             "typeattr": self._get_typeattr(inputs, outputs),
@@ -210,7 +212,7 @@ class FortranAccel(AccelBase):
         main_fmt = {
             "testcode": self._get_testcode(),
             "datacopies":self._gen_datacopies(inputs, outputs),
-            "kernel":self._gen_kernel(inputs, outputs),
+            "kernel":self._gen_kernel(inputs, order, outputs),
             "vars":self._gen_usevars(inputs, outputs),
             "nullify":self._gen_nullify(inputs, outputs)
         }
@@ -271,14 +273,16 @@ class FortranAccel(AccelBase):
         for data in inputs+outputs:
             ndim = data["data"].ndim
             dtype = self.get_dtype(data)
+            varname = data["curname"]
 
             if ndim > 0:
                 bound = ",".join([":"]*ndim)
-                out.append("%s, DIMENSION(%s), POINTER :: %s" % (dtype, bound, data["curname"]))
-                out.append("TYPE(type_{name}) :: {name}_attr".format(name=data["curname"]))
+
+                out.append("%s, DIMENSION(%s), POINTER :: %s" % (dtype, bound, varname))
+                out.append("TYPE(type_{name}) :: {name}_attr".format(name=varname))
 
             else:
-                out.append("%s :: %s" % (dtype, data["curname"]))
+                out.append("%s :: %s" % (dtype, varname))
 
         return "\n".join(out)
 
@@ -394,34 +398,48 @@ class FortranAccel(AccelBase):
 
         return "\n".join(lines)
 
-    def _gen_kernel(self, inputs, outputs):
+    def _gen_kernel(self, inputs, order, outputs):
 
-        names = []
+        _names = []
+        _attrs = []
+        typedecls = []
 
+####
         for data in inputs+outputs:
-            names.append(data["curname"])
+            ndim = data["data"].ndim
+            dtype = self.get_dtype(data)
+            varname = data["curname"]
 
-            if data["data"].ndim > 0:
-                names.append(data["curname"]+"_attr")
+            if ndim > 0:
+                tname = "attrspec_"+varname 
+                if tname in order.kwargs and "dimension" in order.kwargs[tname]:
+                    bound = order.kwargs[tname]["dimension"]
+                else:
+                    bound = ",".join([":"]*ndim)
 
-        lines = [""]
-        maxlen = 72
-
-        for name in names:
-            if len(lines[-1]) + len(name) > maxlen:            
-
-                lines[-1] += " &"
-                lines.append("        &, %s" % name)
-
-            elif lines[-1] == "":
-                lines[-1] += name
+                out.append("%s, DIMENSION(%s), INTENT(INOUT) :: %s" % (
+                            dtype, bound, varname))
 
             else:
-                lines[-1] += ", " + name
-                
-        order =  self._order.get_section(self.name)
+                out.append("%s :: %s" % (dtype, varname))
+####
 
-        return t_kernel.format(order="\n".join(order.body), varandattr="\n".join(lines))
+        return "\n".join(out)
+
+
+
+
+        for data in inputs+outputs:
+            _names.append(data["curname"])
+
+            if data["data"].ndim > 0:
+                _attrs.append(data["curname"]+"_attr")
+
+        names = fortline_pack(_names)
+        attrs = fortline_pack(_attrs)
+
+        return t_kernel.format(order="\n".join(order.body),
+                varnames="\n".join(names), varattrs="\n".join(attrs))
 
     def _gen_varattrs(self, inputs, outputs):
 

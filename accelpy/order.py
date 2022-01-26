@@ -23,7 +23,7 @@ class Section():
 
 class Order(Object):
 
-    def __init__(self, order):
+    def __init__(self, order, env_order= {}):
 
         # invargs, outvars, kwargs
         self._names = [None, None]
@@ -33,7 +33,7 @@ class Order(Object):
                 with open(order) as fo:
                     order = Order(fo.read())
 
-            self._sections = self._parse_order(order)
+            self._sections = self._parse_order(order, env_order)
 
         elif isinstance(order, Order):
             self._sections = order._sections 
@@ -49,7 +49,7 @@ class Order(Object):
         if len(vargs) > 1:
             self._names[1] = vargs[1]
 
-    def _parse_order(self, order):
+    def _parse_order(self, order, env_order):
 
         rawlines = order.split("\n")
 
@@ -66,6 +66,8 @@ class Order(Object):
 
         self._env = dict(_accelpy_builtins)
         self._env["set_argnames"] =  self._of_set_argnames
+        if isinstance(env_order, dict):
+            self._env.update(env_order)
 
         secpy = rawlines[0:sec_starts[0]]
         _, lenv = appeval("\n".join(secpy), self._env)

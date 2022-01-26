@@ -25,5 +25,14 @@ cctype_scalar:
 	${CC} -dynamiclib -fPIC -o cctype_scalar.dylib cctype_scalar.cpp
 	python3 ctype_scalar.py cctype
 
+
+fbound:
+	${FC} -o fbound.exe fbound.F90
+	./fbound.exe
+
+recast:
+	${CC} -o recast.exe recast.cpp
+	./recast.exe
+
 clean:
-	rm -rf *.dylib *.so *.o *.mod
+	rm -rf *.dylib *.so *.o *.mod *.exe core
