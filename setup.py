@@ -46,7 +46,11 @@ class InstallCommand(install):
 
 def main():
 
-    from accelpy.core import name, version, description, long_description, author
+    name            = "accelpy"
+    version         = "0.3.15"
+    description     = "Scalable Accelerator Interface in Python"
+    long_description = "Scalable Accelerator Interface in Python"
+    author          = "Youngsung Kim"
 
     install_requires = ["numpy"]
     console_scripts = ["accelpy=accelpy.command:main"]
