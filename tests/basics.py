@@ -176,7 +176,7 @@ set_argnames("X", "Y", "Z")
     INTEGER i, j, k
 
     DO i=LBOUND(X, 1), UBOUND(X, 1)
-        DO j=LBOUND(X, 2), UBOUND(X, 2)
+        DO j=LBOUND(Y, 2), UBOUND(Y, 2)
             Z(i, j) = 0
             DO k=LBOUND(Y, 1), UBOUND(Y, 1)
                 Z(i, j) = Z(i, j) + X(i, k) * Y(k, j)
