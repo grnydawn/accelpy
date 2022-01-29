@@ -156,7 +156,7 @@ class FortranAccel(AccelBase):
         "float64": ["REAL (C_DOUBLE)", c_double]
     }
 
-    def gen_code(self, compiler, inputs, order, outputs,
+    def gen_code(self, compiler, inputs, outputs,
                  worker_triple, run_id, device, channel):
 
         macros = {}
@@ -170,7 +170,7 @@ class FortranAccel(AccelBase):
         main_fmt = {
             "testcode": self._get_testcode(),
             "datacopies":self._gen_datacopies(inputs, outputs),
-            "kernel":self._gen_kernel(inputs, order, outputs),
+            "kernel":self._gen_kernel(inputs, outputs),
             "varnames":self._gen_usevars(inputs, outputs),
             "nullify":self._gen_nullify(inputs, outputs)
         }
@@ -353,7 +353,7 @@ class FortranAccel(AccelBase):
 
         return "\n".join(lines)
 
-    def _gen_kernel(self, inputs, order, outputs):
+    def _gen_kernel(self, inputs, outputs):
 
         _names = []
         typedecls = []
@@ -366,10 +366,10 @@ class FortranAccel(AccelBase):
             _names.append(varname)
 
             if ndim > 0:
-                if ("attrspec" in order.kwargs and
-                    varname in order.kwargs["attrspec"] and
-                    "dimension" in order.kwargs["attrspec"][varname]):
-                    bound = order.kwargs["attrspec"][varname]["dimension"]
+                if ("attrspec" in self._ordersec.kwargs and
+                    varname in self._ordersec.kwargs["attrspec"] and
+                    "dimension" in self._ordersec.kwargs["attrspec"][varname]):
+                    bound = self._order.kwargs["attrspec"][varname]["dimension"]
 
                 else:
                     bound = ",".join([":"]*ndim)
@@ -383,7 +383,7 @@ class FortranAccel(AccelBase):
 
         names = fortline_pack(_names)
 
-        return t_kernel.format(order="\n".join(order.body),
+        return t_kernel.format(order="\n".join(self._ordersec.body),
                 typedecls="\n".join(typedecls), varnames="\n".join(names))
 
 #    def _gen_varattrs(self, inputs, outputs):

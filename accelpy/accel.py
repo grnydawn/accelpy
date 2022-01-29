@@ -58,7 +58,7 @@ class AccelBase(Object):
         self._orderhash =  hashlib.md5("".join(self._ordersec.body).encode("utf-8")
                             ).hexdigest()[:10]
         self._compile = compile
-        self._threads_run = {} # run_id: [thread, state(0:started 1:stopped), start time, sharedlib]
+        self._threads_run = {} # run_id: [thread, state(0:started 1:stopped), start time, (sharedlib, lang)]
 
     @abc.abstractmethod
     def gen_code(self, compiler, inputs, section, outputs, worker_triple,
@@ -167,16 +167,25 @@ class AccelBase(Object):
             raise Exception("Wrong # of worker initialization: %d" %
                         len(workers))
 
-    def build_sharedlib(self, run_id, device, channel, wtriple, cachekey):
+    def load_sharedlib(self, run_id, device, channel, wtriple, cachekey):
+
+        # If used before
+        if cachekey in _cache["sharedlib"]:
+
+            lang, cachelib, buildlib = _cache["sharedlib"][cachekey]
+
+            libdir, libname = os.path.split(cachelib)
+            name, _ = os.path.splitext(libname)
+
+            lib = load_library(name, libdir)
+
+            return lib, lang
 
         errmsgs = []
         compilers = get_compilers(self.name, compile=self._compile)
-        blddir = get_config("blddir")
-
-        if not os.path.isdir(blddir):
-            set_config("blddir", tempfile.mkdtemp())
 
         for comp in compilers:
+
             libdir = get_config("libdir")
             cachedir = os.path.join(libdir, comp.vendor, cachekey[:2])
             cachelib = os.path.join(cachedir, cachekey[2:]+"."+comp.libext)
@@ -187,6 +196,7 @@ class AccelBase(Object):
             except FileExistsError:
                 pass
 
+            # if exists in cache directory
             if os.path.isfile(cachelib):
 
                 libdir, libname = os.path.split(cachelib)
@@ -197,14 +207,17 @@ class AccelBase(Object):
                 if lib is None:
                     continue
 
+                _cache["sharedlib"][cachekey] = comp.lang, cachelib, None
+
                 return lib, comp.lang
 
-            try:
-                ordersec =  self._order.get_section(self.name)
-                ordersec.update_argnames(self._inputs, self._outputs)
+            # build if not exist
 
-                code, macros = self.gen_code(comp, self._inputs, ordersec,
-                                self._outputs, wtriple, run_id, device, channel)
+            try:
+                self._ordersec.update_argnames(self._inputs, self._outputs)
+
+                code, macros = self.gen_code(comp, self._inputs, self._outputs,
+                                    wtriple, run_id, device, channel)
 
                 macros["ACCELPY_ACCEL_RUNID"] = run_id
                 macros["ACCELPY_ACCEL_DEVICE"] = device
@@ -218,6 +231,9 @@ class AccelBase(Object):
                 macros["ACCELPY_ASSIGN_DIM0"] = wtriple[2][0]
                 macros["ACCELPY_ASSIGN_DIM1"] = wtriple[2][1]
                 macros["ACCELPY_ASSIGN_DIM2"] = wtriple[2][2]
+
+                if not os.path.isdir(get_config("blddir")):
+                    set_config("blddir", tempfile.mkdtemp())
 
                 libfile = comp.compile(code, macros, self._debug)
 
@@ -249,39 +265,12 @@ class AccelBase(Object):
                     raise Exception("accel test result mismatch: %s != %s" %
                         (str(self._testdata[0]["data"]), str(self._testdata[1]["data"])))
 
-                if not os.path.isfile(cachelib):
-                    shutil.copyfile(libfile, cachelib)
-                    _cache["sharedlib"][cachekey] = (lib, comp.lang)
+                _cache["sharedlib"][cachekey] = comp.lang, cachelib, libfile
 
                 return lib, comp.lang
 
             except Exception as err:
                 errmsgs.append(str(err))
-#
-#        else: # not master
-#            TIMEOUT = 20
-#            start = time.time()
-#
-#            while time.time() - start < TIMEOUT:
-#                for comp in compilers:
-#
-#                    cachedir = os.path.join(_config["libdir"], comp.vendor, cachekey[:2])
-#                    cachelib = os.path.join(cachedir, cachekey[2:]+"."+comp.libext)
-#
-#                    if os.path.isfile(cachelib):
-#
-#                        libdir, libname = os.path.split(cachelib)
-#                        name, _ = os.path.splitext(libname)
-#
-#                        lib = load_library(name, libdir)
-#
-#                        if lib is None:
-#                            continue
-#                        
-#                        _cache["sharedlib"][cachekey] = (lib, comp.lang)
-#                        return _cache["sharedlib"][cachekey]
-#
-#                time.sleep(0.1)
 
         raise Exception("\n".join(errmsgs))
 
@@ -371,17 +360,13 @@ class AccelBase(Object):
 
         cachekey = hashlib.md5(str(keys).encode("utf-8")).hexdigest()[:10]
 
-        if cachekey in _cache["sharedlib"]:
-            lib, self.lang = _cache["sharedlib"][cachekey]
+        if self._threads_run[run_id][3] is not None:
+            lib, self.lang = self._threads_run[run_id][3]
 
         else:
-            lib, self.lang = self.build_sharedlib(run_id,
-                                device, channel, worker_triple, cachekey)
+            lib, self.lang = self.load_sharedlib(run_id, device, channel, worker_triple, cachekey)
+            self._threads_run[run_id][3] = lib, self.lang
 
-        if lib is None:
-            raise Exception("Can not build shared library")
-
-        self._threads_run[run_id][3] = lib 
 
         if _inputs:
             for input in _inputs:
@@ -402,8 +387,11 @@ class AccelBase(Object):
         if start() != 0:
             raise Exception("kernel run failed.")
 
-        if cachekey not in _cache["sharedlib"]:
-            _cache["sharedlib"][cachekey] = (lib, self.lang)
+        if cachekey in _cache["sharedlib"]:
+            lang, cachelib, buildlib = _cache["sharedlib"][cachekey]
+
+            if not os.path.isfile(cachelib) and buildlib is not None:
+                shutil.copyfile(buildlib, cachelib)
 
     def run(self, *workers, device=0, channel=0, timeout=None, inputs=None, outputs=None):
 
@@ -415,6 +403,7 @@ class AccelBase(Object):
         thread = threading.Thread(target=self._start_accel,
                             args=(run_id, device, channel, workers, inputs, outputs))
         self._threads_run[run_id] = [thread, 0, time.time(), None]
+
         thread.start()
 
         return run_id
@@ -434,7 +423,7 @@ class AccelBase(Object):
 
         for run_id in run_ids:
 
-            tobj, state, stime, slib = self._threads_run[run_id]
+            _, _, _, (slib, lang) = self._threads_run[run_id]
 
             outputs = output if output else self._outputs
 
@@ -459,7 +448,7 @@ class AccelBase(Object):
 
         for run_id in run_ids:
 
-            tobj, state, stime, slib = self._threads_run[run_id]
+            _, state, _, (slib, lang) = self._threads_run[run_id]
 
             if state == 1:
                 continue
@@ -491,7 +480,7 @@ class AccelBase(Object):
 
         for run_id in run_ids:
 
-            tobj, state, stime, slib = self._threads_run[run_id]
+            tobj, _, stime, _ = self._threads_run[run_id]
 
             timeout = max(0, stime+timeout-time.time()) if timeout else None
             tobj.join(timeout=timeout)

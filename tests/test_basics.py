@@ -303,17 +303,17 @@ a_2d = np.reshape(np.arange(100, dtype=np.float64), (4, 25), order="F")
 b_2d = np.reshape(np.arange(100, dtype=np.float64) * 2, (25, 4), order="F")
 c_2d = np.reshape(np.zeros(16, dtype=np.float64), (4, 4), order="F")
 
-def ttest_first():
+def test_first():
 
-    c_1d.fill(0)
+    #c_1d.fill(0)
 
-    accel_cpp = CppAccel(a_1d, b_1d, Order(order_vecadd1d), c_1d)
+    #accel_cpp = CppAccel(a_1d, b_1d, Order(order_vecadd1d), c_1d)
 
-    accel_cpp.run(a_1d.size)
+    #accel_cpp.run(a_1d.size)
 
-    accel_cpp.stop()
+    #accel_cpp.stop()
 
-    assert np.array_equal(c_1d, a_1d + b_1d)
+    #assert np.array_equal(c_1d, a_1d + b_1d)
 
     c_1d.fill(0)
 
@@ -327,7 +327,7 @@ def ttest_first():
 
 
 @pytest.mark.parametrize("accel, comp", test_accels)
-def ttest_add1d(accel, comp):
+def test_add1d(accel, comp):
 
     c_1d.fill(0)
 
@@ -362,7 +362,7 @@ def test_matmul(accel, comp):
 
 
 @pytest.mark.parametrize("accel, comp", test_accels)
-def ttest_add3d(accel, comp):
+def test_add3d(accel, comp):
 
     c_3d.fill(0)
 
