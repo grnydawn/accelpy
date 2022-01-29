@@ -1,6 +1,6 @@
 """accelpy Accelerator module"""
 
-import os, sys, abc, time, threading, inspect, numpy, hashlib, shutil, tempfile
+import os, sys, abc, time, threading, inspect, numpy, hashlib, shutil, tempfile, traceback, re
 from ctypes import c_int64, POINTER, byref
 from numpy.ctypeslib import ndpointer, load_library
 from numpy.random import random
@@ -61,7 +61,8 @@ class AccelBase(Object):
         self._threads_run = {} # run_id: [thread, state(0:started 1:stopped), start time, sharedlib]
 
     @abc.abstractmethod
-    def gen_code(self, compiler, inputs, outputs, worker_triple, run_id, device, channel):
+    def gen_code(self, compiler, inputs, section, outputs, worker_triple,
+                    run_id, device, channel):
         pass
 
     @abc.abstractmethod
@@ -199,8 +200,11 @@ class AccelBase(Object):
                 return lib, comp.lang
 
             try:
-                code, macros = self.gen_code(comp, self._inputs, self._outputs,
-                                    wtriple, run_id, device, channel)
+                ordersec =  self._order.get_section(self.name)
+                ordersec.update_argnames(self._inputs, self._outputs)
+
+                code, macros = self.gen_code(comp, self._inputs, ordersec,
+                                self._outputs, wtriple, run_id, device, channel)
 
                 macros["ACCELPY_ACCEL_RUNID"] = run_id
                 macros["ACCELPY_ACCEL_DEVICE"] = device
@@ -355,6 +359,9 @@ class AccelBase(Object):
         _inputs = inputs if inputs else self._inputs
         _outputs = outputs if outputs else self._outputs
 
+        ordersec = self._order.get_section(self.name)
+        ordersec.update_argnames(_inputs, _outputs)
+
         keys = [os.uname().release, version, self.name, str(self._compile),
                     self._orderhash, device, channel, worker_triple]
 
@@ -364,15 +371,12 @@ class AccelBase(Object):
 
         cachekey = hashlib.md5(str(keys).encode("utf-8")).hexdigest()[:10]
 
-        #lib, self.lang = self.build_sharedlib(run_id, device, channel, worker_triple)
-
         if cachekey in _cache["sharedlib"]:
             lib, self.lang = _cache["sharedlib"][cachekey]
 
         else:
-            _cache["sharedlib"][cachekey] = self.build_sharedlib(run_id,
-                                            device, channel, worker_triple, cachekey)
-            lib, self.lang = _cache["sharedlib"][cachekey]
+            lib, self.lang = self.build_sharedlib(run_id,
+                                device, channel, worker_triple, cachekey)
 
         if lib is None:
             raise Exception("Can not build shared library")
@@ -397,6 +401,9 @@ class AccelBase(Object):
 
         if start() != 0:
             raise Exception("kernel run failed.")
+
+        if cachekey not in _cache["sharedlib"]:
+            _cache["sharedlib"][cachekey] = (lib, self.lang)
 
     def run(self, *workers, device=0, channel=0, timeout=None, inputs=None, outputs=None):
 

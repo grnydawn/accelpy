@@ -10,7 +10,7 @@ class Section():
 
     def __init__(self, accel, vargs, kwargs, body):
         self.accel = accel
-        self.vargs = vargs
+        self.argnames = vargs
         self.kwargs = kwargs
         self.body = body
 
@@ -20,13 +20,20 @@ class Section():
     def kind(self):
         return self.accel 
 
+    def update_argnames(self, inputs, outputs):
+
+        for idx, data in enumerate(inputs+outputs):
+
+            if self.argnames is not None and len(self.argnames) > idx:
+                data["curname"] = self.argnames[idx]
+
 
 class Order(Object):
 
     def __init__(self, order, env_order= {}):
 
         # invargs, outvars, kwargs
-        self._names = [None, None]
+        self._argnames = None
 
         if isinstance(order, str):
             if os.path.isfile(order):
@@ -43,11 +50,7 @@ class Order(Object):
 
     def _of_set_argnames(self, *vargs):
 
-        if len(vargs) > 0:
-            self._names[0] = vargs[0]
-
-        if len(vargs) > 1:
-            self._names[1] = vargs[1]
+        self._argnames = list(vargs)
 
     def _parse_order(self, order, env_order):
 
@@ -136,7 +139,10 @@ class Order(Object):
                     args.append(line[:-1])
 
                 try:
-                    vargs, kwargs = funcargseval("\n".join(args), self._env)
+                    fargs = " ".join(args).split(",")
+                    vargs = [a.strip() for a in fargs if "=" not in a]
+                    _kwargs = [a.strip() for a in fargs[len(vargs):]]
+                    _, kwargs = funcargseval(",".join(_kwargs), self._env)
                     body = rawlines[row+1:]
                     break
 
@@ -155,25 +161,13 @@ class Order(Object):
 
     def update_argnames(self, inputs, outputs):
 
-        #self._names = [input, output]
+        for idx, data in enumerate(inputs+outputs):
 
-        inids = []
-
-        for idx, input in enumerate(inputs):
-            inids.append(input["id"])
-
-            if self._names[0]:
-                input["curname"] = self._names[0][idx]
+            if self._argnames is not None and len(self._argnames) > idx:
+                data["curname"] = self._argnames[idx]
 
             else:
-                input["curname"] = "accpy_in%d" % idx
-
-        for idx, output in enumerate(outputs):
-            if self._names[1]:
-                output["curname"] = self._names[1][idx]
-
-            else:
-                output["curname"] = "accpy_out%d" % idx
+                data["curname"] = "accpy_var%d" % idx
 
     def get_section(self, accel):
 

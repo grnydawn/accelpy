@@ -12,8 +12,8 @@ test_accels = (
 #    ("cpp", "ibm"),
 #    ("cpp", "pgi"),
 #    ("cpp", "intel"),
-#    ("fortran","gnu"),
-    ("fortran", "cray"),
+    ("fortran","gnu"),
+#    ("fortran", "cray"),
 #    ("fortran", "amd"),
 #    ("fortran", "ibm"),
 #    ("fortran", "pgi"),
@@ -44,7 +44,13 @@ test_accels = (
 
 order_vecadd1d = """
 
-set_argnames(("x", "y"), ("z",))
+set_argnames("x", "y", "z")
+
+attrspec = {
+    'x': {
+        'dimension': '1:'
+    }
+}
 
 cpp_enable = True
 
@@ -53,11 +59,11 @@ cpp_enable = True
         z(id) = x(id) + y(id);
     }
 
-[fortran: attrspec_x={'dimension': '1:'}]
+[fortran: a, b, c, attrspec=attrspec]
     INTEGER id
 
-    DO id=1, x_attr%shape(1)
-        z(id) = x(id) + y(id)
+    DO id=LBOUND(a,1), UBOUND(a,1)
+        c(id) = a(id) + b(id)
     END DO
 
 [hip, cuda]
@@ -101,7 +107,7 @@ cpp_enable = True
 
 order_vecadd3d = """
 
-set_argnames(("x", "y"), ("z",))
+set_argnames("x", "y", "z")
 
 [cpp]
     for (int i = 0; i < x.shape[0]; i++) {
@@ -115,9 +121,9 @@ set_argnames(("x", "y"), ("z",))
 [fortran]
     INTEGER i, j, k
 
-    DO i=1, x_attr%shape(1)
-        DO j=1, x_attr%shape(2)
-            DO k=1, x_attr%shape(3)
+    DO i=LBOUND(x, 1), UBOUND(x, 1)
+        DO j=LBOUND(x, 2), UBOUND(x, 2)
+            DO k=LBOUND(x, 3), UBOUND(x, 3)
                 z(i, j, k) = x(i, j, k) + y(i, j, k)
             END DO
         END DO
@@ -186,7 +192,7 @@ set_argnames(("x", "y"), ("z",))
 
 order_matmul = """
 
-set_argnames(("X", "Y"), ("Z",))
+set_argnames("X", "Y", "Z")
 
 [cpp]
 
@@ -202,10 +208,10 @@ set_argnames(("X", "Y"), ("Z",))
 [fortran]
     INTEGER i, j, k
 
-    DO i=1, X_attr%shape(1)
-        DO j=1, Y_attr%shape(2)
+    DO i=LBOUND(X, 1), UBOUND(X, 1)
+        DO j=LBOUND(X, 2), UBOUND(X, 2)
             Z(i, j) = 0
-            DO k=1, Y_attr%shape(1)
+            DO k=LBOUND(Y, 1), UBOUND(Y, 1)
                 Z(i, j) = Z(i, j) + X(i, k) * Y(k, j)
             END DO
         END DO
@@ -289,13 +295,13 @@ b_1d = np.arange(N1, dtype=np.int64) * 2
 c_1d = np.zeros(N1, dtype=np.int64)
 
 N3 = (2, 5, 10)
-a_3d = np.reshape(np.arange(100, dtype=np.int64), N3)
-b_3d = np.reshape(np.arange(100, dtype=np.int64) * 2, N3)
-c_3d = np.reshape(np.zeros(100, dtype=np.int64), N3)
+a_3d = np.reshape(np.arange(100, dtype=np.int64), N3, order="F")
+b_3d = np.reshape(np.arange(100, dtype=np.int64) * 2, N3, order="F")
+c_3d = np.reshape(np.zeros(100, dtype=np.int64), N3, order="F")
 
-a_2d = np.reshape(np.arange(100, dtype=np.float64), (4, 25))
-b_2d = np.reshape(np.arange(100, dtype=np.float64) * 2, (25, 4))
-c_2d = np.reshape(np.zeros(16, dtype=np.float64), (4, 4))
+a_2d = np.reshape(np.arange(100, dtype=np.float64), (4, 25), order="F")
+b_2d = np.reshape(np.arange(100, dtype=np.float64) * 2, (25, 4), order="F")
+c_2d = np.reshape(np.zeros(16, dtype=np.float64), (4, 4), order="F")
 
 def ttest_first():
 
@@ -321,7 +327,7 @@ def ttest_first():
 
 
 @pytest.mark.parametrize("accel, comp", test_accels)
-def test_add1d(accel, comp):
+def ttest_add1d(accel, comp):
 
     c_1d.fill(0)
 
@@ -341,7 +347,7 @@ def test_add1d(accel, comp):
 
 
 @pytest.mark.parametrize("accel, comp", test_accels)
-def ttest_matmul(accel, comp):
+def test_matmul(accel, comp):
 
     c_2d.fill(0)
 
