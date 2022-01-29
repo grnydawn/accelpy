@@ -4,7 +4,7 @@
 import abc
 
 name            = "accelpy"
-version         = "0.3.12"
+version         = "0.3.13"
 description     = "Scalable Accelerator Interface in Python"
 long_description = "Scalable Accelerator Interface in Python"
 author          = "Youngsung Kim"

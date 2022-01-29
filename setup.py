@@ -10,7 +10,27 @@ def _setcfg():
     import os
 
     cfgdir = os.path.join(os.path.expanduser("~"), ".accelpy")
-    init_config(cfgdir)
+
+    libdir = os.path.join(cfgdir, "lib")
+    cfgfile = os.path.join(cfgdir, "config")
+
+    for vendor in ["cray", "amd", "nvidia", "intel", "pgi", "ibm", "gnu"]:
+        vendor_path = os.path.join(libdir, vendor)
+        if not os.path.isdir(vendor_path):
+            try:
+                os.makedirs(vendor_path)
+
+            except FileExistsError:
+                pass
+
+    config = {
+        "libdir": libdir,
+        "blddir": "",
+    }
+
+    if not os.path.isfile(cfgfile):
+        with open(cfgfile, "w")  as f:
+            json.dump(config, f)
 
 
 class DevelopCommand(develop):
