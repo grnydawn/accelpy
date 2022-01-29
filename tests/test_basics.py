@@ -210,7 +210,6 @@ set_argnames("X", "Y", "Z")
 
     DO i=LBOUND(X, 1), UBOUND(X, 1)
         DO j=LBOUND(Y, 2), UBOUND(Y, 2)
-             print *, i, j
             Z(i, j) = 0
             DO k=LBOUND(Y, 1), UBOUND(Y, 1)
                 Z(i, j) = Z(i, j) + X(i, k) * Y(k, j)
