@@ -1,5 +1,6 @@
 "accelpy setup module."
 
+import os
 from setuptools import setup, find_packages
 from setuptools.command.develop import develop
 from setuptools.command.install import install
@@ -15,7 +16,6 @@ author          = "Youngsung Kim"
 
 
 def _setcfg():
-    import os
 
     cfgdir = os.path.join(os.path.expanduser("~"), ".accelpy")
 
