@@ -5,8 +5,10 @@ from setuptools.command.develop import develop
 from setuptools.command.install import install
 
 
+with open(os.path.join("accelpy", "version.py")) as fp:
+    version = fp.read().strip()
+
 name            = "accelpy"
-version         = "0.3.16"
 description     = "Scalable Accelerator Interface in Python"
 long_description = "Scalable Accelerator Interface in Python"
 author          = "Youngsung Kim"

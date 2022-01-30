@@ -5,7 +5,7 @@ from ctypes import c_int64, POINTER, byref
 from numpy.ctypeslib import ndpointer, load_library
 from collections import OrderedDict
 
-from accelpy.core import Object, version
+from accelpy.core import Object
 from accelpy.order import Order
 from accelpy.compiler import Compiler
 from accelpy.util import get_config, set_config
@@ -15,6 +15,10 @@ _cache = {
     "test": {}
 }
 
+here = os.path.dirname(__file__)
+with open(os.path.join(here, "version.py")) as fp:
+    version = fp.read().strip()
+
 class AccelBase(Object):
     """Accelerator Base Class"""
 
@@ -23,11 +27,11 @@ class AccelBase(Object):
 
     _testdata = [
             {
-                "data":(0.0, 0.1, 0.2, 0.3),
+                "data":numpy.asarray((0.0, 0.1, 0.2, 0.3)),
                 "curname": "accelpy_test_input"
             },
             {
-                "data":[0.0, 0.0, 0.0, 0.0],
+                "data":numpy.asarray((0.0, 0.0, 0.0, 0.0)),
                 "curname": "accelpy_test_output"
             }
     ]
