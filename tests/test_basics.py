@@ -6,14 +6,14 @@ from accelpy import Accel, CppAccel, FortranAccel, HipAccel, Order
 
 
 test_accels = (
-    ("cpp", "gnu"),
+#    ("cpp", "gnu"),
 #    ("cpp", "cray"),
 #    ("cpp", "amd"),
 #    ("cpp", "ibm"),
 #    ("cpp", "pgi"),
 #    ("cpp", "intel"),
 #    ("fortran","gnu"),
-#    ("fortran", "cray"),
+    ("fortran", "cray"),
 #    ("fortran", "amd"),
 #    ("fortran", "ibm"),
 #    ("fortran", "pgi"),

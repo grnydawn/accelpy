@@ -14,10 +14,10 @@ t_main = """
 INTEGER (C_INT64_T) FUNCTION accelpy_start() BIND(C, name="accelpy_start")
 
     USE, INTRINSIC :: ISO_C_BINDING
-    USE accelpy_global, ONLY : {varnames}
+    USE accelpy_global, ONLY : {usevarnames}
     IMPLICIT NONE
 
-    accelpy_start = accelpy_kernel({varnames})
+    accelpy_start = accelpy_kernel({usevarnames})
 
 CONTAINS
 
@@ -27,7 +27,7 @@ END FUNCTION
 
 INTEGER (C_INT64_T) FUNCTION accelpy_stop() BIND(C, name="accelpy_stop")
     USE, INTRINSIC :: ISO_C_BINDING
-    USE accelpy_global, ONLY : {varnames}
+    USE accelpy_global, ONLY : {usevarnames}
     IMPLICIT NONE
 
     {nullify}
@@ -171,7 +171,7 @@ class FortranAccel(AccelBase):
             "testcode": self._get_testcode(),
             "datacopies":self._gen_datacopies(inputs, outputs),
             "kernel":self._gen_kernel(inputs, outputs),
-            "varnames":self._gen_usevars(inputs, outputs),
+            "usevarnames":self._gen_usevars(inputs, outputs),
             "nullify":self._gen_nullify(inputs, outputs)
         }
         main = t_main.format(**main_fmt)
@@ -321,8 +321,7 @@ class FortranAccel(AccelBase):
 
         for data in inputs+outputs:
 
-            if data["data"].ndim > 0:
-                names.append(data["curname"])
+            names.append(data["curname"])
 
         lines = [""]
         maxlen = 72

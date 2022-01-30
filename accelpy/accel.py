@@ -3,15 +3,12 @@
 import os, sys, abc, time, threading, inspect, numpy, hashlib, shutil, tempfile, traceback, re
 from ctypes import c_int64, POINTER, byref
 from numpy.ctypeslib import ndpointer, load_library
-from numpy.random import random
 from collections import OrderedDict
 
 from accelpy.core import Object, version
 from accelpy.order import Order
 from accelpy.compiler import Compiler
 from accelpy.util import get_config, set_config
-
-LEN_TESTDATA = 10
 
 _cache = {
     "sharedlib": {},
@@ -26,11 +23,11 @@ class AccelBase(Object):
 
     _testdata = [
             {
-                "data":random(LEN_TESTDATA),
+                "data":(0.0, 0.1, 0.2, 0.3),
                 "curname": "accelpy_test_input"
             },
             {
-                "data":numpy.zeros(LEN_TESTDATA),
+                "data":[0.0, 0.0, 0.0, 0.0],
                 "curname": "accelpy_test_output"
             }
     ]

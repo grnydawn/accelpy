@@ -2,12 +2,12 @@
 """
 
 import abc
-
-name            = "accelpy"
-version         = "0.3.15"
-description     = "Scalable Accelerator Interface in Python"
-long_description = "Scalable Accelerator Interface in Python"
-author          = "Youngsung Kim"
+#
+#name            = "accelpy"
+#version         = "0.3.15"
+#description     = "Scalable Accelerator Interface in Python"
+#long_description = "Scalable Accelerator Interface in Python"
+#author          = "Youngsung Kim"
 
 class Object(abc.ABC):
 

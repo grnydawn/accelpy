@@ -5,6 +5,13 @@ from setuptools.command.develop import develop
 from setuptools.command.install import install
 
 
+name            = "accelpy"
+version         = "0.3.16"
+description     = "Scalable Accelerator Interface in Python"
+long_description = "Scalable Accelerator Interface in Python"
+author          = "Youngsung Kim"
+
+
 def _setcfg():
     import os
 
@@ -45,12 +52,6 @@ class InstallCommand(install):
 
 
 def main():
-
-    name            = "accelpy"
-    version         = "0.3.15"
-    description     = "Scalable Accelerator Interface in Python"
-    long_description = "Scalable Accelerator Interface in Python"
-    author          = "Youngsung Kim"
 
     install_requires = ["numpy"]
     console_scripts = ["accelpy=accelpy.command:main"]
