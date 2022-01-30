@@ -4,6 +4,10 @@ import os
 from accelpy.util import init_config, get_config, set_config
 
 
+here = os.path.dirname(__file__)
+with open(os.path.join(here, "version.py")) as fp:
+    version = fp.read().strip()
+
 def cmd_config(args):
 
     import json
@@ -42,7 +46,6 @@ def cmd_cache(args):
 
 def main():
     import argparse
-    from accelpy.core import version
 
     parser = argparse.ArgumentParser(description="accelpy command-line tool")
     parser.add_argument("--version", action="version", version="accelpy "+version)
