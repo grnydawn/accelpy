@@ -368,7 +368,7 @@ class FortranAccel(AccelBase):
                 if ("attrspec" in self._ordersec.kwargs and
                     varname in self._ordersec.kwargs["attrspec"] and
                     "dimension" in self._ordersec.kwargs["attrspec"][varname]):
-                    bound = self._order.kwargs["attrspec"][varname]["dimension"]
+                    bound = self._ordersec.kwargs["attrspec"][varname]["dimension"]
 
                 else:
                     bound = ",".join([":"]*ndim)
