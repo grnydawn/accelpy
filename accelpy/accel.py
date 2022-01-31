@@ -37,10 +37,13 @@ class AccelBase(Object):
     ]
 
 
-    def __init__(self, *vargs, kind=None, compile=None, debug=False):
+    def __init__(self, *vargs, kind=None, compile=None, debug=False,
+                    update=None, allocate=None):
 
         self._debug = debug
         self._order = None
+        self._update = [] if update is None else [id(d) for d in update]
+        self._allocate = [] if allocate is None else [id(d) for d in allocate]
 
         inputs, outputs = [], []
         for varg in vargs:
@@ -371,7 +374,12 @@ class AccelBase(Object):
 
         if _inputs:
             for input in _inputs:
-                if "h2acopy" not in input or not input["h2acopy"]:
+                if input["id"] in self._allocate:
+                    if self.h2amalloc(lib, input, self.getname_h2amalloc(input), writable=True) != 0:
+                        raise Exception("Accel h2a malloc failed.")
+                    continue
+
+                if input["id"] in self._update or "h2acopy" not in input or not input["h2acopy"]:
                     if self.h2acopy(lib, input, self.getname_h2acopy(input)) != 0:
                         raise Exception("Accel h2a copy failed.")
 
