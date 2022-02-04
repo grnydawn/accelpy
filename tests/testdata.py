@@ -33,24 +33,26 @@ cpp_enable = True
 
 [openacc_cpp]
     #pragma acc loop gang worker vector
-    for (int id = 0; id < x.shape[0]; id++) {
-        z(id) = x(id) + y(id);
+    for (int id = 0; id < shape_x[0]; id++) {
+        z[id] = x[id] + y[id];
     }
 
 [openacc_fortran]
     INTEGER id
 
+    !$acc parallel num_workers(UBOUND(x,1)-LBOUND(x,1)+1) 
     !$acc loop gang worker vector
-    DO id=1, x_attr%shape(1)
+    DO id=LBOUND(x,1), UBOUND(x,1)
         z(id) = x(id) + y(id)
     END DO
     !$acc end loop
+    !$acc end parallel
 
 [openmp_cpp]
 
     #pragma omp for
-    for (int id = 0; id < x.shape[0]; id++) {
-        z(id) = x(id) + y(id);
+    for (int id = 0; id < shape_x[0]; id++) {
+        z[id] = x[id] + y[id];
         //printf("thread = %d\\n", omp_get_thread_num());
     }
 
@@ -58,7 +60,7 @@ cpp_enable = True
     INTEGER id
 
     !$omp do
-    DO id=1, x_attr%shape(1)
+    DO id=LBOUND(x,1), UBOUND(x,1)
         z(id) = x(id) + y(id)
         !print *, omp_get_thread_num()
     END DO

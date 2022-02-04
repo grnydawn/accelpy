@@ -223,5 +223,12 @@ class FortranKernel(KernelBase):
 
         return "\n".join(lines)
 
+class OpenmpFortranKernel(FortranKernel):
+    name = "openmp_fortran"
 
+class OpenaccFortranKernel(FortranKernel):
+    name = "openacc_fortran"
+
+OpenmpFortranKernel.avails[OpenmpFortranKernel.name] = OpenmpFortranKernel
+OpenaccFortranKernel.avails[OpenaccFortranKernel.name] = OpenaccFortranKernel
 FortranKernel.avails[FortranKernel.name] = FortranKernel

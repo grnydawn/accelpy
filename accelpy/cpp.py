@@ -183,4 +183,14 @@ class CppKernel(KernelBase):
         return "\n".join(argdefs), ", ".join(startargs)
 
 
+class OpenmpCppKernel(CppKernel):
+    name = "openmp_cpp"
+
+
+class OpenaccCppKernel(CppKernel):
+    name = "openacc_cpp"
+
+
+OpenmpCppKernel.avails[OpenmpCppKernel.name] = OpenmpCppKernel
+OpenaccCppKernel.avails[OpenaccCppKernel.name] = OpenaccCppKernel
 CppKernel.avails[CppKernel.name] = CppKernel
