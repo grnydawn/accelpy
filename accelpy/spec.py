@@ -1,57 +1,69 @@
-"""accelpy Order module"""
+"""accelpy Spec module"""
 
-import os
+import os, hashlib
 
-from accelpy.core import Object
-from accelpy.util import _accelpy_builtins, appeval, funcargseval
+from accelpy.util import Object, _accelpy_builtins, appeval, funcargseval, gethash
 
 
 class Section():
 
-    def __init__(self, accel, vargs, kwargs, body):
+    def __init__(self, accel, vargs, kwargs, body, env):
         self.accel = accel
-        self.vargs = vargs
-        self.kwargs = kwargs
+        self.argnames = vargs
+        self._kwargs = kwargs
+        self.kwargs = None
         self.body = body
+        self.env = env
+        self.md5 = None
+
+    def hash(self):
+
+        if self.md5 is None:
+            self.md5 = gethash("".join(self.body))
+
+        return self.md5
 
     def is_enabled(self):
-        return kwargs.get("enable", True)
+        return self.kwargs.get("enable", True)
 
     def kind(self):
         return self.accel 
 
+    def update_argnames(self, data):
 
-class Order(Object):
+        for idx, arg in enumerate(data):
 
-    def __init__(self, order):
+            if self.argnames is not None and len(self.argnames) > idx:
+                arg["curname"] = self.argnames[idx]
+
+
+class Spec(Object):
+
+    def __init__(self, spec):
 
         # invargs, outvars, kwargs
-        self._names = [None, None]
+        self._argnames = None
 
-        if isinstance(order, str):
-            if os.path.isfile(order):
-                with open(order) as fo:
-                    order = Order(fo.read())
+        if isinstance(spec, str):
+            if os.path.isfile(spec):
+                with open(spec) as fs:
+                    spec = Spec(fs.read())
 
-            self._sections = self._parse_order(order)
+            self._sections = self._parse_spec(spec)
 
-        elif isinstance(order, Order):
-            self._sections = order._sections 
+        elif isinstance(spec, Spec):
+            self._sections = spec._sections 
 
         else:
-            raise Exception("Wrong order type: %s" % str(order))
+            raise Exception("Wrong spec type: %s" % str(spec))
 
     def _of_set_argnames(self, *vargs):
 
-        if len(vargs) > 0:
-            self._names[0] = vargs[0]
+        self._argnames = list(vargs)
 
-        if len(vargs) > 1:
-            self._names[1] = vargs[1]
+    def _parse_spec(self, spec):
 
-    def _parse_order(self, order):
-
-        rawlines = order.split("\n")
+        rawlines = spec.split("\n")
 
         sec_starts = []
 
@@ -60,17 +72,16 @@ class Order(Object):
                     sec_starts.append(lineno)
 
         if len(sec_starts) == 0:
-            raise Exception("No order is found.")
+            raise Exception("No spec is found.")
 
         sec_starts.append(len(rawlines))
 
         self._env = dict(_accelpy_builtins)
         self._env["set_argnames"] =  self._of_set_argnames
 
-        secpy = rawlines[0:sec_starts[0]]
-        _, lenv = appeval("\n".join(secpy), self._env)
+        self.env = self._env.copy()
 
-        self._env.update(lenv)
+        self._pysection = rawlines[0:sec_starts[0]]
 
         sections = []
         for sec_start, sec_end in zip(sec_starts[0:-1], sec_starts[1:]):
@@ -78,6 +89,17 @@ class Order(Object):
             sections.extend(section)
 
         return sections
+
+    def eval_pysection(self, env):
+
+        self.env = self._env.copy()
+
+        if isinstance(env, dict):
+            self.env.update(env)
+
+        _, lenv = appeval("\n".join(self._pysection), self.env)
+
+        self.env.update(lenv)
 
     def _parse_section(self, rawlines):
 
@@ -134,7 +156,9 @@ class Order(Object):
                     args.append(line[:-1])
 
                 try:
-                    vargs, kwargs = funcargseval("\n".join(args), self._env)
+                    fargs = " ".join(args).split(",")
+                    vargs = [a.strip() for a in fargs if "=" not in a]
+                    kwargs = [a.strip() for a in fargs[len(vargs):]]
                     body = rawlines[row+1:]
                     break
 
@@ -147,36 +171,28 @@ class Order(Object):
         sections = []
 
         for accel in accels:
-            sections.append(Section(accel, vargs, kwargs, body))
+            sections.append(Section(accel, vargs, kwargs, body, self.env))
 
         return sections
 
-    def update_argnames(self, inputs, outputs):
+    def update_argnames(self, data):
 
-        #self._names = [input, output]
+        for idx, arg in enumerate(data):
 
-        inids = []
-
-        for idx, input in enumerate(inputs):
-            inids.append(input["id"])
-
-            if self._names[0]:
-                input["curname"] = self._names[0][idx]
+            if self._argnames is not None and len(self._argnames) > idx:
+                arg["curname"] = self._argnames[idx]
 
             else:
-                input["curname"] = "accpy_in%d" % idx
-
-        for idx, output in enumerate(outputs):
-            if self._names[1]:
-                output["curname"] = self._names[1][idx]
-
-            else:
-                output["curname"] = "accpy_out%d" % idx
+                arg["curname"] = "accpy_var%d" % idx
 
     def get_section(self, accel):
 
         for sec in self._sections:
-            if sec.accel == accel and getattr(sec, "enable", True):
+
+            if sec.kwargs is None:
+                sec.kwargs = funcargseval(",".join(sec._kwargs), self.env)
+
+            if sec.accel == accel and sec.is_enabled():
                 return sec
 
         raise Exception("No section with '%s' exists or is enabled." % accel)

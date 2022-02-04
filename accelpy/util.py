@@ -1,7 +1,15 @@
 """accelpy utility module"""
 
-import os, ast, json
+import os, abc, ast, json, hashlib
 from subprocess import PIPE, run as subp_run
+
+class Object(abc.ABC):
+
+    def __new__(cls, *vargs, **kwargs):
+
+        obj = super(Object, cls).__new__(cls)
+
+        return obj
 
 _builtin_excludes = ["exec", "eval", "breakpoint", "memoryview"]
 
@@ -42,9 +50,9 @@ def funcargseval(text, lenv):
         env.update(lenv)
 
     env["_appeval_p"] = _p
-    fargs, out = appeval("_appeval_p(%s)" % text, env)
+    (vargs, kwargs), out = appeval("_appeval_p(%s)" % text, env)
 
-    return fargs
+    return kwargs
 
 def shellcmd(cmd, shell=True, stdout=PIPE, stderr=PIPE,
              check=False):
@@ -118,4 +126,29 @@ def set_config(key, value, save=False):
     if save:
         with open(_cfgfile(), "w") as f:
             json.dump(_config, f, indent=4)
+
+
+def fortline_pack(items):
+
+    lines = [""]
+    maxlen = 72
+
+    for item in items:
+        if len(lines[-1]) + len(item) > maxlen:            
+
+            lines[-1] += " &"
+            lines.append("        &, %s" % item)
+
+        elif lines[-1] == "":
+            lines[-1] += item
+
+        else:
+            lines[-1] += ", " + item
+
+    return lines
+
+
+def gethash(text, length=10):
+
+    return hashlib.md5(text.encode("utf-8")).hexdigest()[:length]
 

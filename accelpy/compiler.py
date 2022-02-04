@@ -4,8 +4,7 @@ import os, sys, abc, time, threading, inspect, hashlib
 from numpy import ndarray
 from collections import OrderedDict
 
-from accelpy.core import Object
-from accelpy.util import shellcmd, which, get_config
+from accelpy.util import Object, shellcmd, which, get_config
 
 #########################
 # Generic Compilers

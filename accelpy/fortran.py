@@ -1,25 +1,35 @@
 """accelpy Fortran Accelerator module"""
 
-
-from accelpy.accel import AccelBase, get_compilers
+from accelpy.kernel import KernelBase
+from accelpy.util import fortline_pack
 from ctypes import c_int32, c_int64, c_float, c_double
+
+
+##########################
+#  Code templates
+##########################
+
+t_module = """
+MODULE accelpy_global
+    USE, INTRINSIC :: ISO_C_BINDING
+    IMPLICIT NONE
+
+{datavars}
+
+END MODULE
+"""
 
 t_main = """
 
-{testcode}
-
-{datacopies}
+{varmap}
 
 INTEGER (C_INT64_T) FUNCTION accelpy_start() BIND(C, name="accelpy_start")
 
     USE, INTRINSIC :: ISO_C_BINDING
+    USE accelpy_global, ONLY : {usevarnames}
     IMPLICIT NONE
 
-    INTEGER (C_INT64_T) :: ACCELPY_WORKER_ID
-
-    ACCELPY_WORKER_ID = 0
-    
-    accelpy_start = accelpy_kernel(ACCELPY_WORKER_ID)
+    accelpy_start = accelpy_kernel({usevarnames})
 
 CONTAINS
 
@@ -29,49 +39,29 @@ END FUNCTION
 
 INTEGER (C_INT64_T) FUNCTION accelpy_stop() BIND(C, name="accelpy_stop")
     USE, INTRINSIC :: ISO_C_BINDING
-    USE accelpy_global, ONLY : {vars}
+    USE accelpy_global, ONLY : {usevarnames}
     IMPLICIT NONE
 
-    {nullify}
-
-    accelpy_stop = 0 
+    accelpy_stop = 0
 
 END FUNCTION
-"""
-
-t_module = """
-MODULE accelpy_global
-    USE, INTRINSIC :: ISO_C_BINDING
-    IMPLICIT NONE
-
-{typeattr}
-
-{testvars}
-
-{datavars}
-
-CONTAINS
-
-{procattr}
-
-END MODULE
 """
 
 t_kernel = """
-INTEGER (C_INT64_T) FUNCTION accelpy_kernel(ACCELPY_WORKER_ID)
+INTEGER (C_INT64_T) FUNCTION accelpy_kernel({varnames})
     USE, INTRINSIC :: ISO_C_BINDING
-    USE accelpy_global, ONLY : {varandattr}
     IMPLICIT NONE
 
-    INTEGER (C_INT64_T), INTENT(IN) :: ACCELPY_WORKER_ID
+    {typedecls}
 
-    {order}
+    {spec}
 
     accelpy_kernel = 0
+
 END FUNCTION
 """
 
-t_h2a = """
+t_varmap = """
 INTEGER (C_INT64_T) FUNCTION {funcname} (data) BIND(C, name="{funcname}")
     USE, INTRINSIC :: ISO_C_BINDING
     USE accelpy_global, ONLY : {varname}
@@ -86,7 +76,7 @@ INTEGER (C_INT64_T) FUNCTION {funcname} (data) BIND(C, name="{funcname}")
 END FUNCTION
 """
 
-t_h2a_scalar = """
+t_varmap_scalar = """
 INTEGER (C_INT64_T) FUNCTION {funcname} (data) BIND(C, name="{funcname}")
     USE, INTRINSIC :: ISO_C_BINDING
     USE accelpy_global, ONLY : {varname}
@@ -101,89 +91,7 @@ INTEGER (C_INT64_T) FUNCTION {funcname} (data) BIND(C, name="{funcname}")
 END FUNCTION
 """
 
-t_a2hcopy = """
-INTEGER (C_INT64_T) FUNCTION {funcname} (data) BIND(C, name="{funcname}")
-    USE, INTRINSIC :: ISO_C_BINDING
-    USE accelpy_global, ONLY : {varname}
-    IMPLICIT NONE
-
-    {dtype}, DIMENSION({bound}), INTENT(OUT) :: data
-
-    {funcname} = 0
-
-END FUNCTION
-"""
-
-t_a2hcopy_scalar = """
-INTEGER (C_INT64_T) FUNCTION {funcname} (data) BIND(C, name="{funcname}")
-    USE, INTRINSIC :: ISO_C_BINDING
-    USE accelpy_global, ONLY : {varname}
-    IMPLICIT NONE
-
-    {dtype}, DIMENSION(1), INTENT(OUT) :: data
-
-    {funcname} = 0
-
-END FUNCTION
-"""
-
-t_testfunc = """
-INTEGER (C_INT64_T) FUNCTION accelpy_test_run()  BIND(C, name="accelpy_test_run")
-    USE, INTRINSIC :: ISO_C_BINDING
-    USE accelpy_global, ONLY : {varin}, {varout}, {varin}_attr, {varout}_attr
-    IMPLICIT NONE
-    INTEGER :: id
-
-    DO id=1, {varin}_attr%shape(1)
-        {varout}(id) = {varin}(id)
-    END DO
-
-    IF (ASSOCIATED({varin})) THEN
-        NULLIFY({varin})
-    END IF
-
-    IF (ASSOCIATED({varout})) THEN
-        NULLIFY({varout})
-    END IF
-
-    accelpy_test_run = 0
-
-END FUNCTION
-"""
-
-t_typeattr = """
-TYPE :: type_{varname}
-    INTEGER :: ndim = {ndim}
-    INTEGER :: size = {size}
-    INTEGER, DIMENSION({ndim}) :: shape = (/ {shape} /)
-    INTEGER, DIMENSION({ndim}) :: stride = (/ {stride} /)
-
-CONTAINS
-
-    PROCEDURE :: unravel_index => accelpy_unravel_index_type_{varname}
-END TYPE
-"""
-
-t_procattr = """
-
-INTEGER FUNCTION accelpy_unravel_index_type_{varname}(self, tid, dim)
-    CLASS(type_{varname}), INTENT(IN) :: self
-    INTEGER, INTENT(IN) :: dim, tid
-    INTEGER :: i, q, r, s
-
-    r = tid-1
-
-    DO i=0,dim-1
-        s = self%stride(i+1)
-        q = r / s
-        r = MOD(r, s)
-    END DO
-
-    accelpy_unravel_index_type_{varname} = q+1
-END FUNCTION
-"""
-
-class FortranAccel(AccelBase):
+class FortranKernel(KernelBase):
 
     name = "fortran"
     lang = "fortran"
@@ -195,181 +103,114 @@ class FortranAccel(AccelBase):
         "float64": ["REAL (C_DOUBLE)", c_double]
     }
 
-    def gen_code(self, compiler, inputs, outputs, worker_triple, run_id, device, channel):
+    def gen_code(self, compiler):
 
         macros = {}
 
         module_fmt = {
-            "typeattr": self._get_typeattr(inputs, outputs),
-            "testvars": self._get_testvars(),
-            "datavars": self._get_datavars(inputs, outputs),
-            "procattr": self._get_procattr(inputs, outputs),
+            "datavars": self._get_datavars(),
         }
         module = t_module.format(**module_fmt)
 
         main_fmt = {
-            "testcode": self._get_testcode(),
-            "datacopies":self._gen_datacopies(inputs, outputs),
-            "kernel":self._gen_kernel(inputs, outputs),
-            "vars":self._gen_usevars(inputs, outputs),
-            "nullify":self._gen_nullify(inputs, outputs)
+            "varmap":self._gen_varmap(),
+            "kernel":self._gen_kernel(),
+            "usevarnames":self._gen_usevars(),
         }
         main = t_main.format(**main_fmt)
 
         #print(module)
         #print(main)
         #import pdb; pdb.set_trace()
+
         return [module, main], macros
 
-    def _get_procattr(self, inputs, outputs):
+    def getname_varmap(self, arg):
+        return "accelpy_varmap_%s" % arg["curname"]
+
+    def _get_datavars(self):
 
         out = []
 
-        for arg in self._testdata+inputs+outputs:
-            data = arg["data"]
-
-            if data.ndim > 0:
-                out.append(t_procattr.format(varname=arg["curname"]))
-
-        return "\n".join(out)
-
-    def _get_typeattr(self, inputs, outputs):
-
-        out = []
-
-        for arg in self._testdata+inputs+outputs:
-            data = arg["data"]
-
-            if data.ndim > 0:
-                out.append(t_typeattr.format(varname=arg["curname"],
-                        ndim=str(data.ndim), size=str(data.size),
-                        shape=self.get_shapestr(arg),
-                        stride=self.get_stridestr(arg)))
-
-        return "\n".join(out)
-
-    def _get_testvars(self):
-
-        out = []
-
-        for arg in self._testdata:
+        for arg in self.data:
             ndim = arg["data"].ndim
             dtype = self.get_dtype(arg)
-
-            dimension = (("DIMENSION("+",".join([":"]*ndim)+"), POINTER")
-                            if ndim > 0 else "")
-
-            out.append("%s, %s :: %s" % (dtype, dimension, arg["curname"]))
-            out.append("TYPE(type_{name}) :: {name}_attr".format(name=arg["curname"]))
-
-        return "\n".join(out)
-
-    def _get_datavars(self, inputs, outputs):
-
-        out = []
-
-        for data in inputs+outputs:
-            ndim = data["data"].ndim
-            dtype = self.get_dtype(data)
+            varname = arg["curname"]
 
             if ndim > 0:
                 bound = ",".join([":"]*ndim)
-                out.append("%s, DIMENSION(%s), POINTER :: %s" % (dtype, bound, data["curname"]))
-                out.append("TYPE(type_{name}) :: {name}_attr".format(name=data["curname"]))
+                out.append("%s, DIMENSION(%s), POINTER :: %s" % (dtype, bound, varname))
 
             else:
-                out.append("%s :: %s" % (dtype, data["curname"]))
+                out.append("%s :: %s" % (dtype, varname))
 
         return "\n".join(out)
 
-    def _get_testcode(self):
+    def _gen_varmap(self):
 
         out = []
 
-        input = self._testdata[0]
-        output = self._testdata[1]
-
-        dtype_in = self.get_dtype(input)
-        dtype_out = self.get_dtype(input)
-        funcname_in = "accelpy_test_h2acopy"
-        funcname_out = "accelpy_test_h2amalloc"
-        funcname_a2h = "accelpy_test_a2hcopy"
-        bound_in = ",".join([str(s) for s in input["data"].shape])
-        bound_out = ",".join([str(s) for s in output["data"].shape])
-
-        out.append(t_h2a.format(funcname=funcname_in, bound=bound_in,
-                    varname=input["curname"], dtype=dtype_in))
-        out.append(t_h2a.format(funcname=funcname_out, bound=bound_out,
-                    varname=output["curname"], dtype=dtype_out))
-        out.append(t_a2hcopy.format(funcname=funcname_a2h, bound=bound_out,
-                    varname=output["curname"], dtype=dtype_out))
-
-        out.append(t_testfunc.format(varin=input["curname"],
-                    varout=output["curname"]))
-
-        return "\n".join(out)
-
-    def _gen_datacopies(self, inputs, outputs):
-
-        out = []
-
-        for input in inputs:
-            dtype = self.get_dtype(input)
-            funcname = self.getname_h2acopy(input)
-            ndim = input["data"].ndim
+        for arg in self.data:
+            dtype = self.get_dtype(arg)
+            funcname = self.getname_varmap(arg)
+            ndim = arg["data"].ndim
 
             if ndim > 0:
-                bound = ",".join([str(s) for s in input["data"].shape])
-                out.append(t_h2a.format(funcname=funcname, varname=input["curname"],
+                bound = ",".join([str(s) for s in arg["data"].shape])
+                out.append(t_varmap.format(funcname=funcname, varname=arg["curname"],
                             bound=bound, dtype=dtype))
             else:
-                out.append(t_h2a_scalar.format(funcname=funcname,
-                            varname=input["curname"], dtype=dtype))
-
-        for output in outputs:
-            dtype = self.get_dtype(output)
-            funcname = self.getname_h2amalloc(output)
-            ndim = output["data"].ndim
-
-            if ndim > 0:
-                bound = ",".join([str(s) for s in output["data"].shape])
-                out.append(t_h2a.format(funcname=funcname, varname=output["curname"],
-                        bound=bound, dtype=dtype))
-
-            else:
-                out.append(t_h2a_scalar.format(funcname=funcname,
-                        varname=output["curname"], dtype=dtype))
-
-        for output in outputs:
-            dtype = self.get_dtype(output)
-            funcname = self.getname_a2hcopy(output)
-            ndim = output["data"].ndim
-
-            if ndim > 0:
-                bound = ",".join([str(s) for s in output["data"].shape])
-                out.append(t_a2hcopy.format(funcname=funcname, varname=output["curname"],
-                        bound=bound, dtype=dtype))
-
-            else:
-                out.append(t_a2hcopy_scalar.format(funcname=funcname,
-                        varname=output["curname"], dtype=dtype))
+                out.append(t_varmap_scalar.format(funcname=funcname,
+                            varname=arg["curname"], dtype=dtype))
 
         return "\n".join(out)
 
-    def _gen_usevars(self, inputs, outputs):
+    def _gen_kernel(self):
+
+        _names = []
+        typedecls = []
+
+        for arg in self.data:
+            ndim = arg["data"].ndim
+            dtype = self.get_dtype(arg)
+            varname = arg["curname"]
+
+            _names.append(varname)
+
+            if ndim > 0:
+                if ("attrspec" in self.section.kwargs and
+                    varname in self.section.kwargs["attrspec"] and
+                    "dimension" in self.section.kwargs["attrspec"][varname]):
+                    bound = self.section.kwargs["attrspec"][varname]["dimension"]
+
+                else:
+                    bound = ",".join([":"]*ndim)
+
+
+                typedecls.append("%s, DIMENSION(%s), INTENT(INOUT) :: %s" % (
+                            dtype, bound, varname))
+
+            else:
+                typedecls.append("%s, INTENT(IN) :: %s" % (dtype, varname))
+
+        names = fortline_pack(_names)
+
+        return t_kernel.format(spec="\n".join(self.section.body),
+                typedecls="\n".join(typedecls), varnames="\n".join(names))
+
+    def _gen_usevars(self):
 
         names = []
 
-        for data in inputs+outputs:
+        for arg in self.data:
 
-            if data["data"].ndim > 0:
-                names.append(data["curname"])
+            names.append(arg["curname"])
 
         lines = [""]
         maxlen = 72
 
         for name in names:
-            if len(lines[-1]) + len(name) > maxlen:            
+            if len(lines[-1]) + len(name) > maxlen:
 
                 lines[-1] += " &"
                 lines.append("        &, %s" % name)
@@ -382,64 +223,5 @@ class FortranAccel(AccelBase):
 
         return "\n".join(lines)
 
-    def _gen_nullify(self, inputs, outputs):
 
-        lines = []
-
-        for data in inputs+outputs:
-            if data["data"].ndim > 0:
-                lines.append("IF (ASSOCIATED(%s)) THEN" % data["curname"])
-                lines.append("        NULLIFY(%s)" % data["curname"])
-                lines.append("    END IF")
-
-        return "\n".join(lines)
-
-    def _gen_kernel(self, inputs, outputs):
-
-        names = []
-
-        for data in inputs+outputs:
-            names.append(data["curname"])
-
-            if data["data"].ndim > 0:
-                names.append(data["curname"]+"_attr")
-
-        lines = [""]
-        maxlen = 72
-
-        for name in names:
-            if len(lines[-1]) + len(name) > maxlen:            
-
-                lines[-1] += " &"
-                lines.append("        &, %s" % name)
-
-            elif lines[-1] == "":
-                lines[-1] += name
-
-            else:
-                lines[-1] += ", " + name
-                
-        order =  self._order.get_section(self.name)
-
-        return t_kernel.format(order="\n".join(order.body), varandattr="\n".join(lines))
-
-    def _gen_varattrs(self, inputs, outputs):
-
-        out = []
-
-        for data in inputs+outputs:
-            out.append("%s_attr" % data["curname"])
-
-        return ", ".join(out)
-
-    def getname_h2amalloc(self, arg):
-        return "accelpy_h2amalloc_%s" % arg["curname"]
-
-    def getname_h2acopy(self, arg):
-        return "accelpy_h2acopy_%s" % arg["curname"]
-
-    def getname_a2hcopy(self, arg):
-        return "accelpy_a2hcopy_%s" % arg["curname"]
-
-
-FortranAccel.avails[FortranAccel.name] = FortranAccel
+FortranKernel.avails[FortranKernel.name] = FortranKernel

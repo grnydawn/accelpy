@@ -1,16 +1,42 @@
 "accelpy setup module."
 
+import os
 from setuptools import setup, find_packages
 from setuptools.command.develop import develop
 from setuptools.command.install import install
-from accelpy.util import init_config
 
+genv = {'__builtins__' : None}
+consts = {}
+
+with open(os.path.join("accelpy", "const.py")) as fp:
+    exec(fp.read(), genv, consts)
+
+print(consts)
 
 def _setcfg():
-    import os
 
     cfgdir = os.path.join(os.path.expanduser("~"), ".accelpy")
-    init_config(cfgdir)
+
+    libdir = os.path.join(cfgdir, "lib")
+    cfgfile = os.path.join(cfgdir, "config")
+
+    for vendor in consts["vendors"]:
+        vendor_path = os.path.join(libdir, vendor)
+        if not os.path.isdir(vendor_path):
+            try:
+                os.makedirs(vendor_path)
+
+            except FileExistsError:
+                pass
+
+    config = {
+        "libdir": libdir,
+        "blddir": "",
+    }
+
+    if not os.path.isfile(cfgfile):
+        with open(cfgfile, "w")  as f:
+            json.dump(config, f)
 
 
 class DevelopCommand(develop):
@@ -27,19 +53,17 @@ class InstallCommand(install):
 
 def main():
 
-    from accelpy.core import name, version, description, long_description, author
-
     install_requires = ["numpy"]
     console_scripts = ["accelpy=accelpy.command:main"]
     keywords = ["GPU", "CPU", "Accelerator", "Cuda", "Hip",
                 "OpenAcc", "OpenMP", "Numpy", "C++", "Fortran", "accelpy"]
 
     setup(
-        name=name,
-        version=version,
-        description=description,
-        long_description=long_description,
-        author=author,
+        name=consts["name"],
+        version=consts["version"],
+        description=consts["description"],
+        long_description=consts["long_description"],
+        author=consts["author"],
         author_email="youngsung.kim.act2@gmail.com",
         classifiers=[
             "Development Status :: 3 - Alpha",
