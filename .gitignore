@@ -132,3 +132,6 @@ dmypy.json
 *.dylib
 *.o
 .nfs*
+
+# custom
+_accelpy_debug_

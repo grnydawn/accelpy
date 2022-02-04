@@ -22,6 +22,7 @@ class Task(Object):
         self.lang = lang
         self.libpath = libpath
         self.bldpath = bldpath
+        self.synched = False
 
     def run(self, data, getname):
 
@@ -41,8 +42,7 @@ class Task(Object):
         else:
             raise Exception("Unknown language: %s" % lang)
 
-        #if writable:
-        #    flags.append("writeable")
+        # TODO consider to use "numpy.ascontiguousarray"
 
         datamap = getattr(self.lib, funcname)
         datamap.restype = c_int64
@@ -78,8 +78,17 @@ class Task(Object):
             except FileExistsError:
                 pass
 
+        self.synched = True
+
     def stop(self):
-        pass
+
+        accstop = getattr(self.lib, "accelpy_stop")
+        accstop.restype = c_int64
+        accstop.argtypes = []
+
+        res = accstop()
+
+        return res
 
 
 class KernelBase(Object):
@@ -144,9 +153,12 @@ class KernelBase(Object):
             for task in self.tasks:
                 task.wait(timeout=timeout)
 
-    def stop(self):
+    def stop(self, timeout=None):
 
         for task in self.tasks:
+            if not task.synched:
+                task.wait(timeout=timeout)
+
             task.stop()
 
 
@@ -197,11 +209,12 @@ class KernelBase(Object):
 
             libdir = os.path.join(get_config("libdir"), comp.vendor, self.cachekey[:2])
 
-            try:
-                os.makedirs(libdir)
+            if not os.path.isdir(libdir):
+                try:
+                    os.makedirs(libdir)
 
-            except FileExistsError:
-                pass
+                except FileExistsError:
+                    pass
 
             basename = self.cachekey[2:]
             libname = basename + "." + comp.libext
