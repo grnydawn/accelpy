@@ -15,8 +15,9 @@ attrspec = { 'x': { 'dimension': '1:' } }
 cpp_enable = True
 
 [cpp: enable=cpp_enable]
-    for (int id = 0; id < x.shape[0]; id++) {
-        z(id) = x(id) + y(id);
+
+    for (int id = 0; id < shape_x[0]; id++) {
+        z[id] = x[id] + y[id];
     }
 
 [fortran: a, b, c, attrspec=attrspec]

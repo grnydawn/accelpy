@@ -1,7 +1,7 @@
 "Constant module"
 
 name            = "accelpy"
-version         = "0.3.22.dev1"
+version         = "0.3.24"
 description     = "Scalable Accelerator Interface in Python"
 long_description= "Scalable Accelerator Interface in Python"
 author          = "Youngsung Kim"

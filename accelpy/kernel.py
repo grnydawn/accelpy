@@ -236,12 +236,12 @@ class KernelBase(Object):
             # build if not exist
 
             try:
-                code, macros = self.gen_code(comp)
+                codes, macros = self.gen_code(comp)
 
                 if not os.path.isdir(get_config("blddir")):
                     set_config("blddir", tempfile.mkdtemp())
 
-                bldpath = comp.compile(code, macros, self.debug)
+                bldpath = comp.compile(codes, macros, self.debug)
 
                 blddir, bldname = os.path.split(bldpath)
                 basename, _ = os.path.splitext(bldname)
