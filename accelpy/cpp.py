@@ -99,7 +99,6 @@ class CppKernel(KernelBase):
 
         argdefs, startargs = self._gen_recast()
 
-        import pdb; pdb.set_trace()
         main_fmt = {
             "kernel":self._gen_kernel(),
             "varmap":self._gen_varmap(),
