@@ -57,7 +57,6 @@ cpp_enable = True
     DO id=begin, end
         z(id) = x(id) + y(id)
     END DO
-    !$acc end loop
     !$acc end parallel
     !$acc end data
 

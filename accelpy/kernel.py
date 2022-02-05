@@ -143,17 +143,7 @@ class KernelBase(Object):
             keys.append(item["data"].shape)
             keys.append(item["data"].dtype)
 
-        self.cachekey = gethash(str(keys))
-
-        libpath = None
-        bldpath = None
-
-        if not reload and self.cachekey in cache.sharedlib:
-            lang, basename, libext, libdir, bldpath = cache.sharedlib[self.cachekey]
-            libpath = os.path.join(libdir, basename+"."+libext)
-
-        if libpath is None and bldpath is None:
-            lang, libpath, bldpath = self.build_sharedlib()
+        lang, libpath, bldpath = self.build_sharedlib(gethash(str(keys)), reload)
 
         task = Task(lang, libpath, bldpath)
         task.run(self.data, self.getname_varmap)
@@ -204,7 +194,7 @@ class KernelBase(Object):
 
         return res
 
-    def build_sharedlib(self):
+    def build_sharedlib(self, ckey, reload):
 
         errmsgs = []
 
@@ -212,7 +202,16 @@ class KernelBase(Object):
 
         for comp in compilers:
 
-            libdir = os.path.join(get_config("libdir"), comp.vendor, self.cachekey[:2])
+            cachekey = ckey + "_" + comp.vendor
+
+            if not reload and cachekey in cache.sharedlib:
+                lang, basename, libext, libdir, bldpath = cache.sharedlib[cachekey]
+                libpath = os.path.join(libdir, basename+"."+libext)
+                self.cachekey = cachekey
+
+                return lang, libpath, bldpath
+
+            libdir = os.path.join(get_config("libdir"), comp.vendor, cachekey[:2])
 
             if not os.path.isdir(libdir):
                 try:
@@ -221,7 +220,7 @@ class KernelBase(Object):
                 except FileExistsError:
                     pass
 
-            basename = self.cachekey[2:]
+            basename = cachekey[2:]
             libname = basename + "." + comp.libext
             libpath = os.path.join(libdir, libname)
 

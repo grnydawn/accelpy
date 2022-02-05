@@ -75,9 +75,16 @@ class Compiler(Object):
         text = (code + opt_macro + self.vendor + "".join(self.version) + ext)
         name =  hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
 
+        blddir = get_config("blddir")
         filename = name + "." + self.codeext
-        codepath = os.path.join(get_config("blddir"), filename)
-        outfile = os.path.join(get_config("blddir"), name + "." + ext)
+        codepath = os.path.join(blddir, filename)
+        outfile = os.path.join(blddir, name + "." + ext)
+
+        fortmod = os.path.join(blddir, "accelpy_global.mod")
+        if code.lstrip().startswith("MODULE accelpy_global") and os.path.isfile(fortmod):
+            os.remove(fortmod)
+            if os.path.isfile(outfile):
+                os.remove(outfile)
 
         if not os.path.isfile(codepath):
             try:
@@ -489,8 +496,8 @@ class AmdClangCppCompiler(CppCompiler):
         if path:
             pass
 
-        elif which("clang++"):
-            path = "clang++"
+        elif which("amdclang++"):
+            path = "amdclang++"
 
         super(AmdClangCppCompiler, self).__init__(path, option)
 
@@ -499,7 +506,7 @@ class AmdClangCppCompiler(CppCompiler):
         items = stdout.split()
 
         if sys.platform == "linux":
-            if items[:2] == [b'clang', b'version']:
+            if items[:3] == [b'AMD', b'clang', b'version']:
                 return items[2].decode().split(".")
             raise Exception("Unknown version syntaxt: %s" % str(items[:2]))
 
@@ -538,8 +545,8 @@ class AmdFlangFortranCompiler(FortranCompiler):
         if path:
             pass
 
-        elif which("flang"):
-            path = "flang"
+        elif which("amdflang"):
+            path = "amdflang"
 
         super(AmdFlangFortranCompiler, self).__init__(path, option)
 
@@ -548,7 +555,7 @@ class AmdFlangFortranCompiler(FortranCompiler):
         items = stdout.split()
         
         if sys.platform == "linux":
-            if items[:2] == [b'flang-new', b'version']:
+            if items[:3] == [b'AMD', b'flang-new', b'version']:
                 return items[2].decode().split(".")
             raise Exception("Unknown compiler version syntax: %s" % str(items[:2]))
 
