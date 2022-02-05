@@ -148,7 +148,7 @@ class CppKernel(KernelBase):
             name = arg["curname"]
 
             if ndim > 0:
-                shape0 = ",".join(["[%d]"%s for s in arg["data"].shape])
+                shape0 = "".join(["[%d]"%s for s in arg["data"].shape])
                 shape1 = ",".join([str(s) for s in arg["data"].shape])
 
                 shapes.append("int shape_%s[%d] = {%s};" % (name, ndim, shape1))
@@ -173,7 +173,7 @@ class CppKernel(KernelBase):
             ndim = arg["data"].ndim
 
             if ndim > 0:
-                shape = ",".join(["[%d]"%s for s in arg["data"].shape])
+                shape = "".join(["[%d]"%s for s in arg["data"].shape])
                 argdefs.append(fmt.format(dtype=dtype, name=name, shape=shape))
                 startargs.append("(*ptr_" + name + ")")
 

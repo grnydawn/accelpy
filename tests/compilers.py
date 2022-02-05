@@ -21,3 +21,6 @@ for lang, accels in Compiler.avails.items():
 
             except Exception as err:
                 not_tested.append((accel, vendor))
+
+
+#testable = [("openacc_fortran", "gnu")]
