@@ -136,3 +136,4 @@ dmypy.json
 # custom
 _accelpy_debug_
 core
+*.s

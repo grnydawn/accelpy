@@ -16,9 +16,9 @@ from accelpy import cache
 
 class Task(Object):
 
-    def __init__(self, lib, lang, libpath, bldpath):
+    def __init__(self, lang, libpath, bldpath):
 
-        self.lib = lib
+        self.lib = None
         self.lang = lang
         self.libpath = libpath
         self.bldpath = bldpath
@@ -54,6 +54,21 @@ class Task(Object):
 
     def _start_kernel(self, data, getname):
 
+        if self.libpath is not None and os.path.isfile(self.libpath):
+            try:
+                libdir, libname = os.path.split(self.libpath)
+                basename, _ = os.path.splitext(libname)
+
+                self.lib = load_library(basename, libdir)
+            except:
+                pass
+
+        if self.lib is None and self.bldpath is not None and os.path.isfile(self.bldpath):
+            blddir, bldname = os.path.split(self.bldpath)
+            basename, _ = os.path.splitext(bldname)
+
+            self.lib = load_library(basename, blddir)
+
         for arg in data:
             self.varmap(arg, getname(arg))
 
@@ -61,7 +76,6 @@ class Task(Object):
         start.restype = c_int64
         start.argtypes = []
 
-        #res = 0
         res = start()
 
         if res != 0:
@@ -71,6 +85,7 @@ class Task(Object):
 
         timeout = max(0, self.start+timeout-time.time()) if timeout else None
         self.thread.join(timeout=timeout)
+        self.thread.join()
 
         if not os.path.isfile(self.libpath) and os.path.isfile(self.bldpath):
             try:
@@ -81,7 +96,10 @@ class Task(Object):
 
         self.synched = True
 
-    def stop(self):
+    def stop(self, timeout=None):
+
+        if not self.synched:
+            self.wait(timeout=timeout)
 
         accstop = getattr(self.lib, "accelpy_stop")
         accstop.restype = c_int64
@@ -127,17 +145,17 @@ class KernelBase(Object):
 
         self.cachekey = gethash(str(keys))
 
+        libpath = None
+        bldpath = None
+
         if not reload and self.cachekey in cache.sharedlib:
-            lib, lang, basename, libext, libdir, bldpath = cache.sharedlib[self.cachekey]
+            lang, basename, libext, libdir, bldpath = cache.sharedlib[self.cachekey]
+            libpath = os.path.join(libdir, basename+"."+libext)
 
-            if lib is not None:
-                self.lib = lib
-                libpath = os.path.join(libdir, basename+"."+libext)
+        if libpath is None and bldpath is None:
+            lang, libpath, bldpath = self.build_sharedlib()
 
-        if self.lib is None:
-            self.lib, lang, libpath, bldpath = self.load_sharedlib()
-
-        task = Task(self.lib, lang, libpath, bldpath)
+        task = Task(lang, libpath, bldpath)
         task.run(self.data, self.getname_varmap)
 
         self.tasks.append(task)
@@ -160,8 +178,7 @@ class KernelBase(Object):
             if not task.synched:
                 task.wait(timeout=timeout)
 
-            task.stop()
-
+            task.stop(timeout=timeout)
 
     def get_dtype(self, arg):
         return self.dtypemap[arg["data"].dtype.name][0]
@@ -187,23 +204,10 @@ class KernelBase(Object):
 
         return res
 
-    def load_sharedlib(self):
-
-        # if exists in cache
-        if self.cachekey in cache.sharedlib:
-
-            _, lang, name, libdir, libext, bldpath = cache.sharedlib[self.cachekey]
-
-            try:
-                lib = load_library(name, libdir)
-
-                if lib is not None:
-                    return lib, lang, os.path.join(libdir, name+"."+libext), bldpath
-
-            except Exception as err:
-                pass
+    def build_sharedlib(self):
 
         errmsgs = []
+
         compilers = get_compilers(self.name, compile=self.compile)
 
         for comp in compilers:
@@ -221,21 +225,6 @@ class KernelBase(Object):
             libname = basename + "." + comp.libext
             libpath = os.path.join(libdir, libname)
 
-            # if exists in cache directory
-            if os.path.isfile(libpath):
-
-                lib = load_library(basename, libdir)
-
-                if lib is None:
-                    continue
-
-                cache.sharedlib[self.cachekey] = (lib, comp.lang, basename,
-                                            comp.libext, libdir, None)
-
-                return lib, comp.lang, libpath, None
-
-            # build if not exist
-
             try:
                 codes, macros = self.gen_code(comp)
 
@@ -244,18 +233,9 @@ class KernelBase(Object):
 
                 bldpath = comp.compile(codes, macros, self.debug)
 
-                blddir, bldname = os.path.split(bldpath)
-                basename, _ = os.path.splitext(bldname)
-
-                lib = load_library(basename, blddir)
-
-                if lib is None:
-                    continue
-
-                cache.sharedlib[self.cachekey] = (lib, comp.lang, basename,
-                                                comp.libext, libdir, bldpath)
-
-                return lib, comp.lang, libpath, bldpath
+                cache.sharedlib[self.cachekey] = (comp.lang, basename, comp.libext,
+                                                    libdir, bldpath)
+                return comp.lang, libpath, bldpath
 
             except Exception as err:
                 errmsgs.append(str(err))
