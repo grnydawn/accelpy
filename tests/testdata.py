@@ -21,9 +21,12 @@ cpp_enable = True
     }
 
 [fortran: a, b, c, attrspec=attrspec]
-    INTEGER id
+    INTEGER id, begin, end
 
-    DO id=LBOUND(a,1), UBOUND(a,1)
+    begin = LBOUND(a,1) 
+    end = UBOUND(a,1) 
+
+    DO id=begin, end
         c(id) = a(id) + b(id)
     END DO
 
@@ -32,21 +35,31 @@ cpp_enable = True
     if(id < x.size) z(id) = x(id) + y(id);
 
 [openacc_cpp]
-    #pragma acc loop gang worker vector
-    for (int id = 0; id < shape_x[0]; id++) {
+    int length = shape_x[0];
+
+    #pragma acc data copyin(x[0:length], y[0:length]) copyout(z[0:length])
+    {
+    #pragma acc parallel loop worker 
+    for (int id = 0; id < length; id++) {
         z[id] = x[id] + y[id];
+    }
     }
 
 [openacc_fortran]
-    INTEGER id
+    INTEGER id, begin, end
 
-    !$acc parallel num_workers(UBOUND(x,1)-LBOUND(x,1)+1) 
-    !$acc loop gang worker vector
-    DO id=LBOUND(x,1), UBOUND(x,1)
+    begin = LBOUND(x,1) 
+    end = UBOUND(x,1) 
+
+    !$acc data copyin(x(begin:end), y(begin:end)) copyout(z(begin:end))
+    !$acc parallel num_workers(end-begin+1) 
+    !$acc loop worker
+    DO id=begin, end
         z(id) = x(id) + y(id)
     END DO
     !$acc end loop
     !$acc end parallel
+    !$acc end data
 
 [openmp_cpp]
 
@@ -57,10 +70,13 @@ cpp_enable = True
     }
 
 [openmp_fortran]
-    INTEGER id
+    INTEGER id, begin, end 
+
+    begin = LBOUND(x,1) 
+    end = UBOUND(x,1) 
 
     !$omp do
-    DO id=LBOUND(x,1), UBOUND(x,1)
+    DO id=begin, end
         z(id) = x(id) + y(id)
         !print *, omp_get_thread_num()
     END DO

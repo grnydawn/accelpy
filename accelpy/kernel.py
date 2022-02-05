@@ -61,6 +61,7 @@ class Task(Object):
         start.restype = c_int64
         start.argtypes = []
 
+        #res = 0
         res = start()
 
         if res != 0:
