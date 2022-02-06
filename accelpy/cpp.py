@@ -99,7 +99,7 @@ class CppKernel(KernelBase):
         includes = self.add_includes()
 
         main_fmt = {
-            "preprop": self._gen_preprop(),
+            "preprop": self.gen_preprop(),
             "kernel":self.gen_kernel(),
             "varmap":self._gen_varmap(),
             "startmain":self.gen_startmain(),
@@ -116,7 +116,7 @@ class CppKernel(KernelBase):
     def getname_varmap(self, arg):
         return "accelpy_varmap_%s" % arg["curname"]
 
-    def _gen_preprop(self):
+    def gen_preprop(self):
 
         typedefs = []
         consts = []
@@ -139,7 +139,7 @@ class CppKernel(KernelBase):
             name = arg["curname"]
             ndim = arg["data"].ndim
 
-            consts.append("__host__ __device__ const int apy_size_%s = %d;" % (name, arg["data"].size))
+            consts.append("const int apy_size_%s = %d;" % (name, arg["data"].size))
             typedefs.append("typedef %s apy_type_%s;" % (dtype, name))
 
             if ndim > 0:
@@ -147,7 +147,7 @@ class CppKernel(KernelBase):
                 shapestr = "".join(["[%d]"%s for s in arg["data"].shape])
                 macros.append("#define apy_shapestr_%s %s" % (name, shapestr))
                 for d, s in enumerate(arg["data"].shape):
-                    consts.append("__host__ __device__ const int apy_shape_%s%d = %d;" % (name, d, s))
+                    consts.append("const int apy_shape_%s%d = %d;" % (name, d, s))
             else:
                 pass
 

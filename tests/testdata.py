@@ -49,8 +49,6 @@ cpp_enable = True
     hipFree(DPTR(x));
     hipFree(DPTR(y));
     hipFree(DPTR(z));
-/*
-*/
 
 
 [hip_kernel]
@@ -59,9 +57,37 @@ cpp_enable = True
 
         int id = blockIdx.x * blockDim.x + threadIdx.x;
         if(id < SHAPE(x, 0)) z[id] = x[id] + y[id];
-        //if(id < SIZE(x)) z[id] = x[id] + y[id];
 
     }
+
+[cuda: kernel="cuda_kernel"]
+
+    cudaMalloc((void **)&DPTR(x), SIZE(x) * sizeof(TYPE(x)));
+    cudaMemcpy(DVAR(x), VAR(x), SIZE(x) * sizeof(TYPE(x)), cudaMemcpyHostToDevice);
+
+    cudaMalloc((void **)&DPTR(y), SIZE(y) * sizeof(TYPE(y)));
+    cudaMemcpy(DVAR(y), VAR(y), SIZE(y) * sizeof(TYPE(y)), cudaMemcpyHostToDevice);
+
+    cudaMalloc((void **)&DPTR(z), SIZE(z) * sizeof(TYPE(z)));
+    //accelpy_kernel<<<1, SIZE(x)>>>(DVAR(x), DVAR(y), DVAR(z));
+    accelpy_kernel<<<1, SHAPE(x,0) >>>(DVAR(x), DVAR(y), DVAR(z));
+
+    cudaMemcpy(VAR(z), DVAR(z), SIZE(z) * sizeof(TYPE(z)), cudaMemcpyDeviceToHost);
+
+    cudaFree(DPTR(x));
+    cudaFree(DPTR(y));
+    cudaFree(DPTR(z));
+
+
+[cuda_kernel]
+
+    __global__ void accelpy_kernel(ARG(x), ARG(y), ARG(z)){
+
+        int id = blockIdx.x * blockDim.x + threadIdx.x;
+        if(id < SHAPE(x, 0)) z[id] = x[id] + y[id];
+
+    }
+
 
 
 [openacc_cpp]

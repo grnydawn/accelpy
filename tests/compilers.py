@@ -23,5 +23,6 @@ for lang, accels in Compiler.avails.items():
                 not_tested.append((accel, vendor))
 
 
-testable = [("hip", "amd")]
+#testable = [("cuda", "nvidia")]
+#testable = [("hip", "amd")]
 #testable = [("cpp", "cray")]
