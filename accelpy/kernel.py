@@ -194,6 +194,18 @@ class KernelBase(Object):
 
         return res
 
+    def get_include(self):
+        return ""
+
+    def add_includes(self):
+
+        incs = []
+
+        # TODO: implement this
+        #import pdb; pdb.set_trace()
+
+        return incs
+
     def build_sharedlib(self, ckey, reload):
 
         errmsgs = []

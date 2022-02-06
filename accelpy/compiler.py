@@ -128,6 +128,7 @@ class Compiler(Object):
             #import pdb; pdb.set_trace()
 
             out = shellcmd(build_cmd)
+            #print(str(out.stdout).replace("\\n", "\n"))
 
             if out.returncode != 0:
                 errmsg = str(out.stderr).replace("\\n", "\n")
@@ -167,19 +168,19 @@ class Compiler(Object):
 
         return outfile
 
-    def compile(self, code, macros, debug):
+    def compile(self, codes, macros, debug):
 
         lib = None
 
         objfiles = []
 
         # build object files
-        if isinstance(code, str):
-            objfiles.append(self._compile(code, self.objext, macros, debug))
+        if isinstance(codes, str):
+            objfiles.append(self._compile(codes, self.objext, macros, debug))
 
-        elif isinstance(code, (list, tuple)):
-            for _c in code:
-                objfiles.append(self._compile(_c, self.objext, macros, debug))
+        elif isinstance(codes, (list, tuple)):
+            for code in codes:
+                objfiles.append(self._compile(code, self.objext, macros, debug))
 
         return self._link(self.libext, objfiles)
 

@@ -20,6 +20,7 @@ END MODULE
 """
 
 t_main = """
+{include}
 
 {varmap}
 
@@ -106,6 +107,7 @@ class FortranKernel(KernelBase):
     def gen_code(self, compiler):
 
         macros = {}
+        includes = self.add_includes()
 
         module_fmt = {
             "datavars": self._get_datavars(),
@@ -116,6 +118,7 @@ class FortranKernel(KernelBase):
             "varmap":self._gen_varmap(),
             "kernel":self._gen_kernel(),
             "usevarnames":self._gen_usevars(),
+            "include":self.get_include(),
         }
         main = t_main.format(**main_fmt)
 
@@ -123,7 +126,7 @@ class FortranKernel(KernelBase):
         #print(main)
         #import pdb; pdb.set_trace()
 
-        return [module, main], macros
+        return includes + [module, main], macros
 
     def getname_varmap(self, arg):
         return "accelpy_varmap_%s" % arg["curname"]

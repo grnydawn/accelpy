@@ -16,7 +16,8 @@ cpp_enable = True
 
 [cpp: enable=cpp_enable]
 
-    for (int id = 0; id < shape_x[0]; id++) {
+    //for (int id = 0; id < shape_x[0]; id++) {
+    for (int id = 0; id < SHAPE(x,0); id++) {
         z[id] = x[id] + y[id];
     }
 
@@ -30,9 +31,38 @@ cpp_enable = True
         c(id) = a(id) + b(id)
     END DO
 
-[hip, cuda]
-    int id = blockIdx.x * blockDim.x + threadIdx.x;
-    if(id < x.size) z(id) = x(id) + y(id);
+[hip: kernel="hip_kernel"]
+
+
+    hipMalloc((void **)&DPTR(x), SIZE(x) * sizeof(TYPE(x)));
+    hipMemcpyHtoD(DVAR(x), VAR(x), SIZE(x) * sizeof(TYPE(x)));
+
+    hipMalloc((void **)&DPTR(y), SIZE(y) * sizeof(TYPE(y)));
+    hipMemcpyHtoD(DVAR(y), VAR(y), SIZE(y) * sizeof(TYPE(y)));
+
+    hipMalloc((void **)&DPTR(z), SIZE(z) * sizeof(TYPE(z)));
+    //accelpy_kernel<<<1, SIZE(x)>>>(DVAR(x), DVAR(y), DVAR(z));
+    accelpy_kernel<<<1, SHAPE(x,0) >>>(DVAR(x), DVAR(y), DVAR(z));
+
+    hipMemcpyDtoH(VAR(z), DVAR(z), SIZE(z) * sizeof(TYPE(z)));
+
+    hipFree(DPTR(x));
+    hipFree(DPTR(y));
+    hipFree(DPTR(z));
+/*
+*/
+
+
+[hip_kernel]
+
+    __global__ void accelpy_kernel(ARG(x), ARG(y), ARG(z)){
+
+        int id = blockIdx.x * blockDim.x + threadIdx.x;
+        if(id < SHAPE(x, 0)) z[id] = x[id] + y[id];
+        //if(id < SIZE(x)) z[id] = x[id] + y[id];
+
+    }
+
 
 [openacc_cpp]
     int length = shape_x[0];

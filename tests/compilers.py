@@ -23,4 +23,5 @@ for lang, accels in Compiler.avails.items():
                 not_tested.append((accel, vendor))
 
 
-#testable = [("openacc_fortran", "gnu")]
+testable = [("hip", "amd")]
+#testable = [("cpp", "cray")]

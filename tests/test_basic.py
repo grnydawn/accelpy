@@ -5,7 +5,7 @@ from compilers import testable, not_tested
 from testdata import get_testdata, assert_testdata
 
 @mark.parametrize("accel, compile", testable)
-def ttest_first(accel, compile):
+def test_first(accel, compile):
 
     lang = "fortran" if "fortran" in accel else "cpp"
 
@@ -40,7 +40,7 @@ def ttest_vecadd3d(accel, compile):
 
 
 @mark.parametrize("accel, compile", testable)
-def test_matmul(accel, compile):
+def ttest_matmul(accel, compile):
 
     lang = "fortran" if "fortran" in accel else "cpp"
 

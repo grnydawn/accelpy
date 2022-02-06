@@ -12,7 +12,9 @@ t_main = """
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
+{include}
 
+{preprop}
 
 {varmap}
 
@@ -20,11 +22,9 @@ t_main = """
 
 extern "C" int64_t accelpy_start() {{
 
-    int64_t res;
+    int64_t res = 0;
 
-    {argdefs}
-
-    res = accelpy_kernel({startargs});
+    {startmain}
 
     return res;
 }}
@@ -96,14 +96,14 @@ class CppKernel(KernelBase):
     def gen_code(self, compiler):
 
         macros = {}
-
-        argdefs, startargs = self._gen_recast()
+        includes = self.add_includes()
 
         main_fmt = {
-            "kernel":self._gen_kernel(),
+            "preprop": self._gen_preprop(),
+            "kernel":self.gen_kernel(),
             "varmap":self._gen_varmap(),
-            "argdefs":argdefs,
-            "startargs":startargs,
+            "startmain":self.gen_startmain(),
+            "include":self.get_include(),
         }
         main = t_main.format(**main_fmt)
 
@@ -111,10 +111,47 @@ class CppKernel(KernelBase):
         #print(main)
         #import pdb; pdb.set_trace()
 
-        return [main], macros
+        return includes + [main], macros
 
     def getname_varmap(self, arg):
         return "accelpy_varmap_%s" % arg["curname"]
+
+    def _gen_preprop(self):
+
+        typedefs = []
+        consts = []
+        macros = []
+
+        # TYPE(x), SHAPE(x, 0), SIZE(x), ARG(x), DVAR(x), FLATTEN(x)
+
+        macros.append("#define TYPE(varname) apy_type_##varname")
+        macros.append("#define SHAPE(varname, dim) apy_shape_##varname##dim")
+        macros.append("#define SIZE(varname) apy_size_##varname")
+        macros.append("#define ARG(varname) apy_type_##varname varname apy_shapestr_##varname")
+        macros.append("#define VAR(varname) (*apy_ptr_##varname)")
+        macros.append("#define DVAR(varname) (*apy_dptr_##varname)")
+        macros.append("#define PTR(varname) apy_ptr_##varname")
+        macros.append("#define DPTR(varname) apy_dptr_##varname")
+        macros.append("#define FLATTEN(varname) accelpy_var_##varname")
+
+        for arg in self.data:
+            dtype = self.get_dtype(arg)
+            name = arg["curname"]
+            ndim = arg["data"].ndim
+
+            consts.append("__host__ __device__ const int apy_size_%s = %d;" % (name, arg["data"].size))
+            typedefs.append("typedef %s apy_type_%s;" % (dtype, name))
+
+            if ndim > 0:
+
+                shapestr = "".join(["[%d]"%s for s in arg["data"].shape])
+                macros.append("#define apy_shapestr_%s %s" % (name, shapestr))
+                for d, s in enumerate(arg["data"].shape):
+                    consts.append("__host__ __device__ const int apy_shape_%s%d = %d;" % (name, d, s))
+            else:
+                pass
+
+        return "\n".join(macros) + "\n\n" + "\n".join(typedefs) + "\n\n" + "\n".join(consts)
 
     def _gen_varmap(self):
 
@@ -137,7 +174,7 @@ class CppKernel(KernelBase):
 
         return "\n".join(out)
 
-    def _gen_kernel(self):
+    def gen_kernel(self):
 
         args = []
         shapes = []
@@ -160,12 +197,12 @@ class CppKernel(KernelBase):
         return t_kernel.format(spec="\n".join(self.section.body),
                 kernelargs=", ".join(args), shape="\n".join(shapes))
 
-    def _gen_recast(self):
+    def gen_startmain(self):
 
         argdefs = []
         startargs = []
 
-        fmt = "{dtype}(*ptr_{name}){shape} = reinterpret_cast<{dtype}(*){shape}>(accelpy_var_{name});"
+        fmt = "{dtype}(*apy_ptr_{name}){shape} = reinterpret_cast<{dtype}(*){shape}>(accelpy_var_{name});"
 
         for arg in self.data:
             dtype = self.get_dtype(arg)
@@ -175,12 +212,13 @@ class CppKernel(KernelBase):
             if ndim > 0:
                 shape = "".join(["[%d]"%s for s in arg["data"].shape])
                 argdefs.append(fmt.format(dtype=dtype, name=name, shape=shape))
-                startargs.append("(*ptr_" + name + ")")
+                argdefs.append("%s(*apy_dptr_%s)%s;" % (dtype, name, shape))
+                startargs.append("(*apy_ptr_" + name + ")")
 
             else:
                 startargs.append("accelpy_var_" + name)
 
-        return "\n".join(argdefs), ", ".join(startargs)
+        return "\n".join(argdefs) + "\n\n" + "res = accelpy_kernel(%s);" % ", ".join(startargs)
 
 
 class OpenmpCppKernel(CppKernel):
