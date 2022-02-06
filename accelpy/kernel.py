@@ -84,8 +84,12 @@ class Task(Object):
     def wait(self, timeout=None):
 
         timeout = max(0, self.start+timeout-time.time()) if timeout else None
-        self.thread.join(timeout=timeout)
-        self.thread.join()
+
+        while self.thread.ident is None:
+            time.sleep(0.1)
+            
+        if self.thread.is_alive():
+            self.thread.join(timeout=timeout)
 
         if not os.path.isfile(self.libpath) and os.path.isfile(self.bldpath):
             try:

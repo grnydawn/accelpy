@@ -6,7 +6,7 @@ import numpy as np
 #  Orders
 ###################
 
-orders = {
+specs = {
     "vecadd1d": """
 
 set_argnames("x", "y", "z")
@@ -31,8 +31,7 @@ cpp_enable = True
         c(id) = a(id) + b(id)
     END DO
 
-[hip: kernel="hip_kernel"]
-
+[hip: kernel="kernel"]
 
     hipMalloc((void **)&DPTR(x), SIZE(x) * sizeof(TYPE(x)));
     hipMemcpyHtoD(DVAR(x), VAR(x), SIZE(x) * sizeof(TYPE(x)));
@@ -50,17 +49,7 @@ cpp_enable = True
     hipFree(DPTR(y));
     hipFree(DPTR(z));
 
-
-[hip_kernel]
-
-    __global__ void accelpy_kernel(ARG(x), ARG(y), ARG(z)){
-
-        int id = blockIdx.x * blockDim.x + threadIdx.x;
-        if(id < SHAPE(x, 0)) z[id] = x[id] + y[id];
-
-    }
-
-[cuda: kernel="cuda_kernel"]
+[cuda: kernel="kernel"]
 
     cudaMalloc((void **)&DPTR(x), SIZE(x) * sizeof(TYPE(x)));
     cudaMemcpy(DVAR(x), VAR(x), SIZE(x) * sizeof(TYPE(x)), cudaMemcpyHostToDevice);
@@ -79,16 +68,13 @@ cpp_enable = True
     cudaFree(DPTR(z));
 
 
-[cuda_kernel]
+[kernel]
 
     __global__ void accelpy_kernel(ARG(x), ARG(y), ARG(z)){
 
         int id = blockIdx.x * blockDim.x + threadIdx.x;
         if(id < SHAPE(x, 0)) z[id] = x[id] + y[id];
-
     }
-
-
 
 [openacc_cpp]
     int length = shape_x[0];
@@ -143,9 +129,9 @@ cpp_enable = True
 set_argnames("x", "y", "z")
 
 [cpp]
-    for (int i = 0; i < shape_x[0]; i++) {
-        for (int j = 0; j < shape_x[1]; j++) {
-            for (int k = 0; k < shape_x[2]; k++) {
+    for (int i = 0; i < SHAPE(x, 0); i++) {
+        for (int j = 0; j < SHAPE(x, 1); j++) {
+            for (int k = 0; k < SHAPE(x,2); k++) {
                 z[i][j][k] = x[i][j][k] + y[i][j][k];
             }
         }
@@ -162,20 +148,60 @@ set_argnames("x", "y", "z")
         END DO
     END DO
 
-[hip, cuda]
+[hip: kernel="kernel"]
 
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-    int k = blockIdx.z * blockDim.z + threadIdx.z;
+    hipMalloc((void **)&DPTR(x), SIZE(x) * sizeof(TYPE(x)));
+    hipMemcpyHtoD(DVAR(x), VAR(x), SIZE(x) * sizeof(TYPE(x)));
 
-    if (i < x.shape[0] && j < x.shape[1] && k < x.shape[2])
-        z(i, j, k) = x(i, j, k) + y(i, j, k);
+    hipMalloc((void **)&DPTR(y), SIZE(y) * sizeof(TYPE(y)));
+    hipMemcpyHtoD(DVAR(y), VAR(y), SIZE(y) * sizeof(TYPE(y)));
 
+    hipMalloc((void **)&DPTR(z), SIZE(z) * sizeof(TYPE(z)));
+
+    const dim3 workers = dim3(SHAPE(x,0), SHAPE(x,1), SHAPE(x,2));
+    accelpy_kernel<<<1, workers >>>(DVAR(x), DVAR(y), DVAR(z));
+
+    hipMemcpyDtoH(VAR(z), DVAR(z), SIZE(z) * sizeof(TYPE(z)));
+
+    hipFree(DPTR(x));
+    hipFree(DPTR(y));
+    hipFree(DPTR(z));
+
+[cuda: kernel="kernel"]
+
+    cudaMalloc((void **)&DPTR(x), SIZE(x) * sizeof(TYPE(x)));
+    cudaMemcpy(DVAR(x), VAR(x), SIZE(x) * sizeof(TYPE(x)), cudaMemcpyHostToDevice);
+
+    cudaMalloc((void **)&DPTR(y), SIZE(y) * sizeof(TYPE(y)));
+    cudaMemcpy(DVAR(y), VAR(y), SIZE(y) * sizeof(TYPE(y)), cudaMemcpyHostToDevice);
+
+    cudaMalloc((void **)&DPTR(z), SIZE(z) * sizeof(TYPE(z)));
+
+    const dim3 workers = dim3(SHAPE(x,0), SHAPE(x,1), SHAPE(x,2));
+    accelpy_kernel<<<1, workers >>>(DVAR(x), DVAR(y), DVAR(z));
+
+    cudaMemcpy(VAR(z), DVAR(z), SIZE(z) * sizeof(TYPE(z)), cudaMemcpyDeviceToHost);
+
+    cudaFree(DPTR(x));
+    cudaFree(DPTR(y));
+    cudaFree(DPTR(z));
+
+[kernel]
+
+    __global__ void accelpy_kernel(ARG(x), ARG(y), ARG(z)){
+
+        int i = blockIdx.x * blockDim.x + threadIdx.x;
+        int j = blockIdx.y * blockDim.y + threadIdx.y;
+        int k = blockIdx.z * blockDim.z + threadIdx.z;
+
+        if (i < SHAPE(x, 0) && j < SHAPE(x, 1) && k < SHAPE(x, 2))
+            z[i][j][k] = x[i][j][k] + y[i][j][k];
+    }
 [openacc_cpp]
 
-    int len0 = shape_x[0];
-    int len1 = shape_x[1];
-    int len2 = shape_x[2];
+    int len0 = SHAPE(x, 0);
+    int len1 = SHAPE(x, 1);
+    int len2 = SHAPE(x, 2);
 
     #pragma acc data copyin(x[0:len0][0:len1][0:len2], y[0:len0][0:len1][0:len2]) copyout(z[0:len0][0:len1][0:len2])
     {
@@ -221,9 +247,9 @@ set_argnames("x", "y", "z")
 
 [openmp_cpp]
     #pragma omp for
-    for (int i = 0; i < shape_x[0]; i++) {
-        for (int j = 0; j < shape_x[1]; j++) {
-            for (int k = 0; k < shape_x[2]; k++) {
+    for (int i = 0; i < SHAPE(x, 0); i++) {
+        for (int j = 0; j < SHAPE(x, 1); j++) {
+            for (int k = 0; k < SHAPE(x, 2); k++) {
                 z[i][j][k] = x[i][j][k] + y[i][j][k];
             }
         }
@@ -257,10 +283,10 @@ set_argnames("X", "Y", "Z")
 
 [cpp]
 
-    for (int i = 0; i < shape_X[0]; i++) {
-        for (int j = 0; j < shape_Y[1]; j++) {
+    for (int i = 0; i < SHAPE(X, 0); i++) {
+        for (int j = 0; j < SHAPE(Y, 1); j++) {
             Z[i][j] = 0.0;
-            for (int k = 0; k < shape_Y[0]; k++) {
+            for (int k = 0; k < SHAPE(Y, 0); k++) {
                 Z[i][j] = Z[i][j] + X[i][k] * Y[k][j];
             }
         }
@@ -278,26 +304,67 @@ set_argnames("X", "Y", "Z")
         END DO
     END DO
 
-[hip, cuda]
+[cuda: kernel="kernel"]
 
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    cudaMalloc((void **)&DPTR(X), SIZE(X) * sizeof(TYPE(X)));
+    cudaMemcpy(DVAR(X), VAR(X), SIZE(X) * sizeof(TYPE(X)), cudaMemcpyHostToDevice);
 
-    if (i < X.shape[0] && j < Y.shape[1]) {
-        Z(i, j) = 0.0;
-        for (int k = 0; k < Y.shape[0]; k++) {
-            Z(i, j) += X(i, k) * Y(k, j);
+    cudaMalloc((void **)&DPTR(Y), SIZE(Y) * sizeof(TYPE(Y)));
+    cudaMemcpy(DVAR(Y), VAR(Y), SIZE(Y) * sizeof(TYPE(Y)), cudaMemcpyHostToDevice);
+
+    cudaMalloc((void **)&DPTR(Z), SIZE(Z) * sizeof(TYPE(Z)));
+
+    const dim3 workers = dim3(SHAPE(X,0), SHAPE(Y,1));
+    accelpy_kernel<<<1, workers >>>(DVAR(X), DVAR(Y), DVAR(Z));
+
+    cudaMemcpy(VAR(Z), DVAR(Z), SIZE(Z) * sizeof(TYPE(Z)), cudaMemcpyDeviceToHost);
+
+    cudaFree(DPTR(Y));
+    cudaFree(DPTR(Y));
+    cudaFree(DPTR(Z));
+
+[hip: kernel="kernel"]
+
+    hipMalloc((void **)&DPTR(X), SIZE(X) * sizeof(TYPE(X)));
+    hipMemcpyHtoD(DVAR(X), VAR(X), SIZE(X) * sizeof(TYPE(X)));
+
+    hipMalloc((void **)&DPTR(Y), SIZE(Y) * sizeof(TYPE(Y)));
+    hipMemcpyHtoD(DVAR(Y), VAR(Y), SIZE(Y) * sizeof(TYPE(Y)));
+
+    hipMalloc((void **)&DPTR(Z), SIZE(Z) * sizeof(TYPE(Z)));
+
+    const dim3 workers = dim3(SHAPE(X,0), SHAPE(Y,1));
+    accelpy_kernel<<<1, workers >>>(DVAR(X), DVAR(Y), DVAR(Z));
+
+    hipMemcpyDtoH(VAR(Z), DVAR(Z), SIZE(Z) * sizeof(TYPE(Z)));
+
+    hipFree(DPTR(Y));
+    hipFree(DPTR(Y));
+    hipFree(DPTR(Z));
+
+[kernel]
+
+    __global__ void accelpy_kernel(ARG(X), ARG(Y), ARG(Z)){
+
+        int i = blockIdx.x * blockDim.x + threadIdx.x;
+        int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+        if (i < SHAPE(X, 0) && j < SHAPE(Y, 1)) {
+            Z[i][j] = 0.0;
+            for (int k = 0; k < SHAPE(Y, 0); k++) {
+                Z[i][j] += X[i][k] * Y[k][j];
+            }
         }
     }
 
 [openacc_cpp]
 
-    int x0 = shape_X[0];
-    int x1 = shape_X[1];
-    int y0 = shape_Y[0];
-    int y1 = shape_Y[1];
-    int z0 = shape_Z[0];
-    int z1 = shape_Z[1];
+    int x0 = SHAPE(X, 0);
+    int x1 = SHAPE(X, 1);
+    int y0 = SHAPE(Y, 0);
+    int y1 = SHAPE(Y, 1);
+    int z0 = SHAPE(Z, 0);
+    int z1 = SHAPE(Z, 1);
 
     #pragma acc data copyin(X[0:x0][0:x1], Y[0:y0][0:y1]) copyout(Z[0:z0][0:z1])
     {
@@ -350,10 +417,10 @@ set_argnames("X", "Y", "Z")
 [openmp_cpp]
 
     #pragma omp for
-    for (int i = 0; i < shape_X[0]; i++) {
-        for (int j = 0; j < shape_Y[1]; j++) {
+    for (int i = 0; i < SHAPE(X, 0); i++) {
+        for (int j = 0; j < SHAPE(Y, 1); j++) {
             Z[i][j] = 0.0;
-            for (int k = 0; k < shape_Y[0]; k++) {
+            for (int k = 0; k < SHAPE(Y, 0); k++) {
                 Z[i][j] = Z[i][j] + X[i][k] * Y[k][j];
             }
         }
@@ -443,7 +510,7 @@ def check_result(testname, data):
 ###################
 
 def get_testdata(testname, lang):
-    return _gendata(testname, lang), orders[testname]
+    return _gendata(testname, lang), specs[testname]
 
 
 def assert_testdata(testname, data):
