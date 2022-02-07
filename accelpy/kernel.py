@@ -221,8 +221,7 @@ class KernelBase(Object):
             cachekey = ckey + "_" + comp.vendor
 
             if not reload and cachekey in cache.sharedlib:
-                lang, basename, libext, libdir, bldpath = cache.sharedlib[cachekey]
-                libpath = os.path.join(libdir, basename+"."+libext)
+                lang, basename, libext, libpath, bldpath = cache.sharedlib[cachekey]
                 self.cachekey = cachekey
 
                 return lang, libpath, bldpath
@@ -239,6 +238,12 @@ class KernelBase(Object):
             basename = cachekey[2:]
             libname = basename + "." + comp.libext
             libpath = os.path.join(libdir, libname)
+
+            if not reload and os.path.isfile(libpath):
+                self.cachekey = cachekey
+                cache.sharedlib[self.cachekey] = (comp.lang, basename, comp.libext,
+                                                    libpath, None)
+                return comp.lang, libpath, None
 
             try:
                 codes, macros = self.gen_code(comp)
