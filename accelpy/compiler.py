@@ -253,12 +253,12 @@ class GnuCppCompiler(CppCompiler):
         items = stdout.split()
         
         if sys.platform == "darwin":
-            if items[:3] == [b'Apple', b'clang', b'version']:
+            if items[:2] == [b'Apple', b'clang']:
                 return items[3].decode().split(".")
             raise Exception("Unknown version syntaxt: %s" % str(items[:3]))
 
         elif sys.platform == "linux":
-            if items[:2] == [b'g++', b'(GCC)']:
+            if items[0] == b'g++':
                 return items[2].decode().split(".")
             raise Exception("Unknown version syntaxt: %s" % str(items[:2]))
 
@@ -300,7 +300,7 @@ class GnuFortranCompiler(FortranCompiler):
         items = stdout.split()
         
         if sys.platform in ("darwin", "linux"):
-            if items[:2] == [b'GNU', b'Fortran']:
+            if items[0] == b'GNU':
                 return items[3].decode().split(".")
             raise Exception("Unknown compiler version syntax: %s" % str(items[:3]))
 
@@ -384,7 +384,7 @@ class CrayClangCppCompiler(CppCompiler):
         items = stdout.split()
 
         if sys.platform == "linux":
-            if items[:3] == [b'Cray', b'clang', b'version']:
+            if items[:2] == [b'Cray', b'clang']:
                 return items[3].decode().split(".")
             raise Exception("Unknown version syntaxt: %s" % str(items[:3]))
 
@@ -443,7 +443,7 @@ class CrayFortranCompiler(FortranCompiler):
         items = stdout.split()
         
         if sys.platform == "linux":
-            if items[:4] == [b'Cray', b'Fortran', b':', b'Version']:
+            if items[:2] == [b'Cray', b'Fortran']:
                 return items[4].decode().split(".")
             raise Exception("Unknown compiler version syntax: %s" % str(items[:4]))
 
@@ -501,7 +501,7 @@ class AmdClangCppCompiler(CppCompiler):
         items = stdout.split()
 
         if sys.platform == "linux":
-            if items[:3] == [b'AMD', b'clang', b'version']:
+            if items[:2] == [b'AMD', b'clang']:
                 return items[2].decode().split(".")
             raise Exception("Unknown version syntaxt: %s" % str(items[:2]))
 
@@ -550,7 +550,7 @@ class AmdFlangFortranCompiler(FortranCompiler):
         items = stdout.split()
         
         if sys.platform == "linux":
-            if items[:3] == [b'AMD', b'flang-new', b'version']:
+            if items[:2] == [b'AMD', b'flang-new']:
                 return items[2].decode().split(".")
             raise Exception("Unknown compiler version syntax: %s" % str(items[:2]))
 
@@ -600,7 +600,7 @@ class AmdHipCppCompiler(HipCppCompiler):
         items = stdout.split()
 
         if sys.platform == "linux":
-            if items[:2] == [b'HIP', b'version:']:
+            if items[0] == b'HIP':
                 return items[2].decode().split(".")
             raise Exception("Unknown version syntaxt: %s" % str(items[:2]))
 
@@ -644,7 +644,7 @@ class IbmXlCppCompiler(CppCompiler):
         items = stdout.split()
 
         if sys.platform == "linux":
-            if items[:3] == [b'IBM', b'XL', b'C/C++']:
+            if items[:2] == [b'IBM', b'XL']:
                 return items[5].decode().split(".")
             raise Exception("Unknown version syntaxt: %s" % str(items[:3]))
 
@@ -714,7 +714,7 @@ class IbmXlFortranCompiler(FortranCompiler):
         items = stdout.split()
         
         if sys.platform == "linux":
-            if items[:3] == [b'IBM', b'XL', b'Fortran']:
+            if items[:2] == [b'IBM', b'XL']:
                 return items[5].decode().split(".")
             raise Exception("Unknown compiler version syntax: %s" % str(items[:3]))
 
@@ -768,7 +768,7 @@ class NvidiaCudaCppCompiler(CudaCppCompiler):
         items = stdout.split()
 
         if sys.platform == "linux":
-            if items[:2] == [b'nvcc:', b'NVIDIA']:
+            if items[0] == b'nvcc:':
                 idx = items.index(b'Build')
                 return items[idx+1].decode().split("_")
             raise Exception("Unknown version syntaxt: %s" % str(items[:2]))
@@ -929,7 +929,7 @@ class IntelCppCompiler(CppCompiler):
         items = stdout.strip().split()
 
         if sys.platform == "linux":
-            if items[:2] == [b'icpc', b'(ICC)']:
+            if items[0] == b'icpc':
                 return items[2].decode().split(".")
             raise Exception("Unknown version syntaxt: %s" % str(items[:1]))
 
@@ -974,7 +974,7 @@ class IntelFortranCompiler(FortranCompiler):
         items = stdout.strip().split()
 
         if sys.platform == "linux":
-            if items[:2] == [b'ifort', b'(IFORT)']:
+            if items[0] == b'ifort':
                 return items[2].decode().split(".")
             raise Exception("Unknown version syntaxt: %s" % str(items[:1]))
 
