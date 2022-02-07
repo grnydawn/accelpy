@@ -2,4 +2,4 @@
 
 from collections import OrderedDict
 
-sharedlib = OrderedDict()
+slib_cache = OrderedDict()

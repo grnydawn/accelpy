@@ -7,22 +7,33 @@ from ctypes import c_int64
 from numpy.ctypeslib import ndpointer, load_library
 from collections import OrderedDict
 
-from accelpy.const import version
+from accelpy.const import (version, NOCACHE, MEMCACHE, FILECACHE, NODEBUG,
+                            MINDEBUG, MAXDEBUG, NOPROF, MINPROF, MAXPROF)
 from accelpy.util import Object, gethash, get_config, set_config
 from accelpy.spec import Spec
 from accelpy.compiler import Compiler
-from accelpy import cache
+from accelpy.cache import slib_cache
 
 
 class Task(Object):
 
-    def __init__(self, lang, libpath, bldpath):
+    def __init__(self, liblang, libpath, bldpath):
 
-        self.lib = None
-        self.lang = lang
+        self.liblang = liblang
         self.libpath = libpath
         self.bldpath = bldpath
         self.synched = False
+
+#    def __enter__(self, *data, specenv={}, timeout=None):
+#        self.timeout = timeout
+#        self.launch(*data, specenv=specenv)
+#
+#        return self
+#
+#    def __exit__(self, *exc):
+#        self.wait(timeout = self.timeout)
+#
+#        return False
 
     def run(self, data, getname):
 
@@ -33,18 +44,18 @@ class Task(Object):
 
     def varmap(self, arg, funcname):
 
-        if self.lang == "cpp":
+        if self.liblang[1] == "cpp":
             flags = ["c_contiguous"]
 
-        elif self.lang == "fortran":
+        elif self.liblang[1] == "fortran":
             flags = ["f_contiguous"]
 
         else:
-            raise Exception("Unknown language: %s" % lang)
+            raise Exception("Unknown language: %s" % self.liblang[1])
 
         # TODO consider to use "numpy.ascontiguousarray"
 
-        datamap = getattr(self.lib, funcname)
+        datamap = getattr(self.liblang[0], funcname)
         datamap.restype = c_int64
         datamap.argtypes = [ndpointer(arg["data"].dtype, flags=",".join(flags))]
 
@@ -54,25 +65,32 @@ class Task(Object):
 
     def _start_kernel(self, data, getname):
 
-        if self.libpath is not None and os.path.isfile(self.libpath):
-            try:
-                libdir, libname = os.path.split(self.libpath)
-                basename, _ = os.path.splitext(libname)
+        if self.liblang[0] is None:
 
-                self.lib = load_library(basename, libdir)
-            except:
-                pass
+            if self.libpath is not None and os.path.isfile(self.libpath):
+                try:
+                    libdir, libname = os.path.split(self.libpath)
+                    basename, _ = os.path.splitext(libname)
 
-        if self.lib is None and self.bldpath is not None and os.path.isfile(self.bldpath):
-            blddir, bldname = os.path.split(self.bldpath)
-            basename, _ = os.path.splitext(bldname)
+                    lib = load_library(basename, libdir)
+                except:
+                    pass
 
-            self.lib = load_library(basename, blddir)
+            if (self.liblang[0] is None and self.bldpath is not None and
+                    os.path.isfile(self.bldpath)):
+                blddir, bldname = os.path.split(self.bldpath)
+                basename, _ = os.path.splitext(bldname)
+
+                lib = load_library(basename, blddir)
+
+        if self.liblang[0] is None and lib is not None:
+            with threading.Lock():
+                self.liblang[0] = lib
 
         for arg in data:
             self.varmap(arg, getname(arg))
 
-        start = getattr(self.lib, "accelpy_start")
+        start = getattr(self.liblang[0], "accelpy_start")
         start.restype = c_int64
         start.argtypes = []
 
@@ -91,7 +109,8 @@ class Task(Object):
         if self.thread.is_alive():
             self.thread.join(timeout=timeout)
 
-        if not os.path.isfile(self.libpath) and os.path.isfile(self.bldpath):
+        if (self.libpath and self.bldpath and not os.path.isfile(self.libpath)
+            and os.path.isfile(self.bldpath)):
             try:
                 shutil.copyfile(self.bldpath, self.libpath)
 
@@ -105,7 +124,7 @@ class Task(Object):
         if not self.synched:
             self.wait(timeout=timeout)
 
-        accstop = getattr(self.lib, "accelpy_stop")
+        accstop = getattr(self.liblang[0], "accelpy_stop")
         accstop.restype = c_int64
         accstop.argtypes = []
 
@@ -118,20 +137,22 @@ class KernelBase(Object):
 
     avails = OrderedDict()
 
-    def __init__(self, spec, compile=None, debug=False):
+    def __init__(self, spec, compile=None, cache=MEMCACHE, profile=NOPROF, debug=NODEBUG):
 
+        self.cache = cache
+        self.profile = profile
         self.debug = debug
         self.spec = spec
         self.compile = compile
         self.cachekey = None
-        self.lib = None
+        self.liblang = [None, None]
 
         if self.spec is None:
             raise Exception("No kernel spec is found")
 
         self.tasks = []
 
-    def launch(self, *data, specenv={}, reload=False):
+    def launch(self, *data, specenv={}):
 
         self.spec.eval_pysection(specenv)
         self.section = self.spec.get_section(self.name)
@@ -147,9 +168,15 @@ class KernelBase(Object):
             keys.append(item["data"].shape)
             keys.append(item["data"].dtype)
 
-        lang, libpath, bldpath = self.build_sharedlib(gethash(str(keys)), reload)
+        if self.liblang[0] is None or self.cache < MEMCACHE:
+            lang, libpath, bldpath = self.build_sharedlib(gethash(str(keys)))
+            self.liblang[0] = None
+            self.liblang[1] = lang
+            task = Task(self.liblang, libpath, bldpath)
 
-        task = Task(lang, libpath, bldpath)
+        else:
+            task = Task(self.liblang, None, None)
+
         task.run(self.data, self.getname_varmap)
 
         self.tasks.append(task)
@@ -210,7 +237,7 @@ class KernelBase(Object):
 
         return incs
 
-    def build_sharedlib(self, ckey, reload):
+    def build_sharedlib(self, ckey):
 
         errmsgs = []
 
@@ -220,8 +247,8 @@ class KernelBase(Object):
 
             cachekey = ckey + "_" + comp.vendor
 
-            if not reload and cachekey in cache.sharedlib:
-                lang, basename, libext, libpath, bldpath = cache.sharedlib[cachekey]
+            if self.cache >= FILECACHE and cachekey in slib_cache:
+                lang, basename, libext, libpath, bldpath = slib_cache[cachekey]
                 self.cachekey = cachekey
 
                 return lang, libpath, bldpath
@@ -239,9 +266,9 @@ class KernelBase(Object):
             libname = basename + "." + comp.libext
             libpath = os.path.join(libdir, libname)
 
-            if not reload and os.path.isfile(libpath):
+            if self.cache >= FILECACHE and os.path.isfile(libpath):
                 self.cachekey = cachekey
-                cache.sharedlib[self.cachekey] = (comp.lang, basename, comp.libext,
+                slib_cache[self.cachekey] = (comp.lang, basename, comp.libext,
                                                     libpath, None)
                 return comp.lang, libpath, None
 
@@ -253,7 +280,7 @@ class KernelBase(Object):
 
                 bldpath = comp.compile(codes, macros, self.debug)
 
-                cache.sharedlib[self.cachekey] = (comp.lang, basename, comp.libext,
+                slib_cache[self.cachekey] = (comp.lang, basename, comp.libext,
                                                     libdir, bldpath)
                 return comp.lang, libpath, bldpath
 
@@ -267,10 +294,11 @@ class KernelBase(Object):
         pass
 
 
-def Kernel(spec, accel=None, compile=None, debug=False):
+def Kernel(spec, accel=None, compile=None, cache=MEMCACHE, profile=0, debug=NODEBUG):
 
     if isinstance(accel, str):
-        return KernelBase.avails[accel](spec, compile=compile, debug=debug)
+        return KernelBase.avails[accel](spec, compile=compile, cache=cache,
+                                        profile=profile, debug=debug)
 
     elif accel is None or isinstance(accel, (list, tuple)):
 
@@ -281,7 +309,8 @@ def Kernel(spec, accel=None, compile=None, debug=False):
 
         for k in accel:
             try:
-                kernel = KernelBase.avails[k](spec, compile=compile, debug=debug)
+                kernel = KernelBase.avails[k](spec, compile=compile, cache=cache,
+                                                profile=profile, debug=debug)
                 return kernel
 
             except Exception as err:

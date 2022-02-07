@@ -88,7 +88,7 @@ class Compiler(Object):
             except FileExistsError:
                 pass
 
-        if debug:
+        if debug > 0:
             debugdir = "_accelpy_debug_"
 
             if not os.path.isdir(debugdir):
@@ -110,7 +110,7 @@ class Compiler(Object):
 
         if not os.path.isfile(outfile):
 
-            option = self.opt_debug + " " if debug else ""
+            option = self.opt_debug + " " if debug > 0 else ""
             option += self.opt_compile_only + " " + self.get_option()
 
             # PGI infoopt :  -Minfo=acc
