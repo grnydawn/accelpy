@@ -4,14 +4,23 @@ import os, json
 from setuptools import setup, find_packages
 from setuptools.command.develop import develop
 from setuptools.command.install import install
+from distutils.errors import DistutilsClassError
+
+bdist_wheel = None
+
+try:
+    import wheel.bdist_wheel
+    class bdist_wheel(wheel.bdist_wheel.bdist_wheel):
+        def run(self, *args, **kwargs):
+            raise DistutilsClassError("No!")
+except ModuleNotFoundError:
+    pass
 
 genv = {'__builtins__' : None}
 consts = {}
 
 with open(os.path.join("accelpy", "const.py")) as fp:
     exec(fp.read(), genv, consts)
-
-print(consts)
 
 def _setcfg():
 
@@ -79,6 +88,7 @@ def main():
         cmdclass={
             'develop': DevelopCommand,
             'install': InstallCommand,
+            'bdist_wheel': bdist_wheel
         },
         keywords=keywords,
         packages=find_packages(exclude=["tests"]),
