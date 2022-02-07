@@ -65,8 +65,9 @@ class Task(Object):
 
     def _start_kernel(self, data, getname):
 
-        if self.liblang[0] is None:
+        lib = None
 
+        if self.liblang[0] is None:
             if self.libpath is not None and os.path.isfile(self.libpath):
                 try:
                     libdir, libname = os.path.split(self.libpath)
@@ -76,14 +77,14 @@ class Task(Object):
                 except:
                     pass
 
-            if (self.liblang[0] is None and self.bldpath is not None and
+            if (lib is None and self.bldpath is not None and
                     os.path.isfile(self.bldpath)):
                 blddir, bldname = os.path.split(self.bldpath)
                 basename, _ = os.path.splitext(bldname)
 
                 lib = load_library(basename, blddir)
 
-        if self.liblang[0] is None and lib is not None:
+        if lib is not None:
             with threading.Lock():
                 self.liblang[0] = lib
 
