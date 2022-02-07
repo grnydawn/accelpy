@@ -3,7 +3,7 @@
 from accelpy.compiler import Compiler
 
 excepts = {
-    "cray": ["fortran", "openacc_fortran"],
+    "cray": ["openacc_fortran", "openmp_fortran"],
 }
 
 testable = []

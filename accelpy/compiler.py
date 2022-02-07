@@ -80,12 +80,6 @@ class Compiler(Object):
         codepath = os.path.join(blddir, filename)
         outfile = os.path.join(blddir, name + "." + ext)
 
-        fortmod = os.path.join(blddir, "accelpy_global.mod")
-        if code.lstrip().startswith("MODULE accelpy_global") and os.path.isfile(fortmod):
-            os.remove(fortmod)
-            if os.path.isfile(outfile):
-                os.remove(outfile)
-
         if not os.path.isfile(codepath):
             try:
                 with open(codepath, "w") as f:

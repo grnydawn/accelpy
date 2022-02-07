@@ -1,5 +1,6 @@
 """accelpy Fortran Accelerator module"""
 
+from uuid import uuid4
 from accelpy.kernel import KernelBase
 from accelpy.util import fortline_pack
 from ctypes import c_int32, c_int64, c_float, c_double
@@ -10,7 +11,7 @@ from ctypes import c_int32, c_int64, c_float, c_double
 ##########################
 
 t_module = """
-MODULE accelpy_global
+MODULE {modname}
     USE, INTRINSIC :: ISO_C_BINDING
     IMPLICIT NONE
 
@@ -27,7 +28,7 @@ t_main = """
 INTEGER (C_INT64_T) FUNCTION accelpy_start() BIND(C, name="accelpy_start")
 
     USE, INTRINSIC :: ISO_C_BINDING
-    USE accelpy_global, ONLY : {usevarnames}
+    USE {modname}, ONLY : {usevarnames}
     IMPLICIT NONE
 
     accelpy_start = accelpy_kernel({usevarnames})
@@ -40,7 +41,7 @@ END FUNCTION
 
 INTEGER (C_INT64_T) FUNCTION accelpy_stop() BIND(C, name="accelpy_stop")
     USE, INTRINSIC :: ISO_C_BINDING
-    USE accelpy_global, ONLY : {usevarnames}
+    USE {modname}, ONLY : {usevarnames}
     IMPLICIT NONE
 
     accelpy_stop = 0
@@ -65,7 +66,7 @@ END FUNCTION
 t_varmap = """
 INTEGER (C_INT64_T) FUNCTION {funcname} (data) BIND(C, name="{funcname}")
     USE, INTRINSIC :: ISO_C_BINDING
-    USE accelpy_global, ONLY : {varname}
+    USE {modname}, ONLY : {varname}
     IMPLICIT NONE
 
     {dtype}, DIMENSION({bound}), INTENT(IN), TARGET :: data
@@ -80,7 +81,7 @@ END FUNCTION
 t_varmap_scalar = """
 INTEGER (C_INT64_T) FUNCTION {funcname} (data) BIND(C, name="{funcname}")
     USE, INTRINSIC :: ISO_C_BINDING
-    USE accelpy_global, ONLY : {varname}
+    USE {modname}, ONLY : {varname}
     IMPLICIT NONE
 
     {dtype}, DIMENSION(1), INTENT(IN) :: data
@@ -109,13 +110,17 @@ class FortranKernel(KernelBase):
         macros = {}
         includes = self.add_includes()
 
+        modname  = "mod_" + uuid4().hex[:10]
+
         module_fmt = {
+            "modname": modname,
             "datavars": self._get_datavars(),
         }
         module = t_module.format(**module_fmt)
 
         main_fmt = {
-            "varmap":self._gen_varmap(),
+            "modname":modname,
+            "varmap":self._gen_varmap(modname),
             "kernel":self._gen_kernel(),
             "usevarnames":self._gen_usevars(),
             "include":self.get_include(),
@@ -149,7 +154,7 @@ class FortranKernel(KernelBase):
 
         return "\n".join(out)
 
-    def _gen_varmap(self):
+    def _gen_varmap(self, modname):
 
         out = []
 
@@ -161,9 +166,9 @@ class FortranKernel(KernelBase):
             if ndim > 0:
                 bound = ",".join([str(s) for s in arg["data"].shape])
                 out.append(t_varmap.format(funcname=funcname, varname=arg["curname"],
-                            bound=bound, dtype=dtype))
+                            modname=modname, bound=bound, dtype=dtype))
             else:
-                out.append(t_varmap_scalar.format(funcname=funcname,
+                out.append(t_varmap_scalar.format(funcname=funcname, modname=modname,
                             varname=arg["curname"], dtype=dtype))
 
         return "\n".join(out)
