@@ -153,9 +153,9 @@ class KernelBase(Object):
 
         self.tasks = []
 
-    def launch(self, *data, specenv={}):
+    def launch(self, *data, environ={}):
 
-        self.spec.eval_pysection(specenv)
+        self.spec.eval_pysection(environ)
         self.section = self.spec.get_section(self.name)
 
         self.data = self._pack_arguments(data)
