@@ -2,8 +2,8 @@
 
 import abc, os, tempfile
 
-from ctypes import CDLL, RTLD_GLOBAL
-from numpy.ctypeslib import ndpointer, load_library
+from ctypes import CDLL
+from numpy.ctypeslib import ndpointer
 from collections import OrderedDict
 from accelpy.const import (version, NOCACHE, MEMCACHE, FILECACHE, NODEBUG,
                             MINDEBUG, MAXDEBUG, NOPROF, MINPROF, MAXPROF)
@@ -18,8 +18,7 @@ class AccelDataBase(Object):
 
     # get map info, build & load slib, run mapping, hand over slib to kernels
     def __init__(self, *kernels, mapto=[], maptofrom=[], mapfrom=[],
-                    mapalloc=[], maprelease=[], mapdelete=[], cache=MEMCACHE,
-                    profile=NOPROF, debug=NODEBUG):
+                    mapalloc=[], cache=MEMCACHE, profile=NOPROF, debug=NODEBUG):
 
         for kernel in kernels:
             if kernel.name != kernels[0].name:
@@ -43,15 +42,12 @@ class AccelDataBase(Object):
         self.maptofrom  = pack_arguments(maptofrom)
         self.mapfrom    = pack_arguments(mapfrom)
         self.mapalloc  = pack_arguments(mapalloc)
-        self.maprelease  = pack_arguments(maprelease)
-        self.mapdelete  = pack_arguments(mapdelete)
 
         keys = [os.uname().release, version, self.kernels[0].name,
                 self.kernels[0].compile]
 
-        for maptype, data in zip(("to", "tofrom", "from", "alloc", "release",
-                "delete"), (self.mapto, self.maptofrom, self.mapfrom,
-                self.mapalloc, self.maprelease, self.mapdelete)):
+        for maptype, data in zip(("to", "tofrom", "from", "alloc"),
+                (self.mapto, self.maptofrom, self.mapfrom, self.mapalloc)):
 
             keys.append(maptype)
 
@@ -71,21 +67,21 @@ class AccelDataBase(Object):
         if self.liblang[0] is None:
             if self.libpath is not None and os.path.isfile(self.libpath):
                 try:
-                    libdir, libname = os.path.split(self.libpath)
-                    basename, _ = os.path.splitext(libname)
+                    #libdir, libname = os.path.split(self.libpath)
+                    #basename, _ = os.path.splitext(libname)
 
-                    lib = CDLL(self.libpath, mode=RTLD_GLOBAL)
-                    #lib = load_library(basename, libdir)
+                    #lib = CDLL(self.libpath, mode=RTLD_GLOBAL)
+                    lib = CDLL(self.libpath)
                 except:
                     pass
 
             if (lib is None and self.bldpath is not None and
                     os.path.isfile(self.bldpath)):
-                blddir, bldname = os.path.split(self.bldpath)
-                basename, _ = os.path.splitext(bldname)
+                #blddir, bldname = os.path.split(self.bldpath)
+                #basename, _ = os.path.splitext(bldname)
 
-                lib = CDLL(self.bldpath, mode=RTLD_GLOBAL)
-                #lib = load_library(basename, blddir)
+                #lib = CDLL(self.bldpath, mode=RTLD_GLOBAL)
+                lib = CDLL(self.bldpath)
 
         if lib is not None:
             self.liblang[0] = lib
@@ -183,7 +179,7 @@ class AccelDataBase(Object):
             kernel.wait(timeout=timeout)
 
         argtypes = []
-        argitems = self.mapfrom+self.maprelease+self.mapdelete
+        argitems = self.mapfrom
 
         for item in argitems:
 
@@ -211,7 +207,6 @@ class AccelDataBase(Object):
             kernel.stop(timeout=timeout)
 
 
-#alloc, to, from, tofrom, release, delete
 def AccelData(*kernels, accel=None, mapto=[], maptofrom=[], mapfrom=[],
                 mapalloc=[], cache=MEMCACHE, profile=NOPROF, debug=NODEBUG):
 

@@ -341,7 +341,6 @@ class OmptargetFortranAccelData(FortranAccelData):
 
             enterargs.append(lname)
             mapto.append(gname)
-            #bound = ",".join([":"]*ndim)
             bound = ",".join([str(s) for s in item["data"].shape])
             entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
                             dtype, bound, lname))
@@ -363,11 +362,12 @@ class OmptargetFortranAccelData(FortranAccelData):
 
             enterargs.append(lname)
             maptofrom.append(gname)
-            bound = ",".join([":"]*ndim)
+            bound = ",".join([str(s) for s in item["data"].shape])
             entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
                             dtype, bound, lname))
 
             modpublics.append(gname)
+            bound = ",".join([":"]*ndim)
             modvardecls.append("%s, DIMENSION(%s), POINTER :: %s" % (
                             dtype, bound, gname))
 
@@ -383,11 +383,12 @@ class OmptargetFortranAccelData(FortranAccelData):
 
             enterargs.append(lname)
             mapalloc.append(gname)
-            bound = ",".join([":"]*ndim)
+            bound = ",".join([str(s) for s in item["data"].shape])
             entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
                             dtype, bound, lname))
 
             modpublics.append(gname)
+            bound = ",".join([":"]*ndim)
             modvardecls.append("%s, DIMENSION(%s), POINTER :: %s" % (
                             dtype, bound, gname))
 
@@ -402,7 +403,6 @@ class OmptargetFortranAccelData(FortranAccelData):
             enterargs.append(lname)
             exitfrom.append(gname)
             mapalloc.append(gname)
-            #bound = ",".join([":"]*ndim)
             bound = ",".join([str(s) for s in item["data"].shape])
             entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
                             dtype, bound, lname))
