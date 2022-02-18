@@ -356,8 +356,10 @@ class FortranOpenAccelData(FortranAccelData):
         for item in self.mapto:
             ndim = item["data"].ndim
             dtype = self.get_dtype(item)
-            lname = "l" + str(item["id"])
-            gname = "g" + str(item["id"])
+            lname = "apy_acceldata_lvar_" + str(item["index"])
+            gname = "apy_acceldata_gvar_" + str(item["index"])
+
+            item["modname"] = gname
 
             enterargs.append(lname)
             mapto.append(gname)
@@ -375,8 +377,10 @@ class FortranOpenAccelData(FortranAccelData):
         for item in self.maptofrom:
             ndim = item["data"].ndim
             dtype = self.get_dtype(item)
-            lname = "l" + str(item["id"])
-            gname = "g" + str(item["id"])
+            lname = "apy_acceldata_lvar_" + str(item["index"])
+            gname = "apy_acceldata_gvar_" + str(item["index"])
+
+            item["modname"] = gname
 
             enterargs.append(lname)
             maptofrom.append(gname)
@@ -394,8 +398,10 @@ class FortranOpenAccelData(FortranAccelData):
         for item in self.mapalloc:
             ndim = item["data"].ndim
             dtype = self.get_dtype(item)
-            lname = "l" + str(item["id"])
-            gname = "g" + str(item["id"])
+            lname = "l" + str(item["index"])
+            gname = "g" + str(item["index"])
+
+            item["modname"] = gname
 
             enterargs.append(lname)
             mapalloc.append(gname)
@@ -413,8 +419,10 @@ class FortranOpenAccelData(FortranAccelData):
         for item in self.mapfrom:
             ndim = item["data"].ndim
             dtype = self.get_dtype(item)
-            lname = "l" + str(item["id"])
-            gname = "g" + str(item["id"])
+            lname = "apy_acceldata_lvar_" + str(item["index"])
+            gname = "apy_acceldata_gvar_" + str(item["index"])
+
+            item["modname"] = gname
 
             enterargs.append(lname)
             mapfrom.append(gname)

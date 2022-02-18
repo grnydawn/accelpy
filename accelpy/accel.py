@@ -40,20 +40,25 @@ class AccelDataBase(Object):
 
         self.mapto      = pack_arguments(mapto)
         self.maptofrom  = pack_arguments(maptofrom)
-        self.mapfrom    = pack_arguments(mapfrom)
         self.mapalloc  = pack_arguments(mapalloc)
+        self.mapfrom    = pack_arguments(mapfrom)
 
         keys = [os.uname().release, version, self.kernels[0].name,
                 self.kernels[0].compile]
 
-        for maptype, data in zip(("to", "tofrom", "from", "alloc"),
-                (self.mapto, self.maptofrom, self.mapfrom, self.mapalloc)):
+        argindex = 0
+
+        for maptype, data in zip(("to", "tofrom", "alloc", "from"),
+                (self.mapto, self.maptofrom, self.mapalloc, self.mapfrom)):
 
             keys.append(maptype)
 
             for item in data:
                 keys.append(item["data"].shape)
                 keys.append(item["data"].dtype)
+
+                item["index"] = argindex
+                argindex += 1
 
         if self.liblang[0] is None or self.cache < MEMCACHE:
             lang, libpath, bldpath = self.build_sharedlib(gethash(str(keys)))
@@ -77,10 +82,10 @@ class AccelDataBase(Object):
 
         if lib is not None:
             self.liblang[0] = lib
-
-        self.mapto      = pack_arguments(mapto)
-        self.maptofrom  = pack_arguments(maptofrom)
-        self.mapalloc  = pack_arguments(mapalloc)
+#
+#        self.mapto      = pack_arguments(mapto)
+#        self.maptofrom  = pack_arguments(maptofrom)
+#        self.mapalloc  = pack_arguments(mapalloc)
 
         argtypes = []
         argitems = self.mapto+self.maptofrom+self.mapalloc+self.mapfrom

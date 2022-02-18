@@ -185,7 +185,7 @@ def pack_arguments(data):
         idarg = id(arg)
         narg = arg if isinstance(arg, numpy.ndarray) else  numpy.asarray(arg)
         res.append({"data": narg, "id": idarg, "curname": None, "orgdata": arg,
-                    "index": None})
+                    "index": None, "modname": None})
 
     return res
 
