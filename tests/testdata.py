@@ -399,7 +399,7 @@ set_argnames("X", "Y", "Z")
     zl2 = LBOUND(Z,2) 
     zu2 = UBOUND(Z,2) 
 
-    !$acc data copyin(X(xl1:xu1, xl2:xu2), Y(yl1:yu1, yl2:yu2)), copyout(Z(zl1:zu1, zl2:zu2))
+    !!$acc data copyin(X(xl1:xu1, xl2:xu2), Y(yl1:yu1, yl2:yu2)), copyout(Z(zl1:zu1, zl2:zu2))
     !$acc parallel num_gangs(xu1-xl1+1) num_workers(yu2-yl2+1)
     !$acc loop gang
     DO i=xl1, xu1
@@ -412,7 +412,7 @@ set_argnames("X", "Y", "Z")
         END DO
     END DO
     !$acc end parallel
-    !$acc end data
+    !!$acc end data
 
 [openmp_cpp]
 

@@ -439,9 +439,10 @@ class FortranOpenAccelData(FortranAccelData):
             enterassigns.append("%s => %s" % (gname, lname))
 
         entermaps = "%s %s %s" % (self.clause_mapto(mapto),
-                        self.clause_maptofrom(maptofrom),
+                        self.clause_maptofrom(maptofrom, True),
                         self.clause_mapalloc(mapalloc))
-        exitmaps = self.clause_mapfrom(mapfrom)
+        exitmaps = "%s %s" % (self.clause_maptofrom(maptofrom, False),
+                                self.clause_mapfrom(mapfrom))
 
         enterdir = self.enterdirect()
         exitdir = self.exitdirect()
@@ -471,22 +472,27 @@ class OpenaccFortranAccelData(FortranOpenAccelData):
     name = "openacc_fortran"
 
     def clause_mapto(self, mapto):
-        pass
+        return "copyin(%s)" % ", ".join(mapto) if mapto else ""
 
-    def clause_maptofrom(self, maptofrom):
-        pass
+    def clause_maptofrom(self, maptofrom, isenter):
+
+        if isenter:
+            return "copyin(%s)" % ", ".join(maptofrom) if maptofrom else ""
+
+        else:
+            return "copyout(%s)" % ", ".join(maptofrom) if maptofrom else ""
 
     def clause_mapalloc(self, mapalloc):
-        pass
+        return "create(%s)" % ", ".join(mapalloc) if mapalloc else ""
 
     def clause_mapfrom(self, mapfrom):
-        pass
+        return "copyout(%s)" % ", ".join(mapfrom) if mapfrom else ""
 
     def enterdirect(self):
-        pass
+        return "!$acc enter data"
 
     def exitdirect(self):
-        pass
+        return "!$acc exit data"
 
 class OmptargetFortranAccelData(FortranOpenAccelData):
     name = "omptarget_fortran"
@@ -494,8 +500,12 @@ class OmptargetFortranAccelData(FortranOpenAccelData):
     def clause_mapto(self, mapto):
         return "map(to: %s)" % ", ".join(mapto) if mapto else ""
 
-    def clause_maptofrom(self, maptofrom):
-        return "map(tofrom: %s)" % ", ".join(maptofrom) if maptofrom else ""
+    def clause_maptofrom(self, maptofrom, isenter):
+        if isenter:
+            return ("map(tofrom: %s)" % ", ".join(maptofrom)
+                    if maptofrom else "")
+        else:
+            return ""
 
     def clause_mapalloc(self, mapalloc):
         return "map(alloc: %s)" % ", ".join(mapalloc) if mapalloc else ""

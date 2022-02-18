@@ -212,10 +212,12 @@ def AccelData(*kernels, accel=None, mapto=[], maptofrom=[], mapfrom=[],
                     maptofrom=maptofrom, mapfrom=mapfrom, mapalloc=mapalloc,
                     cache=cache, profile=profile, debug=debug)
 
-    elif accel is None or isinstance(accel, (list, tuple)):
+    elif accel is None:
+        return AccelDataBase.avails[kernels[0].name](*kernels, mapto=mapto,
+                    maptofrom=maptofrom, mapfrom=mapfrom, mapalloc=mapalloc,
+                    cache=cache, profile=profile, debug=debug)
 
-        if accel is None:
-            accel = AccelDataBase.avails.keys()
+    elif isinstance(accel, (list, tuple)):
 
         errmsgs = []
 
