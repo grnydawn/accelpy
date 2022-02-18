@@ -183,14 +183,9 @@ def pack_arguments(data):
 
     for arg in data:
         idarg = id(arg)
-
-        if isinstance(arg, numpy.ndarray):
-            res.append({"data": arg, "id": idarg, "curname": None})
-
-        else:
-            newarg = numpy.asarray(arg)
-            res.append({"data": newarg, "id": idarg, "curname": None,
-                        "orgdata": arg})
+        narg = arg if isinstance(arg, numpy.ndarray) else  numpy.asarray(arg)
+        res.append({"data": narg, "id": idarg, "curname": None, "orgdata": arg,
+                    "index": None})
 
     return res
 

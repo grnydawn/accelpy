@@ -1,5 +1,7 @@
 """accelpy Fortran Accelerator module"""
 
+import abc
+
 from uuid import uuid4
 from accelpy.accel import AccelDataBase
 from accelpy.kernel import KernelBase
@@ -255,7 +257,7 @@ FortranKernel.avails[FortranKernel.name] = FortranKernel
 #  AccelData Code templates
 ##########################
 
-t_ompdata = """
+t_accdata = """
 MODULE {modname}
     USE, INTRINSIC :: ISO_C_BINDING
     IMPLICIT NONE
@@ -273,7 +275,7 @@ INTEGER (C_INT64_T) FUNCTION dataenter({enterargs}) BIND(C, name="dataenter")
 
     {enterassigns}
 
-    !$omp target enter data {entermaps}
+    {enterdir} {entermaps}
 
     dataenter = 0
 
@@ -282,7 +284,7 @@ END FUNCTION
 INTEGER (C_INT64_T) FUNCTION dataexit() BIND(C, name="dataexit")
     USE, INTRINSIC :: ISO_C_BINDING
 
-    !$omp target exit data {exitmaps}
+    {exitdir} {exitmaps}
 
     dataexit = 0
 
@@ -309,15 +311,33 @@ class FortranAccelData(AccelDataBase):
     def gen_code(self, compiler):
         pass
 
+class FortranOpenAccelData(FortranAccelData):
 
-class OpenaccFortranAccelData(FortranAccelData):
-    name = "openacc_fortran"
+    @abc.abstractmethod
+    def clause_mapto(self, mapto):
+        pass
 
-class OmptargetFortranAccelData(FortranAccelData):
-    name = "omptarget_fortran"
+    @abc.abstractmethod
+    def clause_maptofrom(self, maptofrom):
+        pass
+
+    @abc.abstractmethod
+    def clause_mapalloc(self, mapalloc):
+        pass
+
+    @abc.abstractmethod
+    def clause_mapfrom(self, mapfrom):
+        pass
+
+    @abc.abstractmethod
+    def enterdirect(self):
+        pass
+
+    @abc.abstractmethod
+    def exitdirect(self):
+        pass
 
     def gen_code(self, compiler):
-
 
         macros = {}
 
@@ -331,7 +351,7 @@ class OmptargetFortranAccelData(FortranAccelData):
         mapto = []
         maptofrom = []
         mapalloc = []
-        exitfrom = []
+        mapfrom = []
 
         for item in self.mapto:
             ndim = item["data"].ndim
@@ -352,8 +372,6 @@ class OmptargetFortranAccelData(FortranAccelData):
 
             enterassigns.append("%s => %s" % (gname, lname))
 
-        strto = "map(to: %s)" % ", ".join(mapto) if mapto else ""
-
         for item in self.maptofrom:
             ndim = item["data"].ndim
             dtype = self.get_dtype(item)
@@ -373,8 +391,6 @@ class OmptargetFortranAccelData(FortranAccelData):
 
             enterassigns.append("%s => %s" % (gname, lname))
 
-        strtofrom = "map(tofrom: %s)" % ", ".join(maptofrom) if maptofrom else ""
-
         for item in self.mapalloc:
             ndim = item["data"].ndim
             dtype = self.get_dtype(item)
@@ -401,7 +417,7 @@ class OmptargetFortranAccelData(FortranAccelData):
             gname = "g" + str(item["id"])
 
             enterargs.append(lname)
-            exitfrom.append(gname)
+            mapfrom.append(gname)
             mapalloc.append(gname)
             bound = ",".join([str(s) for s in item["data"].shape])
             entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
@@ -414,10 +430,13 @@ class OmptargetFortranAccelData(FortranAccelData):
 
             enterassigns.append("%s => %s" % (gname, lname))
 
-        stralloc = "map(alloc: %s)" % ", ".join(mapalloc) if mapalloc else ""
+        entermaps = "%s %s %s" % (self.clause_mapto(mapto),
+                        self.clause_maptofrom(maptofrom),
+                        self.clause_mapalloc(mapalloc))
+        exitmaps = self.clause_mapfrom(mapfrom)
 
-        entermaps = "%s %s %s" % (strto, strtofrom, stralloc)
-        exitmaps = "map(from: %s)" % ", ".join(exitfrom) if exitfrom else ""
+        enterdir = self.enterdirect()
+        exitdir = self.exitdirect()
 
         acceldata_fmt = {
             "modname": modname,
@@ -426,97 +445,62 @@ class OmptargetFortranAccelData(FortranAccelData):
             "enterargs": ", ".join(enterargs),
             "entertypedecls": "\n".join(entertypedecls),
             "enterassigns": "\n".join(enterassigns),
+            "enterdir": enterdir,
             "entermaps": entermaps,
+            "exitdir": exitdir,
             "exitmaps": exitmaps,
         }
-        ompdata = t_ompdata.format(**acceldata_fmt)
 
-        #print(ompdata)
+        acceldata = t_accdata.format(**acceldata_fmt)
+
+        #print(acceldata)
         #import pdb; pdb.set_trace()
 
-        return [ompdata], macros
+        return [acceldata], macros
 
 
-    def _get_enterinfo(self):
+class OpenaccFortranAccelData(FortranOpenAccelData):
+    name = "openacc_fortran"
 
-        enterargs = []
-        entertypedecls = []
+    def clause_mapto(self, mapto):
+        pass
 
-        for item in self.mapto+self.maptofrom+self.mapalloc:
+    def clause_maptofrom(self, maptofrom):
+        pass
 
-            ndim = item["data"].ndim
-            dtype = self.get_dtype(item)
-            varname = "v" + str(item["id"])
+    def clause_mapalloc(self, mapalloc):
+        pass
 
-            enterargs.append(varname)
+    def clause_mapfrom(self, mapfrom):
+        pass
 
-            bound = ",".join([":"]*ndim)
-            entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT) :: %s" % (
-                            dtype, bound, varname))
+    def enterdirect(self):
+        pass
 
-        mapto = []
-        maptofrom = []
-        mapalloc = []
+    def exitdirect(self):
+        pass
 
-        for item in self.mapto:
-            varname = "v" + str(item["id"])
-            mapto.append(varname)
-        strto = "map(to: %s)" % ", ".join(mapto) if mapto else ""
+class OmptargetFortranAccelData(FortranOpenAccelData):
+    name = "omptarget_fortran"
 
-        for item in self.maptofrom:
-            varname = "v" + str(item["id"])
-            maptofrom.append(varname)
-        strtofrom = "map(tofrom: %s)" % ", ".join(maptofrom) if maptofrom else ""
+    def clause_mapto(self, mapto):
+        return "map(to: %s)" % ", ".join(mapto) if mapto else ""
 
-        for item in self.mapalloc:
-            varname = "v" + str(item["id"])
-            mapalloc.append(varname)
-        stralloc = "map(alloc: %s)" % ", ".join(mapalloc) if mapalloc else ""
+    def clause_maptofrom(self, maptofrom):
+        return "map(tofrom: %s)" % ", ".join(maptofrom) if maptofrom else ""
 
-        entermaps = "%s %s %s" % (strto, strtofrom, stralloc)
+    def clause_mapalloc(self, mapalloc):
+        return "map(alloc: %s)" % ", ".join(mapalloc) if mapalloc else ""
 
-        return ", ".join(enterargs), "\n".join(entertypedecls), entermaps
+    def clause_mapfrom(self, mapfrom):
+        return "map(from: %s)" % ", ".join(mapfrom) if mapfrom else ""
 
+    def enterdirect(self):
+        return "!$omp target enter data"
 
-    def _get_exitinfo(self):
+    def exitdirect(self):
+        return "!$omp target exit data"
 
-        exitargs = []
-        exittypedecls = []
-
-        for item in self.mapfrom+self.maprelease+self.mapdelete:
-
-            ndim = item["data"].ndim
-            dtype = self.get_dtype(item)
-            varname = "v" + str(item["id"])
-
-            exitargs.append(varname)
-
-            bound = ",".join([":"]*ndim)
-            exittypedecls.append("%s, DIMENSION(%s), INTENT(INOUT) :: %s" % (
-                            dtype, bound, varname))
-
-        mapfrom = []
-        maprelease = []
-        mapdelete = []
-
-        for item in self.mapfrom:
-            varname = "v" + str(item["id"])
-            mapfrom.append(varname)
-        strfrom = "map(from: %s)" % ", ".join(mapfrom) if mapfrom else ""
-
-        for item in self.maprelease:
-            varname = "v" + str(item["id"])
-            maprelease.append(varname)
-        strrelease = "map(release: %s)" % ", ".join(maprelease) if maprelease else ""
-
-        for item in self.mapdelete:
-            varname = "v" + str(item["id"])
-            mapdelete.append(varname)
-        strdelete = "map(delete: %s)" % ", ".join(mapdelete) if mapdelete else ""
-
-        exitmaps = "%s %s %s" % (strfrom, strrelease, strdelete)
-
-        return ", ".join(exitargs), "\n".join(exittypedecls), exitmaps
 
 AccelDataBase.avails[OmptargetFortranAccelData.name] = OmptargetFortranAccelData
 AccelDataBase.avails[OpenaccFortranAccelData.name] = OpenaccFortranAccelData

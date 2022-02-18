@@ -67,20 +67,12 @@ class AccelDataBase(Object):
         if self.liblang[0] is None:
             if self.libpath is not None and os.path.isfile(self.libpath):
                 try:
-                    #libdir, libname = os.path.split(self.libpath)
-                    #basename, _ = os.path.splitext(libname)
-
-                    #lib = CDLL(self.libpath, mode=RTLD_GLOBAL)
                     lib = CDLL(self.libpath)
                 except:
                     pass
 
             if (lib is None and self.bldpath is not None and
                     os.path.isfile(self.bldpath)):
-                #blddir, bldname = os.path.split(self.bldpath)
-                #basename, _ = os.path.splitext(bldname)
-
-                #lib = CDLL(self.bldpath, mode=RTLD_GLOBAL)
                 lib = CDLL(self.bldpath)
 
         if lib is not None:
