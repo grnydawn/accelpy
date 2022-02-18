@@ -448,6 +448,30 @@ set_argnames("X", "Y", "Z")
     END DO
     !$omp end do
 
+[omptarget_fortran]
+
+    INTEGER i, j, k, xl1, xu1, yl1, yu1, yl2, yu2
+
+    xl1 = LBOUND(X,1) 
+    xu1 = UBOUND(X,1) 
+    yl1 = LBOUND(Y,1) 
+    yu1 = UBOUND(Y,1) 
+    yl2 = LBOUND(Y,2) 
+    yu2 = UBOUND(Y,2) 
+
+    !$omp target teams num_teams(xu1-xl1+1)
+    !$omp distribute
+    DO i=xl1, xu1
+        !$omp parallel do
+        DO j=yl2, yu2
+            Z(i, j) = 0
+            DO k=yl1, yu1
+                Z(i, j) = Z(i, j) + X(i, k) * Y(k, j)
+            END DO
+        END DO
+        !$omp end parallel do
+    END DO
+    !$omp end target teams
 """
 }
 

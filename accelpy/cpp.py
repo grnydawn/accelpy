@@ -1,7 +1,7 @@
 """accelpy C++ kernel module"""
 
 from accelpy.kernel import KernelBase
-from ctypes import c_int32, c_int64, c_float, c_double
+from accelpy.util import c_dtypemap
 
 ##########################
 #  Code templates
@@ -86,12 +86,12 @@ class CppKernel(KernelBase):
 
     # dtype: ( C type name, ctype )
     # TODO: dynamically generates on loading
-    dtypemap = {
-        "int32": ["int32_t", c_int32],
-        "int64": ["int64_t", c_int64],
-        "float32": ["float", c_float],
-        "float64": ["double", c_double]
-    }
+#    dtypemap = {
+#        "int32": ["int32_t", c_int32],
+#        "int64": ["int64_t", c_int64],
+#        "float32": ["float", c_float],
+#        "float64": ["double", c_double]
+#    }
 
     def gen_code(self, compiler):
 
@@ -112,6 +112,9 @@ class CppKernel(KernelBase):
         #import pdb; pdb.set_trace()
 
         return includes + [main], macros
+
+    def get_dtype(self, arg):
+        return c_dtypemap[arg["data"].dtype.name][0]
 
     def getname_varmap(self, arg):
         return "accelpy_varmap_%s" % arg["curname"]

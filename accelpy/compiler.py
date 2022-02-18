@@ -232,6 +232,10 @@ class OpenmpFortranCompiler(FortranCompiler):
     accel = "openmp_fortran"
 
 
+class OmptargetFortranCompiler(FortranCompiler):
+
+    accel = "omptarget_fortran"
+
 ################
 # GNU Compilers
 ################
@@ -351,6 +355,12 @@ class GnuOpenmpFortranCompiler(OpenmpFortranCompiler, GnuFortranCompiler):
 
     def get_option(self):
         return "-fopenmp " + super(GnuOpenmpFortranCompiler, self).get_option()
+
+
+class GnuOmptargetFortranCompiler(OmptargetFortranCompiler, GnuFortranCompiler):
+
+    def get_option(self):
+        return "-fopenmp " + super(GnuOmptargetFortranCompiler, self).get_option()
 
 
 ################
@@ -476,6 +486,11 @@ class CrayOpenmpFortranCompiler(OpenmpFortranCompiler, CrayFortranCompiler):
     def get_option(self):
         return "-h omp,noacc " + super(CrayOpenmpFortranCompiler, self).get_option()
 
+
+class CrayOmptargetFortranCompiler(OmptargetFortranCompiler, CrayFortranCompiler):
+
+    def get_option(self):
+        return "-h omp,noacc " + super(CrayOmptargetFortranCompiler, self).get_option()
 
 ################
 # AMD Compilers
@@ -999,8 +1014,9 @@ class IntelFortranFortranCompiler(FortranFortranCompiler, IntelFortranCompiler):
 
 # priorities
 _lang_priority = ["fortran", "cpp"]
-_accel_priority = ["openmp_fortran", "openmp_cpp", "openacc_fortran",
-                    "openacc_cpp", "hip", "cuda", "fortran", "cpp"]
+_accel_priority = ["omptarget_fortran", "openmp_fortran", "openmp_cpp",
+                    "openacc_fortran", "openacc_cpp", "hip", "cuda",
+                    "fortran", "cpp"]
 _vendor_priority = ["cray", "amd", "nvidia", "intel", "pgi", "ibm", "gnu"]
 
 def sort_compilers():
@@ -1052,3 +1068,113 @@ sort_compilers()
 #FORTRAN FLAGSS: -acc -ta=nvidia or -ta=multicore for host cpu code -lcudart -mcmodel=medium
 #C FLAGS: -acc -ta=nvidia -lcudart -mcmodel=medium
 #HELP FLAGS: -Minfo=accel
+
+def generate_compiler(compile):
+
+    clist = compile.split()
+
+    compcls = Compiler.from_path(clist[0])
+    comp = compcls(option=" ".join(clist[1:]))
+
+    return comp
+
+
+def get_compilers(accname, lang, compile=None):
+
+    kernels = [(accname, lang)]
+
+    compilers = []
+
+    if compile:
+        if isinstance(compile, str):
+            citems = compile.split()
+
+            if not citems:
+                raise Exception("Blank compile")
+
+            if os.path.isfile(citems[0]):
+                compilers.append(generate_compiler(compile))
+
+            else:
+                # TODO: vendor name search
+                for lang, langsubc in Compiler.avails.items():
+                    for kernel, kernelsubc in langsubc.items():
+                        for vendor, vendorsubc in kernelsubc.items():
+                            if vendor == citems[0]:
+                                try:
+                                    compilers.append(vendorsubc(option=" ".join(citems[1:])))
+                                except:
+                                    pass
+
+        elif isinstance(compile, Compiler):
+            compilers.append(compile)
+
+        elif isinstance(compile, (list, tuple)):
+
+            for comp in compile:
+                if isinstance(comp, str):
+                    citems = comp.split()
+
+                    if not citems:
+                        raise Exception("Blank compile")
+
+                    if os.path.isfile(citems[0]):
+                        try:
+                            compilers.append(generate_compiler(comp))
+                        except:
+                            pass
+
+                    else:
+                        # TODO: vendor name search
+                        for lang, langsubc in Compiler.avails.items():
+                            for kernel, kernelsubc in langsubc.items():
+                                for vendor, vendorsubc in kernelsubc.items():
+                                    if vendor == citems[0]:
+                                        try:
+                                            compilers.append(vendorsubc(option=" ".join(citems[1:])))
+                                        except:
+                                            pass
+
+                elif isinstance(comp, Compiler):
+                    compilers.append(comp)
+
+                else:
+                    raise Exception("Unsupported compiler type: %s" % str(comp))
+        else:
+            raise Exception("Unsupported compiler type: %s" % str(compile))
+
+    return_compilers = []
+    errmsgs = []
+
+
+    if compilers:
+        for comp in compilers:
+            if any(comp.accel==k[0] and comp.lang==k[1] for k in kernels):
+                return_compilers.append(comp)
+
+    elif compile is None:
+        for acc, lang in kernels:
+
+            if lang not in Compiler.avails:
+                continue
+
+            if acc not in Compiler.avails[lang]:
+                continue
+
+            vendors = Compiler.avails[lang][acc]
+
+            for vendor, cls in vendors.items():
+                try:
+                    return_compilers.append(cls())
+                except Exception as err:
+                    errmsgs.append(str(err))
+
+
+    if not return_compilers:
+        if errmsgs:
+            raise Exception("No compiler is found: %s" % "\n".join(errmsgs))
+        else:
+            raise Exception("No compiler is found: %s" % str(kernels))
+
+    return return_compilers
+

@@ -1,6 +1,10 @@
 NAME := accelpy
 PY := python3
 
+#### NOTE ####
+# run "module load craype-accel-amd-gfx90a" on Crusher to support GPU
+# run "export CRAY_ACC_DEBUG=2" to display acc debug from Cray compiler
+
 .PHONY: clean clean-test clean-pyc clean-build doc help
 .DEFAULT_GOAL := help
 

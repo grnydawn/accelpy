@@ -1,7 +1,8 @@
 """accelpy utility module"""
 
-import os, abc, ast, json, hashlib
+import os, abc, ast, json, hashlib, numpy
 from subprocess import PIPE, run as subp_run
+from ctypes import c_int32, c_int64, c_float, c_double
 
 class Object(abc.ABC):
 
@@ -17,6 +18,29 @@ _accelpy_builtins = dict((k, v) for k, v in __builtins__.items()
                        if k not in _builtin_excludes)
 
 _config = None
+
+c_dtypemap = {
+    "int32": ["int32_t", c_int32],
+    "int64": ["int64_t", c_int64],
+    "float32": ["float", c_float],
+    "float64": ["double", c_double]
+}
+
+f_dtypemap = {
+    "int32": ["INTEGER (C_INT32_T)", c_int32],
+    "int64": ["INTEGER (C_INT64_T)", c_int64],
+    "float32": ["REAL (C_FLOAT)", c_float],
+    "float64": ["REAL (C_DOUBLE)", c_double]
+}
+
+
+def get_c_dtype(arg):
+    return c_dtypemap[arg["data"].dtype.name][0]
+
+
+def get_f_dtype(arg):
+    return f_dtypemap[arg["data"].dtype.name][0]
+
 
 def appeval(text, env):
 
@@ -151,4 +175,22 @@ def fortline_pack(items):
 def gethash(text, length=10):
 
     return hashlib.md5(text.encode("utf-8")).hexdigest()[:length]
+
+
+def pack_arguments(data):
+
+    res = []
+
+    for arg in data:
+        idarg = id(arg)
+
+        if isinstance(arg, numpy.ndarray):
+            res.append({"data": arg, "id": idarg, "curname": None})
+
+        else:
+            newarg = numpy.asarray(arg)
+            res.append({"data": newarg, "id": idarg, "curname": None,
+                        "orgdata": arg})
+
+    return res
 

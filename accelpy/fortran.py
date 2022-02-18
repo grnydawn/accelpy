@@ -1,13 +1,14 @@
 """accelpy Fortran Accelerator module"""
 
 from uuid import uuid4
+from accelpy.accel import AccelDataBase
 from accelpy.kernel import KernelBase
-from accelpy.util import fortline_pack
+from accelpy.util import fortline_pack, f_dtypemap
 from ctypes import c_int32, c_int64, c_float, c_double
 
 
 ##########################
-#  Code templates
+#  Kernel Code templates
 ##########################
 
 t_module = """
@@ -98,12 +99,12 @@ class FortranKernel(KernelBase):
     name = "fortran"
     lang = "fortran"
 
-    dtypemap = {
-        "int32": ["INTEGER (C_INT32_T)", c_int32],
-        "int64": ["INTEGER (C_INT64_T)", c_int64],
-        "float32": ["REAL (C_FLOAT)", c_float],
-        "float64": ["REAL (C_DOUBLE)", c_double]
-    }
+#    dtypemap = {
+#        "int32": ["INTEGER (C_INT32_T)", c_int32],
+#        "int64": ["INTEGER (C_INT64_T)", c_int64],
+#        "float32": ["REAL (C_FLOAT)", c_float],
+#        "float64": ["REAL (C_DOUBLE)", c_double]
+#    }
 
     def gen_code(self, compiler):
 
@@ -132,6 +133,9 @@ class FortranKernel(KernelBase):
         #import pdb; pdb.set_trace()
 
         return includes + [module, main], macros
+
+    def get_dtype(self, arg):
+        return f_dtypemap[arg["data"].dtype.name][0]
 
     def getname_varmap(self, arg):
         return "accelpy_varmap_%s" % arg["curname"]
@@ -237,6 +241,282 @@ class OpenmpFortranKernel(FortranKernel):
 class OpenaccFortranKernel(FortranKernel):
     name = "openacc_fortran"
 
-OpenmpFortranKernel.avails[OpenmpFortranKernel.name] = OpenmpFortranKernel
+class OmptargetFortranKernel(OpenmpFortranKernel):
+    name = "omptarget_fortran"
+
+OmptargetFortranKernel.avails[OmptargetFortranKernel.name] = OmptargetFortranKernel
 OpenaccFortranKernel.avails[OpenaccFortranKernel.name] = OpenaccFortranKernel
+OpenmpFortranKernel.avails[OpenmpFortranKernel.name] = OpenmpFortranKernel
 FortranKernel.avails[FortranKernel.name] = FortranKernel
+
+
+
+##########################
+#  AccelData Code templates
+##########################
+
+t_ompdata = """
+MODULE {modname}
+    USE, INTRINSIC :: ISO_C_BINDING
+    IMPLICIT NONE
+
+{modvardecls}
+
+PUBLIC {modpublics}
+
+CONTAINS
+
+INTEGER (C_INT64_T) FUNCTION dataenter({enterargs}) BIND(C, name="dataenter")
+    USE, INTRINSIC :: ISO_C_BINDING
+
+    {entertypedecls}
+
+    {enterassigns}
+
+    !$omp target enter data {entermaps}
+
+    dataenter = 0
+
+END FUNCTION
+
+INTEGER (C_INT64_T) FUNCTION dataexit() BIND(C, name="dataexit")
+    USE, INTRINSIC :: ISO_C_BINDING
+
+    !$omp target exit data {exitmaps}
+
+    dataexit = 0
+
+END FUNCTION
+
+END MODULE
+"""
+
+class FortranAccelData(AccelDataBase):
+
+    name = "fortran"
+    lang = "fortran"
+
+#    dtypemap = {
+#        "int32": ["INTEGER (C_INT32_T)", c_int32],
+#        "int64": ["INTEGER (C_INT64_T)", c_int64],
+#        "float32": ["REAL (C_FLOAT)", c_float],
+#        "float64": ["REAL (C_DOUBLE)", c_double]
+#    }
+
+    def get_dtype(self, arg):
+        return f_dtypemap[arg["data"].dtype.name][0]
+
+    def gen_code(self, compiler):
+        pass
+
+
+class OpenaccFortranAccelData(FortranAccelData):
+    name = "openacc_fortran"
+
+class OmptargetFortranAccelData(FortranAccelData):
+    name = "omptarget_fortran"
+
+    def gen_code(self, compiler):
+
+
+        macros = {}
+
+        modname  = "mod_" + uuid4().hex[:10]
+
+        modvardecls = []
+        modpublics = []
+        enterargs = []
+        entertypedecls = []
+        enterassigns = []
+        mapto = []
+        maptofrom = []
+        mapalloc = []
+        exitfrom = []
+
+        for item in self.mapto:
+            ndim = item["data"].ndim
+            dtype = self.get_dtype(item)
+            lname = "l" + str(item["id"])
+            gname = "g" + str(item["id"])
+
+            enterargs.append(lname)
+            mapto.append(gname)
+            #bound = ",".join([":"]*ndim)
+            bound = ",".join([str(s) for s in item["data"].shape])
+            entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
+                            dtype, bound, lname))
+
+            modpublics.append(gname)
+            bound = ",".join([":"]*ndim)
+            modvardecls.append("%s, DIMENSION(%s), POINTER :: %s" % (
+                            dtype, bound, gname))
+
+            enterassigns.append("%s => %s" % (gname, lname))
+
+        strto = "map(to: %s)" % ", ".join(mapto) if mapto else ""
+
+        for item in self.maptofrom:
+            ndim = item["data"].ndim
+            dtype = self.get_dtype(item)
+            lname = "l" + str(item["id"])
+            gname = "g" + str(item["id"])
+
+            enterargs.append(lname)
+            maptofrom.append(gname)
+            bound = ",".join([":"]*ndim)
+            entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
+                            dtype, bound, lname))
+
+            modpublics.append(gname)
+            modvardecls.append("%s, DIMENSION(%s), POINTER :: %s" % (
+                            dtype, bound, gname))
+
+            enterassigns.append("%s => %s" % (gname, lname))
+
+        strtofrom = "map(tofrom: %s)" % ", ".join(maptofrom) if maptofrom else ""
+
+        for item in self.mapalloc:
+            ndim = item["data"].ndim
+            dtype = self.get_dtype(item)
+            lname = "l" + str(item["id"])
+            gname = "g" + str(item["id"])
+
+            enterargs.append(lname)
+            mapalloc.append(gname)
+            bound = ",".join([":"]*ndim)
+            entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
+                            dtype, bound, lname))
+
+            modpublics.append(gname)
+            modvardecls.append("%s, DIMENSION(%s), POINTER :: %s" % (
+                            dtype, bound, gname))
+
+            enterassigns.append("%s => %s" % (gname, lname))
+
+        for item in self.mapfrom:
+            ndim = item["data"].ndim
+            dtype = self.get_dtype(item)
+            lname = "l" + str(item["id"])
+            gname = "g" + str(item["id"])
+
+            enterargs.append(lname)
+            exitfrom.append(gname)
+            mapalloc.append(gname)
+            #bound = ",".join([":"]*ndim)
+            bound = ",".join([str(s) for s in item["data"].shape])
+            entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
+                            dtype, bound, lname))
+
+            modpublics.append(gname)
+            bound = ",".join([":"]*ndim)
+            modvardecls.append("%s, DIMENSION(%s), POINTER :: %s" % (
+                            dtype, bound, gname))
+
+            enterassigns.append("%s => %s" % (gname, lname))
+
+        stralloc = "map(alloc: %s)" % ", ".join(mapalloc) if mapalloc else ""
+
+        entermaps = "%s %s %s" % (strto, strtofrom, stralloc)
+        exitmaps = "map(from: %s)" % ", ".join(exitfrom) if exitfrom else ""
+
+        acceldata_fmt = {
+            "modname": modname,
+            "modvardecls": "\n".join(modvardecls),
+            "modpublics": ", ".join(modpublics),
+            "enterargs": ", ".join(enterargs),
+            "entertypedecls": "\n".join(entertypedecls),
+            "enterassigns": "\n".join(enterassigns),
+            "entermaps": entermaps,
+            "exitmaps": exitmaps,
+        }
+        ompdata = t_ompdata.format(**acceldata_fmt)
+
+        #print(ompdata)
+        #import pdb; pdb.set_trace()
+
+        return [ompdata], macros
+
+
+    def _get_enterinfo(self):
+
+        enterargs = []
+        entertypedecls = []
+
+        for item in self.mapto+self.maptofrom+self.mapalloc:
+
+            ndim = item["data"].ndim
+            dtype = self.get_dtype(item)
+            varname = "v" + str(item["id"])
+
+            enterargs.append(varname)
+
+            bound = ",".join([":"]*ndim)
+            entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT) :: %s" % (
+                            dtype, bound, varname))
+
+        mapto = []
+        maptofrom = []
+        mapalloc = []
+
+        for item in self.mapto:
+            varname = "v" + str(item["id"])
+            mapto.append(varname)
+        strto = "map(to: %s)" % ", ".join(mapto) if mapto else ""
+
+        for item in self.maptofrom:
+            varname = "v" + str(item["id"])
+            maptofrom.append(varname)
+        strtofrom = "map(tofrom: %s)" % ", ".join(maptofrom) if maptofrom else ""
+
+        for item in self.mapalloc:
+            varname = "v" + str(item["id"])
+            mapalloc.append(varname)
+        stralloc = "map(alloc: %s)" % ", ".join(mapalloc) if mapalloc else ""
+
+        entermaps = "%s %s %s" % (strto, strtofrom, stralloc)
+
+        return ", ".join(enterargs), "\n".join(entertypedecls), entermaps
+
+
+    def _get_exitinfo(self):
+
+        exitargs = []
+        exittypedecls = []
+
+        for item in self.mapfrom+self.maprelease+self.mapdelete:
+
+            ndim = item["data"].ndim
+            dtype = self.get_dtype(item)
+            varname = "v" + str(item["id"])
+
+            exitargs.append(varname)
+
+            bound = ",".join([":"]*ndim)
+            exittypedecls.append("%s, DIMENSION(%s), INTENT(INOUT) :: %s" % (
+                            dtype, bound, varname))
+
+        mapfrom = []
+        maprelease = []
+        mapdelete = []
+
+        for item in self.mapfrom:
+            varname = "v" + str(item["id"])
+            mapfrom.append(varname)
+        strfrom = "map(from: %s)" % ", ".join(mapfrom) if mapfrom else ""
+
+        for item in self.maprelease:
+            varname = "v" + str(item["id"])
+            maprelease.append(varname)
+        strrelease = "map(release: %s)" % ", ".join(maprelease) if maprelease else ""
+
+        for item in self.mapdelete:
+            varname = "v" + str(item["id"])
+            mapdelete.append(varname)
+        strdelete = "map(delete: %s)" % ", ".join(mapdelete) if mapdelete else ""
+
+        exitmaps = "%s %s %s" % (strfrom, strrelease, strdelete)
+
+        return ", ".join(exitargs), "\n".join(exittypedecls), exitmaps
+
+AccelDataBase.avails[OmptargetFortranAccelData.name] = OmptargetFortranAccelData
+AccelDataBase.avails[OpenaccFortranAccelData.name] = OpenaccFortranAccelData

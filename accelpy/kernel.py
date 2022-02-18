@@ -9,9 +9,9 @@ from collections import OrderedDict
 
 from accelpy.const import (version, NOCACHE, MEMCACHE, FILECACHE, NODEBUG,
                             MINDEBUG, MAXDEBUG, NOPROF, MINPROF, MAXPROF)
-from accelpy.util import Object, gethash, get_config, set_config
+from accelpy.util import Object, gethash, get_config, set_config, pack_arguments
 from accelpy.spec import Spec
-from accelpy.compiler import Compiler
+from accelpy.compiler import Compiler, get_compilers
 from accelpy.cache import slib_cache
 
 
@@ -143,7 +143,7 @@ class KernelBase(Object):
         self.cache = cache
         self.profile = profile
         self.debug = debug
-        self.spec = spec
+        self.spec = spec if isinstance(spec, Spec) else Spec(spec)
         self.compile = compile
         self.cachekey = None
         self.liblang = [None, None]
@@ -158,7 +158,7 @@ class KernelBase(Object):
         self.spec.eval_pysection(environ)
         self.section = self.spec.get_section(self.name)
 
-        self.data = self._pack_arguments(data)
+        self.data = pack_arguments(data)
         self.spec.update_argnames(self.data)
         self.section.update_argnames(self.data)
 
@@ -202,29 +202,30 @@ class KernelBase(Object):
 
             task.stop(timeout=timeout)
 
+    @abc.abstractmethod
     def get_dtype(self, arg):
-        return self.dtypemap[arg["data"].dtype.name][0]
+        pass
 
     @abc.abstractmethod
     def getname_varmap(self, arg):
         pass
 
-    def _pack_arguments(self, data):
-
-        res = []
-
-        for arg in data:
-            idarg = id(arg)
-
-            if isinstance(arg, numpy.ndarray):
-                res.append({"data": arg, "id": idarg, "curname": None})
-
-            else:
-                newarg = numpy.asarray(arg)
-                res.append({"data": newarg, "id": idarg, "curname": None,
-                            "orgdata": arg})
-
-        return res
+#    def _pack_arguments(self, data):
+#
+#        res = []
+#
+#        for arg in data:
+#            idarg = id(arg)
+#
+#            if isinstance(arg, numpy.ndarray):
+#                res.append({"data": arg, "id": idarg, "curname": None})
+#
+#            else:
+#                newarg = numpy.asarray(arg)
+#                res.append({"data": newarg, "id": idarg, "curname": None,
+#                            "orgdata": arg})
+#
+#        return res
 
     def get_include(self):
         return ""
@@ -242,7 +243,8 @@ class KernelBase(Object):
 
         errmsgs = []
 
-        compilers = get_compilers(self.name, compile=self.compile)
+        #compilers = get_compilers(self.name, compile=self.compile)
+        compilers = get_compilers(self.name, self.lang, compile=self.compile)
 
         for comp in compilers:
 
@@ -281,6 +283,7 @@ class KernelBase(Object):
 
                 bldpath = comp.compile(codes, macros, self.debug)
 
+                self.cachekey = cachekey
                 slib_cache[self.cachekey] = (comp.lang, basename, comp.libext,
                                                     libdir, bldpath)
                 return comp.lang, libpath, bldpath
@@ -317,144 +320,144 @@ def Kernel(spec, accel=None, compile=None, cache=MEMCACHE, profile=0, debug=NODE
             except Exception as err:
                 errmsgs.append(repr(err))
 
-        raise Exception("No kernel is working: %s" % "\n".join(errmsgs))
+        raise Exception("No kernel is available: %s" % "\n".join(errmsgs))
 
-    raise Exception("Accelerator '%s' is not valid." % str(accel))
+    raise Exception("Kernel '%s' is not valid." % str(accel))
 
-
-def generate_compiler(compile):
-
-    clist = compile.split()
-
-    compcls = Compiler.from_path(clist[0])
-    comp = compcls(option=" ".join(clist[1:]))
-
-    return comp
-
-
-def get_compilers(kernel, compile=None):
-    """
-        parameters:
-
-        kernel: the kernel id or a list of them
-        compile: compiler path or compiler id, or a list of them
-                  syntax: "vendor|path [{default}] [additional options]"
-"""
-
-    kernels = []
-
-    if isinstance(kernel, str):
-        kernels.append((kernel, KernelBase.avails[kernel].lang))
-
-    elif isinstance(kernel, KernelBase):
-        kernels.append((kernel.name, kernel.lang))
-
-    elif isinstance(kernel, (list, tuple)):
-        for k in kernel:
-            if isinstance(k, str):
-                kernels.append((k, KernelBase.avails[k].lang))
-
-            elif isinstance(k, KernelBase):
-                kernels.append((k.name, k.lang))
-
-            else:
-                raise Exception("Unknown kernel type: %s" % str(k))
-
-    else:
-        raise Exception("Unknown kernel type: %s" % str(kernel))
-
-    compilers = []
-
-    if compile:
-        if isinstance(compile, str):
-            citems = compile.split()
-
-            if not citems:
-                raise Exception("Blank compile")
-
-            if os.path.isfile(citems[0]):
-                compilers.append(generate_compiler(compile))
-
-            else:
-                # TODO: vendor name search
-                for lang, langsubc in Compiler.avails.items():
-                    for kernel, kernelsubc in langsubc.items():
-                        for vendor, vendorsubc in kernelsubc.items():
-                            if vendor == citems[0]:
-                                try:
-                                    compilers.append(vendorsubc(option=" ".join(citems[1:])))
-                                except:
-                                    pass
-
-        elif isinstance(compile, Compiler):
-            compilers.append(compile)
-
-        elif isinstance(compile, (list, tuple)):
-
-            for comp in compile:
-                if isinstance(comp, str):
-                    citems = comp.split()
-
-                    if not citems:
-                        raise Exception("Blank compile")
-
-                    if os.path.isfile(citems[0]):
-                        try:
-                            compilers.append(generate_compiler(comp))
-                        except:
-                            pass
-
-                    else:
-                        # TODO: vendor name search
-                        for lang, langsubc in Compiler.avails.items():
-                            for kernel, kernelsubc in langsubc.items():
-                                for vendor, vendorsubc in kernelsubc.items():
-                                    if vendor == citems[0]:
-                                        try:
-                                            compilers.append(vendorsubc(option=" ".join(citems[1:])))
-                                        except:
-                                            pass
-
-                elif isinstance(comp, Compiler):
-                    compilers.append(comp)
-
-                else:
-                    raise Exception("Unsupported compiler type: %s" % str(comp))
-        else:
-            raise Exception("Unsupported compiler type: %s" % str(compile))
-
-    return_compilers = []
-    errmsgs = []
-
-
-    if compilers:
-        for comp in compilers:
-            if any(comp.accel==k[0] and comp.lang==k[1] for k in kernels):
-                return_compilers.append(comp)
-
-    elif compile is None:
-        for acc, lang in kernels:
-
-            if lang not in Compiler.avails:
-                continue
-
-            if acc not in Compiler.avails[lang]:
-                continue
-
-            vendors = Compiler.avails[lang][acc]
-
-            for vendor, cls in vendors.items():
-                try:
-                    return_compilers.append(cls())
-                except Exception as err:
-                    errmsgs.append(str(err))
-
-
-    if not return_compilers:
-        if errmsgs:
-            raise Exception("No compiler is found: %s" % "\n".join(errmsgs))
-        else:
-            raise Exception("No compiler is found: %s" % str(kernels))
-
-    return return_compilers
-
+#
+#def generate_compiler(compile):
+#
+#    clist = compile.split()
+#
+#    compcls = Compiler.from_path(clist[0])
+#    comp = compcls(option=" ".join(clist[1:]))
+#
+#    return comp
+#
+#
+#def get_compilers(kernel, compile=None):
+#    """
+#        parameters:
+#
+#        kernel: the kernel id or a list of them
+#        compile: compiler path or compiler id, or a list of them
+#                  syntax: "vendor|path [{default}] [additional options]"
+#"""
+#
+#    kernels = []
+#
+#    if isinstance(kernel, str):
+#        kernels.append((kernel, KernelBase.avails[kernel].lang))
+#
+#    elif isinstance(kernel, KernelBase):
+#        kernels.append((kernel.name, kernel.lang))
+#
+#    elif isinstance(kernel, (list, tuple)):
+#        for k in kernel:
+#            if isinstance(k, str):
+#                kernels.append((k, KernelBase.avails[k].lang))
+#
+#            elif isinstance(k, KernelBase):
+#                kernels.append((k.name, k.lang))
+#
+#            else:
+#                raise Exception("Unknown kernel type: %s" % str(k))
+#
+#    else:
+#        raise Exception("Unknown kernel type: %s" % str(kernel))
+#
+#    compilers = []
+#
+#    if compile:
+#        if isinstance(compile, str):
+#            citems = compile.split()
+#
+#            if not citems:
+#                raise Exception("Blank compile")
+#
+#            if os.path.isfile(citems[0]):
+#                compilers.append(generate_compiler(compile))
+#
+#            else:
+#                # TODO: vendor name search
+#                for lang, langsubc in Compiler.avails.items():
+#                    for kernel, kernelsubc in langsubc.items():
+#                        for vendor, vendorsubc in kernelsubc.items():
+#                            if vendor == citems[0]:
+#                                try:
+#                                    compilers.append(vendorsubc(option=" ".join(citems[1:])))
+#                                except:
+#                                    pass
+#
+#        elif isinstance(compile, Compiler):
+#            compilers.append(compile)
+#
+#        elif isinstance(compile, (list, tuple)):
+#
+#            for comp in compile:
+#                if isinstance(comp, str):
+#                    citems = comp.split()
+#
+#                    if not citems:
+#                        raise Exception("Blank compile")
+#
+#                    if os.path.isfile(citems[0]):
+#                        try:
+#                            compilers.append(generate_compiler(comp))
+#                        except:
+#                            pass
+#
+#                    else:
+#                        # TODO: vendor name search
+#                        for lang, langsubc in Compiler.avails.items():
+#                            for kernel, kernelsubc in langsubc.items():
+#                                for vendor, vendorsubc in kernelsubc.items():
+#                                    if vendor == citems[0]:
+#                                        try:
+#                                            compilers.append(vendorsubc(option=" ".join(citems[1:])))
+#                                        except:
+#                                            pass
+#
+#                elif isinstance(comp, Compiler):
+#                    compilers.append(comp)
+#
+#                else:
+#                    raise Exception("Unsupported compiler type: %s" % str(comp))
+#        else:
+#            raise Exception("Unsupported compiler type: %s" % str(compile))
+#
+#    return_compilers = []
+#    errmsgs = []
+#
+#
+#    if compilers:
+#        for comp in compilers:
+#            if any(comp.accel==k[0] and comp.lang==k[1] for k in kernels):
+#                return_compilers.append(comp)
+#
+#    elif compile is None:
+#        for acc, lang in kernels:
+#
+#            if lang not in Compiler.avails:
+#                continue
+#
+#            if acc not in Compiler.avails[lang]:
+#                continue
+#
+#            vendors = Compiler.avails[lang][acc]
+#
+#            for vendor, cls in vendors.items():
+#                try:
+#                    return_compilers.append(cls())
+#                except Exception as err:
+#                    errmsgs.append(str(err))
+#
+#
+#    if not return_compilers:
+#        if errmsgs:
+#            raise Exception("No compiler is found: %s" % "\n".join(errmsgs))
+#        else:
+#            raise Exception("No compiler is found: %s" % str(kernels))
+#
+#    return return_compilers
+#

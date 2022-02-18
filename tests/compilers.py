@@ -26,3 +26,4 @@ for lang, accels in Compiler.avails.items():
 #testable = [("cuda", "nvidia")]
 #testable = [("hip", "amd")]
 #testable = [("cpp", "cray")]
+testable = [("omptarget_fortran", "cray")]
