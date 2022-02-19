@@ -248,23 +248,27 @@ CppKernel.avails[CppKernel.name] = CppKernel
 ##########################
 
 t_accdata = """
+extern "C" {{
+
 {vardecls}
 
 int dataenter({enterargs})
-{
+{{
     {enterassigns}
 
     {enterdir} {entermaps}
 
     return 0;
-}
+}}
 
 int dataexit()
-{
+{{
     {exitdir} {exitmaps}
 
     return 0;
-}
+}}
+
+}}
 """
 
 class CppAccelData(AccelDataBase):
@@ -313,13 +317,10 @@ class CppOpenAccelData(CppAccelData):
     def gen_code(self, compiler):
 
         #import pdb; pdb.set_trace()
-        print("BBBBB")
         macros = {}
 
-        modvardecls = []
-        modpublics = []
+        vardecls = []
         enterargs = []
-        entertypedecls = []
         enterassigns = []
         mapto = []
         maptofrom = []
@@ -334,18 +335,10 @@ class CppOpenAccelData(CppAccelData):
 
             item["modname"] = gname
 
-            enterargs.append(lname)
-            mapto.append(gname)
-            bound = ",".join([str(s) for s in item["data"].shape])
-            entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
-                            dtype, bound, lname))
-
-            modpublics.append(gname)
-            bound = ",".join([":"]*ndim)
-            modvardecls.append("%s, DIMENSION(%s), POINTER :: %s" % (
-                            dtype, bound, gname))
-
-            enterassigns.append("%s => %s" % (gname, lname))
+            enterargs.append("%s * %s" % (dtype, lname))
+            vardecls.append("%s * %s;" % (dtype, gname))
+            enterassigns.append("%s = %s;" % (gname, lname))
+            mapto.append("%s[0:%d]" % (gname, item["data"].size))
 
         for item in self.maptofrom:
             ndim = item["data"].ndim
@@ -355,18 +348,10 @@ class CppOpenAccelData(CppAccelData):
 
             item["modname"] = gname
 
-            enterargs.append(lname)
-            maptofrom.append(gname)
-            bound = ",".join([str(s) for s in item["data"].shape])
-            entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
-                            dtype, bound, lname))
-
-            modpublics.append(gname)
-            bound = ",".join([":"]*ndim)
-            modvardecls.append("%s, DIMENSION(%s), POINTER :: %s" % (
-                            dtype, bound, gname))
-
-            enterassigns.append("%s => %s" % (gname, lname))
+            enterargs.append("%s * %s" % (dtype, lname))
+            vardecls.append("%s * %s;" % (dtype, gname))
+            enterassigns.append("%s = %s;" % (gname, lname))
+            maptofrom.append("%s[0:%d]" % (gname, item["data"].size))
 
         for item in self.mapalloc:
             ndim = item["data"].ndim
@@ -376,18 +361,10 @@ class CppOpenAccelData(CppAccelData):
 
             item["modname"] = gname
 
-            enterargs.append(lname)
-            mapalloc.append(gname)
-            bound = ",".join([str(s) for s in item["data"].shape])
-            entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
-                            dtype, bound, lname))
-
-            modpublics.append(gname)
-            bound = ",".join([":"]*ndim)
-            modvardecls.append("%s, DIMENSION(%s), POINTER :: %s" % (
-                            dtype, bound, gname))
-
-            enterassigns.append("%s => %s" % (gname, lname))
+            enterargs.append("%s * %s" % (dtype, lname))
+            vardecls.append("%s * %s;" % (dtype, gname))
+            enterassigns.append("%s = %s;" % (gname, lname))
+            mapalloc.append("%s[0:%d]" % (gname, item["data"].size))
 
         for item in self.mapfrom:
             ndim = item["data"].ndim
@@ -397,19 +374,11 @@ class CppOpenAccelData(CppAccelData):
 
             item["modname"] = gname
 
-            enterargs.append(lname)
-            mapfrom.append(gname)
-            mapalloc.append(gname)
-            bound = ",".join([str(s) for s in item["data"].shape])
-            entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
-                            dtype, bound, lname))
-
-            modpublics.append(gname)
-            bound = ",".join([":"]*ndim)
-            modvardecls.append("%s, DIMENSION(%s), POINTER :: %s" % (
-                            dtype, bound, gname))
-
-            enterassigns.append("%s => %s" % (gname, lname))
+            enterargs.append("%s * %s" % (dtype, lname))
+            vardecls.append("%s * %s;" % (dtype, gname))
+            enterassigns.append("%s = %s;" % (gname, lname))
+            mapfrom.append("%s[0:%d]" % (gname, item["data"].size))
+            mapalloc.append("%s[0:%d]" % (gname, item["data"].size))
 
         entermaps = "%s %s %s" % (self.clause_mapto(mapto),
                         self.clause_maptofrom(maptofrom, True),
@@ -438,12 +407,63 @@ class CppOpenAccelData(CppAccelData):
         return [acceldata], macros
 
 
+class OpenaccCppAccelData(CppOpenAccelData):
+    name = "openacc_cpp"
+
+    def clause_mapto(self, mapto):
+        return "copyin(%s)" % ", ".join(mapto) if mapto else ""
+
+    def clause_maptofrom(self, maptofrom, isenter):
+
+        if isenter:
+            return "copyin(%s)" % ", ".join(maptofrom) if maptofrom else ""
+
+        else:
+            return "copyout(%s)" % ", ".join(maptofrom) if maptofrom else ""
+
+    def clause_mapalloc(self, mapalloc):
+        return "create(%s)" % ", ".join(mapalloc) if mapalloc else ""
+
+    def clause_mapfrom(self, mapfrom):
+        return "copyout(%s)" % ", ".join(mapfrom) if mapfrom else ""
+
+    def enterdirect(self):
+        return "#pragma acc enter data"
+
+    def exitdirect(self):
+        return "#pragma acc exit data"
+
+class OmptargetCppAccelData(CppOpenAccelData):
+    name = "omptarget_cpp"
+
+    def clause_mapto(self, mapto):
+        return "map(to: %s)" % ", ".join(mapto) if mapto else ""
+
+    def clause_maptofrom(self, maptofrom, isenter):
+        if isenter:
+            return ("map(tofrom: %s)" % ", ".join(maptofrom)
+                    if maptofrom else "")
+        else:
+            return ""
+
+    def clause_mapalloc(self, mapalloc):
+        return "map(alloc: %s)" % ", ".join(mapalloc) if mapalloc else ""
+
+    def clause_mapfrom(self, mapfrom):
+        return "map(from: %s)" % ", ".join(mapfrom) if mapfrom else ""
+
+    def enterdirect(self):
+        return "#pragma omp target enter data"
+
+    def exitdirect(self):
+        return "#pragma omp target exit data"
+
 
 #AccelDataBase.avails[OmptargetCppAccelData.name] = OmptargetCppAccelData
 #AccelDataBase.avails[OpenaccCppAccelData.name] = OpenaccCppAccelData
 
-AccelDataBase.avails["openacc_cpp"] = OpenmpCppAccelData
-AccelDataBase.avails["omptarget_cpp"] = OpenmpCppAccelData
+AccelDataBase.avails[OmptargetCppAccelData.name] = OmptargetCppAccelData
+AccelDataBase.avails[OpenaccCppAccelData.name] = OpenaccCppAccelData
 AccelDataBase.avails[OpenmpCppAccelData.name] = OpenmpCppAccelData
 AccelDataBase.avails[CppAccelData.name] = CppAccelData
 

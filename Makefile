@@ -39,7 +39,7 @@ SHAREWORK := ${SHAREDIR}/${NAME}
 help:
 	@${PY} -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
 
-clean: clean-build clean-pyc clean-test ## remove all build, test, coverage and Python artifacts
+clean: clean-build clean-pyc clean-test clean-compile## remove all build, test, coverage and Python artifacts
 
 clean-build: ## remove build artifacts
 	rm -fr build/
@@ -58,6 +58,9 @@ clean-test: ## remove test and coverage artifacts
 	rm -fr .tox/
 	rm -f .coverage
 	rm -fr htmlcov/
+
+clean-compile:
+	rm -rf *.o *.s core _accelpy_debug_
 
 lint: ## check style with flake8
 	flake8 ${NAME} tests

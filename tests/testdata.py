@@ -475,7 +475,7 @@ set_argnames("X", "Y", "Z")
 
 [omptarget_cpp]
 
-    #pragma omp target enter data map(to:X[0:SIZE(X)], Y[0:SIZE(Y)]) map(alloc: Z[0:SIZE(Z)])
+    //#pragma omp target enter data map(to:X[0:SHAPE(X,0)], Y[0:SHAPE(Y,0)]) map(alloc: Z[0:SHAPE(Z,0)])
     #pragma omp target teams num_teams(SHAPE(X, 0))
     #pragma omp distribute
     for (int i = 0; i < SHAPE(X, 0); i++) {
@@ -487,7 +487,7 @@ set_argnames("X", "Y", "Z")
             }
         }
     }
-    #pragma omp target exit data map(from: Z[0:SIZE(Z)])
+    //#pragma omp target exit data map(from: Z[0:SHAPE(Z,0)])
 
 """
 }

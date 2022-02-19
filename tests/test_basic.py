@@ -69,7 +69,7 @@ def ttest_matmul(accel, compile):
 @mark.parametrize("accel, compile", testable)
 def test_acceldata(accel, compile):
 
-    debug = False
+    debug = True
 
     lang = "fortran" if "fortran" in accel else "cpp"
 
