@@ -113,7 +113,7 @@ class Compiler(Object):
             option = self.opt_debug + " " if debug > 0 else ""
             option += self.opt_compile_only + " " + self.get_option()
 
-            # PGI infoopt :  -Minfo=acc
+            # PGI infoopt :  -Minfo=acc -ta=tesla
             build_cmd = "{compiler} {option} {macro} -o {outfile} {infile}".format(
                             compiler=self.path, option=option, outfile=outfile,
                             infile=codepath, macro=opt_macro)
@@ -123,6 +123,7 @@ class Compiler(Object):
 
             out = shellcmd(build_cmd)
             #print(str(out.stdout).replace("\\n", "\n"))
+            #print(str(out.stderr).replace("\\n", "\n"))
 
             if out.returncode != 0:
                 errmsg = str(out.stderr).replace("\\n", "\n")
@@ -215,6 +216,11 @@ class OpenaccCppCompiler(CppCompiler):
 class OpenmpCppCompiler(CppCompiler):
 
     accel = "openmp_cpp"
+
+
+class OmptargetCppCompiler(CppCompiler):
+
+    accel = "omptarget_cpp"
 
 
 class FortranFortranCompiler(FortranCompiler):
@@ -345,6 +351,12 @@ class GnuOpenmpCppCompiler(OpenmpCppCompiler, GnuCppCompiler):
         return "-fopenmp " + super(GnuOpenmpCppCompiler, self).get_option()
 
 
+class GnuOmptargetCppCompiler(OmptargetCppCompiler, GnuCppCompiler):
+
+    def get_option(self):
+        return "-fopenmp " + super(GnuOmptargetCppCompiler, self).get_option()
+
+
 class GnuOpenaccFortranCompiler(OpenaccFortranCompiler, GnuFortranCompiler):
 
     def get_option(self):
@@ -419,13 +431,21 @@ class CrayClangCppCppCompiler(CppCppCompiler, CrayClangCppCompiler):
 class CrayClangOpenaccCppCompiler(OpenaccCppCompiler, CrayClangCppCompiler):
 
     def get_option(self):
-        return "-h pragma=acc " + super(CrayClangOpenaccCppCompiler, self).get_option()
+        return "-h acc,noomp " + super(CrayClangOpenaccCppCompiler, self).get_option()
 
 
 class CrayClangOpenmpCppCompiler(OpenmpCppCompiler, CrayClangCppCompiler):
 
     def get_option(self):
-        return "-h pragma=omp " + super(CrayClangOpenmpCppCompiler, self).get_option()
+        #return "-fopenmp " + super(CrayClangOpenmpCppCompiler, self).get_option()
+        return "-h omp,noacc " + super(CrayClangOpenmpCppCompiler, self).get_option()
+
+
+class CrayClangOmptargetCppCompiler(OmptargetCppCompiler, CrayClangCppCompiler):
+
+    def get_option(self):
+        return "-fopenmp " + super(CrayClangOmptargetCppCompiler, self).get_option()
+        #return "-h omp,noacc " + super(CrayClangOmptargetCppCompiler, self).get_option()
 
 
 class CrayFortranCompiler(FortranCompiler):
@@ -481,6 +501,7 @@ class CrayOpenaccFortranCompiler(OpenaccFortranCompiler, CrayFortranCompiler):
     def get_option(self):
         return "-h acc,noomp " + super(CrayOpenaccFortranCompiler, self).get_option()
 
+
 class CrayOpenmpFortranCompiler(OpenmpFortranCompiler, CrayFortranCompiler):
 
     def get_option(self):
@@ -491,6 +512,7 @@ class CrayOmptargetFortranCompiler(OmptargetFortranCompiler, CrayFortranCompiler
 
     def get_option(self):
         return "-h omp,noacc " + super(CrayOmptargetFortranCompiler, self).get_option()
+
 
 ################
 # AMD Compilers
@@ -544,6 +566,12 @@ class AmdClangOpenmpCppCompiler(OpenmpCppCompiler, AmdClangCppCompiler):
         return "-fopenmp " + super(AmdClangOpenmpCppCompiler, self).get_option()
 
 
+class AmdClangOmptargetCppCompiler(OmptargetCppCompiler, AmdClangCppCompiler):
+
+    def get_option(self):
+        return "-fopenmp " + super(AmdClangOmptargetCppCompiler, self).get_option()
+
+
 class AmdFlangFortranCompiler(FortranCompiler):
 
     vendor = "amd"
@@ -593,6 +621,18 @@ class AmdFlangOpenmpFortranCompiler(OpenmpFortranCompiler, AmdFlangFortranCompil
 
     def get_option(self):
         return "-fopenmp " + super(AmdFlangOpenmpFortranCompiler, self).get_option()
+
+
+class AmdFlangOpenaccFortranCompiler(OpenaccFortranCompiler, AmdFlangFortranCompiler):
+
+    def get_option(self):
+        return "-fopenacc " + super(AmdFlangOpenaccFortranCompiler, self).get_option()
+
+
+class AmdFlangOmptargetFortranCompiler(OmptargetFortranCompiler, AmdFlangFortranCompiler):
+
+    def get_option(self):
+        return "-fopenmp " + super(AmdFlangOmptargetFortranCompiler, self).get_option()
 
 
 class AmdHipCppCompiler(HipCppCompiler):
@@ -687,6 +727,12 @@ class IbmXlOpenmpCppCompiler(OpenmpCppCompiler, IbmXlCppCompiler):
         return "-qsmp=omp " + super(IbmXlOpenmpCppCompiler, self).get_option()
 
 
+class IbmXlOmptargetCppCompiler(OmptargetCppCompiler, IbmXlCppCompiler):
+
+    def get_option(self):
+        return "-qsmp=omp " + super(IbmXlOmptargetCppCompiler, self).get_option()
+
+
 class IbmXlFortranCompiler(FortranCompiler):
 
     vendor = "ibm"
@@ -757,6 +803,12 @@ class IbmXlOpenmpFortranCompiler(OpenmpFortranCompiler, IbmXlFortranCompiler):
 
     def get_option(self):
         return "-qsmp=omp " + super(IbmXlOpenmpFortranCompiler, self).get_option()
+
+
+class IbmXlOmptargetFortranCompiler(OmptargetFortranCompiler, IbmXlFortranCompiler):
+
+    def get_option(self):
+        return "-qsmp=omp " + super(IbmXlOmptargetFortranCompiler, self).get_option()
 
 
 ###################
@@ -913,10 +965,22 @@ class PgiOpenmpCppCompiler(OpenmpCppCompiler, PgiCppCompiler):
         return "-mp " + super(PgiOpenmpCppCompiler, self).get_option()
 
 
+class PgiOmptargetCppCompiler(OmptargetCppCompiler, PgiCppCompiler):
+
+    def get_option(self):
+        return "-mp " + super(PgiOmptargetCppCompiler, self).get_option()
+
+
 class PgiOpenmpFortranCompiler(OpenmpFortranCompiler, PgiFortranCompiler):
 
     def get_option(self):
         return "-mp " + super(PgiOpenmpFortranCompiler, self).get_option()
+
+
+class PgiOmptargetFortranCompiler(OmptargetFortranCompiler, PgiFortranCompiler):
+
+    def get_option(self):
+        return "-mp " + super(PgiOmptargetFortranCompiler, self).get_option()
 
 
 ###################
@@ -966,6 +1030,17 @@ class IntelCppCppCompiler(CppCppCompiler, IntelCppCompiler):
     pass
 
 
+class IntelOpenmpCppCompiler(OpenmpCppCompiler, IntelCppCompiler):
+
+    def get_option(self):
+        return "-qopenmp " + super(IntelOpenmpCppCompiler, self).get_option()
+
+
+class IntelOmptargetCppCompiler(OmptargetCppCompiler, IntelCppCompiler):
+
+    def get_option(self):
+        return "-qopenmp " + super(IntelOmptargetCppCompiler, self).get_option()
+
 
 class IntelFortranCompiler(FortranCompiler):
 
@@ -1012,11 +1087,24 @@ class IntelFortranFortranCompiler(FortranFortranCompiler, IntelFortranCompiler):
     pass
 
 
+
+class IntelOpenmpFortranCompiler(OpenmpFortranCompiler, IntelFortranCompiler):
+
+    def get_option(self):
+        return "-qopenmp " + super(IntelOpenmpFortranCompiler, self).get_option()
+
+
+class IntelOmptargetFortranCompiler(OmptargetFortranCompiler, IntelFortranCompiler):
+
+    def get_option(self):
+        return "-qopenmp " + super(IntelOmptargetFortranCompiler, self).get_option()
+
+
 # priorities
 _lang_priority = ["fortran", "cpp"]
-_accel_priority = ["omptarget_fortran", "openmp_fortran", "openmp_cpp",
-                    "openacc_fortran", "openacc_cpp", "hip", "cuda",
-                    "fortran", "cpp"]
+_accel_priority = ["omptarget_fortran", "omptarget_cpp", "openmp_fortran",
+                    "openmp_cpp", "openacc_fortran", "openacc_cpp", "hip",
+                    "cuda", "fortran", "cpp"]
 _vendor_priority = ["cray", "amd", "nvidia", "intel", "pgi", "ibm", "gnu"]
 
 def sort_compilers():

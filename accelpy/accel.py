@@ -2,7 +2,7 @@
 
 import abc, os, tempfile
 
-from ctypes import CDLL
+from ctypes import CDLL, RTLD_GLOBAL
 from numpy.ctypeslib import ndpointer
 from collections import OrderedDict
 from accelpy.const import (version, NOCACHE, MEMCACHE, FILECACHE, NODEBUG,
@@ -15,6 +15,7 @@ from accelpy.cache import slib_cache
 class AccelDataBase(Object):
 
     avails = OrderedDict()
+    offload = False
 
     # get map info, build & load slib, run mapping, hand over slib to kernels
     def __init__(self, *kernels, mapto=[], maptofrom=[], mapfrom=[],
@@ -27,7 +28,7 @@ class AccelDataBase(Object):
 
         self.kernels = kernels
 
-        if self.kernels[0].name not in self.avails:
+        if not self.offload:
             return
 
         self.cache = cache
@@ -72,13 +73,13 @@ class AccelDataBase(Object):
         if self.liblang[0] is None:
             if self.libpath is not None and os.path.isfile(self.libpath):
                 try:
-                    lib = CDLL(self.libpath)
+                    lib = CDLL(self.libpath, mode=RTLD_GLOBAL)
                 except:
                     pass
 
             if (lib is None and self.bldpath is not None and
                     os.path.isfile(self.bldpath)):
-                lib = CDLL(self.bldpath)
+                lib = CDLL(self.bldpath, mode=RTLD_GLOBAL)
 
         if lib is not None:
             self.liblang[0] = lib
@@ -175,26 +176,27 @@ class AccelDataBase(Object):
         for kernel in self.kernels:
             kernel.wait(timeout=timeout)
 
-        argtypes = []
-        argitems = self.mapfrom
+        if self.offload:
+            argtypes = []
+            argitems = self.mapfrom
 
-        for item in argitems:
+            for item in argitems:
 
-            if self.liblang[1] == "cpp":
-                flags = ["c_contiguous"]
+                if self.liblang[1] == "cpp":
+                    flags = ["c_contiguous"]
 
-            elif self.liblang[1] == "fortran":
-                flags = ["f_contiguous"]
+                elif self.liblang[1] == "fortran":
+                    flags = ["f_contiguous"]
 
-            else:
-                raise Exception("Unknown language: %s" % self.liblang[1])
+                else:
+                    raise Exception("Unknown language: %s" % self.liblang[1])
 
-            argtypes.append(ndpointer(item["data"].dtype, flags=",".join(flags)))
+                argtypes.append(ndpointer(item["data"].dtype, flags=",".join(flags)))
 
-        dataexit = getattr(self.liblang[0], "dataexit")
-        dataexit.argtypes = argtypes
+            dataexit = getattr(self.liblang[0], "dataexit")
+            dataexit.argtypes = argtypes
 
-        dataexit(*[a["data"] for a in argitems])
+            dataexit(*[a["data"] for a in argitems])
 
     def stop(self, timeout=None):
 

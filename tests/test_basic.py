@@ -69,13 +69,16 @@ def ttest_matmul(accel, compile):
 @mark.parametrize("accel, compile", testable)
 def test_acceldata(accel, compile):
 
+    debug = False
+
     lang = "fortran" if "fortran" in accel else "cpp"
 
     data, spec  = get_testdata("matmul", lang)
 
-    kernel = Kernel(spec, accel=accel, compile=compile, debug=True)
+    kernel = Kernel(spec, accel=accel, compile=compile, debug=debug)
+    #kernel = Kernel(spec, accel=accel, compile="-Minfo -ta=tesla", debug=debug)
 
-    accel = AccelData(kernel, mapto=data[:2], mapfrom=data[2:], debug=True)
+    accel = AccelData(kernel, mapto=data[:2], mapfrom=data[2:], debug=debug)
 
     kernel.launch(*data)
 

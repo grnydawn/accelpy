@@ -311,8 +311,14 @@ class FortranAccelData(AccelDataBase):
     def gen_code(self, compiler):
         pass
 
+class OpenmpFortranAccelData(FortranAccelData):
+    name = "openmp_fortran"
+
+
 class FortranOpenAccelData(FortranAccelData):
 
+    offload = True
+    
     @abc.abstractmethod
     def clause_mapto(self, mapto):
         pass
@@ -522,3 +528,5 @@ class OmptargetFortranAccelData(FortranOpenAccelData):
 
 AccelDataBase.avails[OmptargetFortranAccelData.name] = OmptargetFortranAccelData
 AccelDataBase.avails[OpenaccFortranAccelData.name] = OpenaccFortranAccelData
+AccelDataBase.avails[OpenmpFortranAccelData.name] = OpenmpFortranAccelData
+AccelDataBase.avails[FortranAccelData.name] = FortranAccelData

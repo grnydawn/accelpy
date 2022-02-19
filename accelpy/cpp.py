@@ -1,5 +1,8 @@
 """accelpy C++ kernel module"""
 
+import abc
+
+from accelpy.accel import AccelDataBase
 from accelpy.kernel import KernelBase
 from accelpy.util import c_dtypemap
 
@@ -107,7 +110,6 @@ class CppKernel(KernelBase):
         }
         main = t_main.format(**main_fmt)
 
-        #print(module)
         #print(main)
         #import pdb; pdb.set_trace()
 
@@ -232,6 +234,216 @@ class OpenaccCppKernel(CppKernel):
     name = "openacc_cpp"
 
 
-OpenmpCppKernel.avails[OpenmpCppKernel.name] = OpenmpCppKernel
+class OmptargetCppKernel(CppKernel):
+    name = "omptarget_cpp"
+
+OmptargetCppKernel.avails[OmptargetCppKernel.name] = OmptargetCppKernel
 OpenaccCppKernel.avails[OpenaccCppKernel.name] = OpenaccCppKernel
+OpenmpCppKernel.avails[OpenmpCppKernel.name] = OpenmpCppKernel
 CppKernel.avails[CppKernel.name] = CppKernel
+
+
+##########################
+#  AccelData Code templates
+##########################
+
+t_accdata = """
+{vardecls}
+
+int dataenter({enterargs})
+{
+    {enterassigns}
+
+    {enterdir} {entermaps}
+
+    return 0;
+}
+
+int dataexit()
+{
+    {exitdir} {exitmaps}
+
+    return 0;
+}
+"""
+
+class CppAccelData(AccelDataBase):
+
+    name = "cpp"
+    lang = "cpp"
+
+    def get_dtype(self, arg):
+        return c_dtypemap[arg["data"].dtype.name][0]
+
+    def gen_code(self, compiler):
+        pass
+
+class OpenmpCppAccelData(CppAccelData):
+    name = "openmp_cpp"
+
+
+class CppOpenAccelData(CppAccelData):
+
+    offload = True
+    
+    @abc.abstractmethod
+    def clause_mapto(self, mapto):
+        pass
+
+    @abc.abstractmethod
+    def clause_maptofrom(self, maptofrom):
+        pass
+
+    @abc.abstractmethod
+    def clause_mapalloc(self, mapalloc):
+        pass
+
+    @abc.abstractmethod
+    def clause_mapfrom(self, mapfrom):
+        pass
+
+    @abc.abstractmethod
+    def enterdirect(self):
+        pass
+
+    @abc.abstractmethod
+    def exitdirect(self):
+        pass
+
+    def gen_code(self, compiler):
+
+        #import pdb; pdb.set_trace()
+        print("BBBBB")
+        macros = {}
+
+        modvardecls = []
+        modpublics = []
+        enterargs = []
+        entertypedecls = []
+        enterassigns = []
+        mapto = []
+        maptofrom = []
+        mapalloc = []
+        mapfrom = []
+
+        for item in self.mapto:
+            ndim = item["data"].ndim
+            dtype = self.get_dtype(item)
+            lname = "apy_acceldata_lvar_" + str(item["index"])
+            gname = "apy_acceldata_gvar_" + str(item["index"])
+
+            item["modname"] = gname
+
+            enterargs.append(lname)
+            mapto.append(gname)
+            bound = ",".join([str(s) for s in item["data"].shape])
+            entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
+                            dtype, bound, lname))
+
+            modpublics.append(gname)
+            bound = ",".join([":"]*ndim)
+            modvardecls.append("%s, DIMENSION(%s), POINTER :: %s" % (
+                            dtype, bound, gname))
+
+            enterassigns.append("%s => %s" % (gname, lname))
+
+        for item in self.maptofrom:
+            ndim = item["data"].ndim
+            dtype = self.get_dtype(item)
+            lname = "apy_acceldata_lvar_" + str(item["index"])
+            gname = "apy_acceldata_gvar_" + str(item["index"])
+
+            item["modname"] = gname
+
+            enterargs.append(lname)
+            maptofrom.append(gname)
+            bound = ",".join([str(s) for s in item["data"].shape])
+            entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
+                            dtype, bound, lname))
+
+            modpublics.append(gname)
+            bound = ",".join([":"]*ndim)
+            modvardecls.append("%s, DIMENSION(%s), POINTER :: %s" % (
+                            dtype, bound, gname))
+
+            enterassigns.append("%s => %s" % (gname, lname))
+
+        for item in self.mapalloc:
+            ndim = item["data"].ndim
+            dtype = self.get_dtype(item)
+            lname = "l" + str(item["index"])
+            gname = "g" + str(item["index"])
+
+            item["modname"] = gname
+
+            enterargs.append(lname)
+            mapalloc.append(gname)
+            bound = ",".join([str(s) for s in item["data"].shape])
+            entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
+                            dtype, bound, lname))
+
+            modpublics.append(gname)
+            bound = ",".join([":"]*ndim)
+            modvardecls.append("%s, DIMENSION(%s), POINTER :: %s" % (
+                            dtype, bound, gname))
+
+            enterassigns.append("%s => %s" % (gname, lname))
+
+        for item in self.mapfrom:
+            ndim = item["data"].ndim
+            dtype = self.get_dtype(item)
+            lname = "apy_acceldata_lvar_" + str(item["index"])
+            gname = "apy_acceldata_gvar_" + str(item["index"])
+
+            item["modname"] = gname
+
+            enterargs.append(lname)
+            mapfrom.append(gname)
+            mapalloc.append(gname)
+            bound = ",".join([str(s) for s in item["data"].shape])
+            entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
+                            dtype, bound, lname))
+
+            modpublics.append(gname)
+            bound = ",".join([":"]*ndim)
+            modvardecls.append("%s, DIMENSION(%s), POINTER :: %s" % (
+                            dtype, bound, gname))
+
+            enterassigns.append("%s => %s" % (gname, lname))
+
+        entermaps = "%s %s %s" % (self.clause_mapto(mapto),
+                        self.clause_maptofrom(maptofrom, True),
+                        self.clause_mapalloc(mapalloc))
+        exitmaps = "%s %s" % (self.clause_maptofrom(maptofrom, False),
+                                self.clause_mapfrom(mapfrom))
+
+        enterdir = self.enterdirect()
+        exitdir = self.exitdirect()
+
+        acceldata_fmt = {
+            "vardecls": "\n".join(vardecls),
+            "enterargs": ", ".join(enterargs),
+            "enterassigns": "\n".join(enterassigns),
+            "enterdir": enterdir,
+            "entermaps": entermaps,
+            "exitdir": exitdir,
+            "exitmaps": exitmaps,
+        }
+
+        acceldata = t_accdata.format(**acceldata_fmt)
+
+        #print(acceldata)
+        #import pdb; pdb.set_trace()
+
+        return [acceldata], macros
+
+
+
+#AccelDataBase.avails[OmptargetCppAccelData.name] = OmptargetCppAccelData
+#AccelDataBase.avails[OpenaccCppAccelData.name] = OpenaccCppAccelData
+
+AccelDataBase.avails["openacc_cpp"] = OpenmpCppAccelData
+AccelDataBase.avails["omptarget_cpp"] = OpenmpCppAccelData
+AccelDataBase.avails[OpenmpCppAccelData.name] = OpenmpCppAccelData
+AccelDataBase.avails[CppAccelData.name] = CppAccelData
+

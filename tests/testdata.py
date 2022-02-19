@@ -416,7 +416,7 @@ set_argnames("X", "Y", "Z")
 
 [openmp_cpp]
 
-    #pragma omp for
+    #pragma omp parallel for
     for (int i = 0; i < SHAPE(X, 0); i++) {
         for (int j = 0; j < SHAPE(Y, 1); j++) {
             Z[i][j] = 0.0;
@@ -472,6 +472,23 @@ set_argnames("X", "Y", "Z")
         !$omp end parallel do
     END DO
     !$omp end target teams
+
+[omptarget_cpp]
+
+    #pragma omp target enter data map(to:X[0:SIZE(X)], Y[0:SIZE(Y)]) map(alloc: Z[0:SIZE(Z)])
+    #pragma omp target teams num_teams(SHAPE(X, 0))
+    #pragma omp distribute
+    for (int i = 0; i < SHAPE(X, 0); i++) {
+        #pragma omp parallel for
+        for (int j = 0; j < SHAPE(Y, 1); j++) {
+            Z[i][j] = 0.0;
+            for (int k = 0; k < SHAPE(Y, 0); k++) {
+                Z[i][j] = Z[i][j] + X[i][k] * Y[k][j];
+            }
+        }
+    }
+    #pragma omp target exit data map(from: Z[0:SIZE(Z)])
+
 """
 }
 
