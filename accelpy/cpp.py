@@ -459,11 +459,7 @@ class OmptargetCppAccelData(CppOpenAccelData):
         return "#pragma omp target exit data"
 
 
-#AccelDataBase.avails[OmptargetCppAccelData.name] = OmptargetCppAccelData
-#AccelDataBase.avails[OpenaccCppAccelData.name] = OpenaccCppAccelData
-
 AccelDataBase.avails[OmptargetCppAccelData.name] = OmptargetCppAccelData
 AccelDataBase.avails[OpenaccCppAccelData.name] = OpenaccCppAccelData
 AccelDataBase.avails[OpenmpCppAccelData.name] = OpenmpCppAccelData
 AccelDataBase.avails[CppAccelData.name] = CppAccelData
-
