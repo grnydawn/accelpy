@@ -5,6 +5,8 @@ from numpy import ndarray
 from collections import OrderedDict
 
 from accelpy.util import Object, shellcmd, which, get_config
+from accelpy.const import (lang_priority, accel_priority, vendor_priority,
+                            NODEBUG)
 
 #########################
 # Generic Compilers
@@ -19,8 +21,9 @@ class Compiler(Object):
     opt_compile_only = "-c"
     opt_debug = "-O0 -g"
 
-    def __init__(self, path, option=None):
+    def __init__(self, path, option=None, debug=NODEBUG):
 
+        self.debug = debug
         self.version = []
 
         if isinstance(path, str):
@@ -65,7 +68,7 @@ class Compiler(Object):
 
         self.version = self.parse_version(out.stdout)
 
-    def _compile(self, code, ext, macros, debug):
+    def _compile(self, code, ext, macros):
 
         _macros = []
         for k, v in macros.items():
@@ -88,7 +91,7 @@ class Compiler(Object):
             except FileExistsError:
                 pass
 
-        if debug > 0:
+        if self.debug > 0:
             debugdir = "_accelpy_debug_"
 
             if not os.path.isdir(debugdir):
@@ -110,7 +113,7 @@ class Compiler(Object):
 
         if not os.path.isfile(outfile):
 
-            option = self.opt_debug + " " if debug > 0 else ""
+            option = self.opt_debug + " " if self.debug > 0 else ""
             option += self.opt_compile_only + " " + self.get_option()
 
             # PGI infoopt :  -Minfo=acc -ta=tesla
@@ -118,7 +121,9 @@ class Compiler(Object):
                             compiler=self.path, option=option, outfile=outfile,
                             infile=codepath, macro=opt_macro)
 
-            #print(build_cmd)
+            if self.debug > 0:
+                print("DEBUG: compiling: %s" % build_cmd)
+
             #import pdb; pdb.set_trace()
 
             out = shellcmd(build_cmd)
@@ -163,7 +168,7 @@ class Compiler(Object):
 
         return outfile
 
-    def compile(self, codes, macros, debug):
+    def compile(self, codes, macros):
 
         lib = None
 
@@ -171,11 +176,11 @@ class Compiler(Object):
 
         # build object files
         if isinstance(codes, str):
-            objfiles.append(self._compile(codes, self.objext, macros, debug))
+            objfiles.append(self._compile(codes, self.objext, macros))
 
         elif isinstance(codes, (list, tuple)):
             for code in codes:
-                objfiles.append(self._compile(code, self.objext, macros, debug))
+                objfiles.append(self._compile(code, self.objext, macros))
 
         return self._link(self.libext, objfiles)
 
@@ -251,12 +256,12 @@ class GnuCppCompiler(CppCompiler):
     vendor = "gnu"
     opt_version = "--version"
 
-    def __init__(self, path=None, option=None):
+    def __init__(self, path=None, option=None, debug=NODEBUG):
 
         if not path:
             path = "g++"
 
-        super(GnuCppCompiler, self).__init__(path, option)
+        super(GnuCppCompiler, self).__init__(path, option, debug=debug)
 
     def parse_version(self, stdout):
 
@@ -298,12 +303,12 @@ class GnuFortranCompiler(FortranCompiler):
     opt_version = "--version"
     opt_moddir = "-J %s"
 
-    def __init__(self, path=None, option=None):
+    def __init__(self, path=None, option=None, debug=NODEBUG):
 
         if not path:
             path = "gfortran"
 
-        super(GnuFortranCompiler, self).__init__(path, option)
+        super(GnuFortranCompiler, self).__init__(path, option, debug=debug)
 
     def parse_version(self, stdout):
 
@@ -386,7 +391,7 @@ class CrayClangCppCompiler(CppCompiler):
     opt_version = "--version"
     #opt_openmp = "-h omp"
 
-    def __init__(self, path=None, option=None):
+    def __init__(self, path=None, option=None, debug=NODEBUG):
 
         if path:
             pass
@@ -400,7 +405,7 @@ class CrayClangCppCompiler(CppCompiler):
         elif which("clang++"):
             path = "clang++"
 
-        super(CrayClangCppCompiler, self).__init__(path, option)
+        super(CrayClangCppCompiler, self).__init__(path, option, debug=debug)
 
     def parse_version(self, stdout):
 
@@ -456,7 +461,7 @@ class CrayFortranCompiler(FortranCompiler):
     #opt_openmp = "-h omp"
     opt_moddir = "-J %s"
 
-    def __init__(self, path=None, option=None):
+    def __init__(self, path=None, option=None, debug=NODEBUG):
 
         if path:
             pass
@@ -467,7 +472,7 @@ class CrayFortranCompiler(FortranCompiler):
         elif which("crayftn"):
             path = "crayftn"
 
-        super(CrayFortranCompiler, self).__init__(path, option)
+        super(CrayFortranCompiler, self).__init__(path, option, debug=debug)
 
     def parse_version(self, stdout):
 
@@ -524,7 +529,7 @@ class AmdClangCppCompiler(CppCompiler):
     vendor = "amd"
     opt_version = "--version"
 
-    def __init__(self, path=None, option=None):
+    def __init__(self, path=None, option=None, debug=NODEBUG):
 
         if path:
             pass
@@ -532,7 +537,7 @@ class AmdClangCppCompiler(CppCompiler):
         elif which("amdclang++"):
             path = "amdclang++"
 
-        super(AmdClangCppCompiler, self).__init__(path, option)
+        super(AmdClangCppCompiler, self).__init__(path, option, debug=debug)
 
     def parse_version(self, stdout):
 
@@ -579,7 +584,7 @@ class AmdFlangFortranCompiler(FortranCompiler):
     opt_version = "--version"
     opt_moddir = "-J %s"
 
-    def __init__(self, path=None, option=None):
+    def __init__(self, path=None, option=None, debug=NODEBUG):
 
         if path:
             pass
@@ -587,7 +592,7 @@ class AmdFlangFortranCompiler(FortranCompiler):
         elif which("amdflang"):
             path = "amdflang"
 
-        super(AmdFlangFortranCompiler, self).__init__(path, option)
+        super(AmdFlangFortranCompiler, self).__init__(path, option, debug=debug)
 
     def parse_version(self, stdout):
 
@@ -641,7 +646,7 @@ class AmdHipCppCompiler(HipCppCompiler):
     vendor = "amd"
     opt_version = "--version"
 
-    def __init__(self, path=None, option=None):
+    def __init__(self, path=None, option=None, debug=NODEBUG):
 
         if path:
             pass
@@ -649,7 +654,7 @@ class AmdHipCppCompiler(HipCppCompiler):
         elif which("hipcc"):
             path = "hipcc"
 
-        super(AmdHipCppCompiler, self).__init__(path, option)
+        super(AmdHipCppCompiler, self).__init__(path, option, debug=debug)
 
     def parse_version(self, stdout):
 
@@ -682,7 +687,7 @@ class IbmXlCppCompiler(CppCompiler):
     vendor = "ibm"
     opt_version = "-qversion"
 
-    def __init__(self, path=None, option=None):
+    def __init__(self, path=None, option=None, debug=NODEBUG):
 
         if path:
             pass
@@ -693,7 +698,7 @@ class IbmXlCppCompiler(CppCompiler):
         elif which("xlc++"):
             path = "xlc++"
 
-        super(IbmXlCppCompiler, self).__init__(path, option)
+        super(IbmXlCppCompiler, self).__init__(path, option, debug=debug)
 
     def parse_version(self, stdout):
 
@@ -740,7 +745,7 @@ class IbmXlFortranCompiler(FortranCompiler):
     opt_moddir = "-qmoddir=%s"
     opt_version = "-qversion"
 
-    def __init__(self, path=None, option=None):
+    def __init__(self, path=None, option=None, debug=NODEBUG):
 
         if path:
             pass
@@ -769,7 +774,7 @@ class IbmXlFortranCompiler(FortranCompiler):
         elif which("xlf90"):
             path = "xlf90"
 
-        super(IbmXlFortranCompiler, self).__init__(path, option)
+        super(IbmXlFortranCompiler, self).__init__(path, option, debug=debug)
 
     def parse_version(self, stdout):
 
@@ -821,7 +826,7 @@ class NvidiaCudaCppCompiler(CudaCppCompiler):
     vendor = "nvidia"
     opt_version = "--version"
 
-    def __init__(self, path=None, option=None):
+    def __init__(self, path=None, option=None, debug=NODEBUG):
 
         if path:
             pass
@@ -829,7 +834,7 @@ class NvidiaCudaCppCompiler(CudaCppCompiler):
         elif which("nvcc"):
             path = "nvcc"
 
-        super(NvidiaCudaCppCompiler, self).__init__(path, option)
+        super(NvidiaCudaCppCompiler, self).__init__(path, option, debug=debug)
 
     def parse_version(self, stdout):
 
@@ -865,7 +870,7 @@ class PgiCppCompiler(CppCompiler):
     opt_version = "--version"
     #opt_openmp = "-mp"
 
-    def __init__(self, path=None, option=None):
+    def __init__(self, path=None, option=None, debug=NODEBUG):
 
         if path:
             pass
@@ -873,7 +878,7 @@ class PgiCppCompiler(CppCompiler):
         elif which("pgc++"):
             path = "pgc++"
 
-        super(PgiCppCompiler, self).__init__(path, option)
+        super(PgiCppCompiler, self).__init__(path, option, debug=debug)
 
     def parse_version(self, stdout):
 
@@ -905,7 +910,7 @@ class PgiFortranCompiler(FortranCompiler):
     opt_version = "--version"
     opt_moddir = "-module %s"
 
-    def __init__(self, path=None, option=None):
+    def __init__(self, path=None, option=None, debug=NODEBUG):
 
         if path:
             pass
@@ -913,7 +918,7 @@ class PgiFortranCompiler(FortranCompiler):
         elif which("pgfortran"):
             path = "pgfortran"
 
-        super(PgiFortranCompiler, self).__init__(path, option)
+        super(PgiFortranCompiler, self).__init__(path, option, debug=debug)
 
     def parse_version(self, stdout):
 
@@ -994,7 +999,7 @@ class IntelCppCompiler(CppCompiler):
     opt_version = "--version"
     #opt_openmp = "-qopenmp"
 
-    def __init__(self, path=None, option=None):
+    def __init__(self, path=None, option=None, debug=NODEBUG):
 
         if path:
             pass
@@ -1002,7 +1007,7 @@ class IntelCppCompiler(CppCompiler):
         elif which("icpc"):
             path = "icpc"
 
-        super(IntelCppCompiler, self).__init__(path, option)
+        super(IntelCppCompiler, self).__init__(path, option, debug=debug)
 
     def parse_version(self, stdout):
 
@@ -1050,7 +1055,7 @@ class IntelFortranCompiler(FortranCompiler):
     #opt_openmp = "-qopenmp"
     opt_moddir = "-module %s"
 
-    def __init__(self, path=None, option=None):
+    def __init__(self, path=None, option=None, debug=NODEBUG):
 
         if path:
             pass
@@ -1058,7 +1063,7 @@ class IntelFortranCompiler(FortranCompiler):
         elif which("ifort"):
             path = "ifort"
 
-        super(IntelFortranCompiler, self).__init__(path, option)
+        super(IntelFortranCompiler, self).__init__(path, option, debug=debug)
 
     def parse_version(self, stdout):
 
@@ -1101,27 +1106,21 @@ class IntelOmptargetFortranCompiler(OmptargetFortranCompiler, IntelFortranCompil
         return "-qopenmp " + super(IntelOmptargetFortranCompiler, self).get_option()
 
 
-# priorities
-_lang_priority = ["fortran", "cpp"]
-_accel_priority = ["omptarget_fortran", "omptarget_cpp", "openmp_fortran",
-                    "openmp_cpp", "openacc_fortran", "openacc_cpp", "hip",
-                    "cuda", "fortran", "cpp"]
-_vendor_priority = ["cray", "amd", "nvidia", "intel", "pgi", "ibm", "gnu"]
 
 def sort_compilers():
 
     def _langsort(l):
-        return _lang_priority.index(l.lang)
+        return lang_priority.index(l.lang)
 
     def _accelsort(a):
         if hasattr(a, "accel"):
-            return _accel_priority.index(a.accel)
+            return accel_priority.index(a.accel)
 
         else:
             return -1
 
     def _vendorsort(v):
-        return _vendor_priority.index(v.vendor)
+        return vendor_priority.index(v.vendor)
 
     Compiler.avails = OrderedDict()
 
@@ -1158,17 +1157,17 @@ sort_compilers()
 #C FLAGS: -acc -ta=nvidia -lcudart -mcmodel=medium
 #HELP FLAGS: -Minfo=accel
 
-def generate_compiler(compile):
+def generate_compiler(compile, debug=NODEBUG):
 
     clist = compile.split()
 
     compcls = Compiler.from_path(clist[0])
-    comp = compcls(option=" ".join(clist[1:]))
+    comp = compcls(option=" ".join(clist[1:]), debug=debug)
 
     return comp
 
 
-def get_compilers(accname, lang, compile=None):
+def get_compilers(accname, lang, compile=None, debug=NODEBUG):
 
     kernels = [(accname, lang)]
 
@@ -1182,7 +1181,7 @@ def get_compilers(accname, lang, compile=None):
                 raise Exception("Blank compile")
 
             if os.path.isfile(citems[0]):
-                compilers.append(generate_compiler(compile))
+                compilers.append(generate_compiler(compile, debug=debug))
 
             else:
                 # TODO: vendor name search
@@ -1191,7 +1190,9 @@ def get_compilers(accname, lang, compile=None):
                         for vendor, vendorsubc in kernelsubc.items():
                             if vendor == citems[0]:
                                 try:
-                                    compilers.append(vendorsubc(option=" ".join(citems[1:])))
+                                    compilers.append(vendorsubc(
+                                        option=" ".join(citems[1:]),
+                                        debug=debug))
                                 except:
                                     pass
 
@@ -1209,7 +1210,7 @@ def get_compilers(accname, lang, compile=None):
 
                     if os.path.isfile(citems[0]):
                         try:
-                            compilers.append(generate_compiler(comp))
+                            compilers.append(generate_compiler(comp, debug=debug))
                         except:
                             pass
 
@@ -1220,7 +1221,9 @@ def get_compilers(accname, lang, compile=None):
                                 for vendor, vendorsubc in kernelsubc.items():
                                     if vendor == citems[0]:
                                         try:
-                                            compilers.append(vendorsubc(option=" ".join(citems[1:])))
+                                            compilers.append(vendorsubc(
+                                                option=" ".join(citems[1:]),
+                                                debug=debug))
                                         except:
                                             pass
 
@@ -1254,7 +1257,7 @@ def get_compilers(accname, lang, compile=None):
 
             for vendor, cls in vendors.items():
                 try:
-                    return_compilers.append(cls())
+                    return_compilers.append(cls(debug=debug))
                 except Exception as err:
                     errmsgs.append(str(err))
 

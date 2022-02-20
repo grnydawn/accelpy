@@ -9,7 +9,8 @@ from collections import OrderedDict
 
 from accelpy.const import (version, NOCACHE, MEMCACHE, FILECACHE, NODEBUG,
                             MINDEBUG, MAXDEBUG, NOPROF, MINPROF, MAXPROF)
-from accelpy.util import Object, gethash, get_config, set_config, pack_arguments
+from accelpy.util import (Object, gethash, get_config, set_config,
+                            pack_arguments, getname_varmap)
 from accelpy.spec import Spec
 from accelpy.compiler import Compiler, get_compilers
 from accelpy.cache import slib_cache
@@ -35,10 +36,10 @@ class Task(Object):
 #
 #        return False
 
-    def run(self, data, getname):
+    def run(self, data):
 
         self.thread = threading.Thread(target=self._start_kernel,
-                            args=(data, getname))
+                            args=(data,))
         self.start = time.time()
         self.thread.start()
 
@@ -63,7 +64,7 @@ class Task(Object):
 
         return res
 
-    def _start_kernel(self, data, getname):
+    def _start_kernel(self, data):
 
         lib = None
 
@@ -89,7 +90,7 @@ class Task(Object):
                 self.liblang[0] = lib
 
         for arg in data:
-            self.varmap(arg, getname(arg))
+            self.varmap(arg, getname_varmap(arg))
 
         start = getattr(self.liblang[0], "accelpy_start")
         start.restype = c_int64
@@ -138,27 +139,97 @@ class KernelBase(Object):
 
     avails = OrderedDict()
 
-    def __init__(self, spec, compile=None, cache=MEMCACHE, profile=NOPROF, debug=NODEBUG):
+    #def __init__(self, spec, compile=None, cache=MEMCACHE, profile=NOPROF, debug=NODEBUG):
+    def __init__(self, section, data):
+
+        self.section = section
+        self.data = data
+#
+#        self.cache = cache
+#        self.profile = profile
+#        self.debug = debug
+#        self.spec = spec if isinstance(spec, Spec) else Spec(spec)
+#        self.compile = compile
+#        self.cachekey = None
+#        self.liblang = [None, None]
+#
+#        if self.spec is None:
+#            raise Exception("No kernel spec is found")
+        pass
+
+    @abc.abstractmethod
+    def get_dtype(self, arg):
+        pass
+
+    def get_include(self):
+        return ""
+
+    def add_includes(self):
+
+        incs = []
+
+        # TODO: implement this
+        #import pdb; pdb.set_trace()
+
+        return incs
+
+    @abc.abstractmethod
+    def gen_code(self, compiler):
+        pass
+
+
+class Kernel:
+
+    def __init__(self, spec, acctype=None, compile=None, cache=MEMCACHE, profile=0, debug=NODEBUG):
+
+        self.acctype = acctype
+        self.name = None
+        self._kernel = None
 
         self.cache = cache
         self.profile = profile
         self.debug = debug
-        self.spec = spec if isinstance(spec, Spec) else Spec(spec)
         self.compile = compile
         self.cachekey = None
         self.liblang = [None, None]
 
-        if self.spec is None:
+        if isinstance(spec, Spec):
+            self.spec = spec
+        elif spec is not None:
+            self.spec = Spec(spec)
+        else:
             raise Exception("No kernel spec is found")
 
         self.tasks = []
+
+    def set_name(self, name):
+
+        if self.acctype is None:
+            self.name = name
+
+        elif isinstance(self.acctype, (list, tuple)) and name in self.acctype:
+            self.name = name
+
+        else:
+            raise Exception("Can not set Kernel name: (%s | %s)" %
+                            (str(self.acctype), name))
 
     def launch(self, *data, environ={}):
 
         self.spec.eval_pysection(environ)
         self.section = self.spec.get_section(self.name)
-
         self.data = pack_arguments(data)
+
+        if self._kernel is None:
+            if self.name is None:
+                raise Exception("Kernel type is not defined.")
+
+            else:
+                self._kernel = KernelBase.avails[self.name](self.section, self.data)
+
+        if self.debug > 0:
+            print("DEBUG: using '%s' kernel" % (self.name))
+
         self.spec.update_argnames(self.data)
         self.section.update_argnames(self.data)
 
@@ -178,7 +249,7 @@ class KernelBase(Object):
         else:
             task = Task(self.liblang, None, None)
 
-        task.run(self.data, self.getname_varmap)
+        task.run(self.data)
 
         self.tasks.append(task)
 
@@ -202,49 +273,12 @@ class KernelBase(Object):
 
             task.stop(timeout=timeout)
 
-    @abc.abstractmethod
-    def get_dtype(self, arg):
-        pass
-
-    @abc.abstractmethod
-    def getname_varmap(self, arg):
-        pass
-
-#    def _pack_arguments(self, data):
-#
-#        res = []
-#
-#        for arg in data:
-#            idarg = id(arg)
-#
-#            if isinstance(arg, numpy.ndarray):
-#                res.append({"data": arg, "id": idarg, "curname": None})
-#
-#            else:
-#                newarg = numpy.asarray(arg)
-#                res.append({"data": newarg, "id": idarg, "curname": None,
-#                            "orgdata": arg})
-#
-#        return res
-
-    def get_include(self):
-        return ""
-
-    def add_includes(self):
-
-        incs = []
-
-        # TODO: implement this
-        #import pdb; pdb.set_trace()
-
-        return incs
-
     def build_sharedlib(self, ckey):
 
         errmsgs = []
 
-        #compilers = get_compilers(self.name, compile=self.compile)
-        compilers = get_compilers(self.name, self.lang, compile=self.compile)
+        compilers = get_compilers(self.name, self._kernel.lang,
+                        compile=self.compile, debug=self.debug)
 
         for comp in compilers:
 
@@ -276,12 +310,12 @@ class KernelBase(Object):
                 return comp.lang, libpath, None
 
             try:
-                codes, macros = self.gen_code(comp)
+                codes, macros = self._kernel.gen_code(comp)
 
                 if not os.path.isdir(get_config("blddir")):
                     set_config("blddir", tempfile.mkdtemp())
 
-                bldpath = comp.compile(codes, macros, self.debug)
+                bldpath = comp.compile(codes, macros)
 
                 self.cachekey = cachekey
                 slib_cache[self.cachekey] = (comp.lang, basename, comp.libext,
@@ -293,37 +327,32 @@ class KernelBase(Object):
 
         raise Exception("\n".join(errmsgs))
 
-    @abc.abstractmethod
-    def gen_code(self, compiler):
-        pass
-
-
-def Kernel(spec, accel=None, compile=None, cache=MEMCACHE, profile=0, debug=NODEBUG):
-
-    if isinstance(accel, str):
-        return KernelBase.avails[accel](spec, compile=compile, cache=cache,
-                                        profile=profile, debug=debug)
-
-    elif accel is None or isinstance(accel, (list, tuple)):
-
-        if accel is None:
-            accel = KernelBase.avails.keys()
-
-        errmsgs = []
-
-        for k in accel:
-            try:
-                kernel = KernelBase.avails[k](spec, compile=compile, cache=cache,
-                                                profile=profile, debug=debug)
-                return kernel
-
-            except Exception as err:
-                errmsgs.append(repr(err))
-
-        raise Exception("No kernel is available: %s" % "\n".join(errmsgs))
-
-    raise Exception("Kernel '%s' is not valid." % str(accel))
-
+#def Kernel(spec, accel=None, compile=None, cache=MEMCACHE, profile=0, debug=NODEBUG):
+#
+#    if isinstance(accel, str):
+#        return KernelBase.avails[accel](spec, compile=compile, cache=cache,
+#                                        profile=profile, debug=debug)
+#
+#    elif accel is None or isinstance(accel, (list, tuple)):
+#
+#        if accel is None:
+#            accel = KernelBase.avails.keys()
+#
+#        errmsgs = []
+#
+#        for k in accel:
+#            try:
+#                kernel = KernelBase.avails[k](spec, compile=compile, cache=cache,
+#                                                profile=profile, debug=debug)
+#                return kernel
+#
+#            except Exception as err:
+#                errmsgs.append(repr(err))
+#
+#        raise Exception("No kernel is available: %s" % "\n".join(errmsgs))
+#
+#    raise Exception("Kernel '%s' is not valid." % str(accel))
+#
 #
 #def generate_compiler(compile):
 #

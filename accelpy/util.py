@@ -189,3 +189,7 @@ def pack_arguments(data):
 
     return res
 
+
+def getname_varmap(arg):
+    return "accelpy_varmap_%s" % arg["curname"]
+

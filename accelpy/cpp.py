@@ -4,7 +4,7 @@ import abc
 
 from accelpy.accel import AccelDataBase
 from accelpy.kernel import KernelBase
-from accelpy.util import c_dtypemap
+from accelpy.util import c_dtypemap, getname_varmap
 
 ##########################
 #  Code templates
@@ -118,9 +118,6 @@ class CppKernel(KernelBase):
     def get_dtype(self, arg):
         return c_dtypemap[arg["data"].dtype.name][0]
 
-    def getname_varmap(self, arg):
-        return "accelpy_varmap_%s" % arg["curname"]
-
     def gen_preprop(self):
 
         typedefs = []
@@ -164,7 +161,7 @@ class CppKernel(KernelBase):
 
         for arg in self.data:
             dtype = self.get_dtype(arg)
-            funcname = self.getname_varmap(arg)
+            funcname = getname_varmap(arg)
             varname = "accelpy_var_" + arg["curname"]
             ndim = arg["data"].ndim
 

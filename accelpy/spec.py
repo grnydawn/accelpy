@@ -90,12 +90,12 @@ class Spec(Object):
 
         return sections
 
-    def eval_pysection(self, env):
+    def eval_pysection(self, environ):
 
         self.env = self._env.copy()
 
-        if isinstance(env, dict):
-            self.env.update(env)
+        if isinstance(environ, dict):
+            self.env.update(environ)
 
         _, lenv = appeval("\n".join(self._pysection), self.env)
 
@@ -189,10 +189,22 @@ class Spec(Object):
 
         for sec in self._sections:
 
-            if sec.kwargs is None:
-                sec.kwargs = funcargseval(",".join(sec._kwargs), self.env)
+            sec.kwargs = funcargseval(",".join(sec._kwargs), self.env)
 
             if sec.accel == accel and sec.is_enabled():
                 return sec
 
         raise Exception("No section with '%s' exists or is enabled." % accel)
+
+    def list_sections(self):
+
+        secs = []
+
+        for sec in self._sections:
+
+            sec.kwargs = funcargseval(",".join(sec._kwargs), self.env)
+
+            if sec.is_enabled():
+                secs.append(sec.accel)
+
+        return secs

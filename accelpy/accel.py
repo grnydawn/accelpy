@@ -6,7 +6,8 @@ from ctypes import CDLL, RTLD_GLOBAL
 from numpy.ctypeslib import ndpointer
 from collections import OrderedDict
 from accelpy.const import (version, NOCACHE, MEMCACHE, FILECACHE, NODEBUG,
-                            MINDEBUG, MAXDEBUG, NOPROF, MINPROF, MAXPROF)
+                            MINDEBUG, MAXDEBUG, NOPROF, MINPROF, MAXPROF,
+                            accel_priority)
 from accelpy.util import Object, gethash, get_config, set_config, pack_arguments
 from accelpy.compiler import get_compilers
 
@@ -21,19 +22,17 @@ class AccelDataBase(Object):
     def __init__(self, *kernels, mapto=[], maptofrom=[], mapfrom=[],
                     mapalloc=[], cache=MEMCACHE, profile=NOPROF, debug=NODEBUG):
 
-        for kernel in kernels:
-            if kernel.name != kernels[0].name:
-                raise Exception("Kernel accel type mismatch: %s != %s" %
-                                (kernel.name, kernels[0].name)) 
-
         self.kernels = kernels
+        self.debug = debug
+        self.profile = profile
+        self.cache = cache
 
         if not self.offload:
+            for kernel in self.kernels:
+                kernel.set_name(self.name)
+
             return
 
-        self.cache = cache
-        self.profile = profile
-        self.debug = debug
         self.cachekey = None
         self.liblang = [None, None]
         self.libpath = None 
@@ -44,8 +43,7 @@ class AccelDataBase(Object):
         self.mapalloc  = pack_arguments(mapalloc)
         self.mapfrom    = pack_arguments(mapfrom)
 
-        keys = [os.uname().release, version, self.kernels[0].name,
-                self.kernels[0].compile]
+        keys = [os.uname().release, version, self.name, self.kernels[0].compile]
 
         argindex = 0
 
@@ -109,12 +107,16 @@ class AccelDataBase(Object):
 
         dataenter(*[a["data"] for a in argitems])
 
+        for kernel in self.kernels:
+            kernel.set_name(self.name)
+
     def build_sharedlib(self, ckey):
 
         errmsgs = []
 
-        compilers = get_compilers(self.kernels[0].name, self.kernels[0].lang,
-                                    compile=self.kernels[0].compile)
+        compilers = get_compilers(self.name, self.lang,
+                                    compile=self.kernels[0].compile,
+                                    debug=self.debug)
 
         for comp in compilers:
 
@@ -151,7 +153,7 @@ class AccelDataBase(Object):
                 if not os.path.isdir(get_config("blddir")):
                     set_config("blddir", tempfile.mkdtemp())
 
-                bldpath = comp.compile(codes, macros, self.debug)
+                bldpath = comp.compile(codes, macros)
 
                 self.cachekey = cachekey
                 slib_cache[self.cachekey] = (comp.lang, basename, comp.libext,
@@ -206,36 +208,36 @@ class AccelDataBase(Object):
             kernel.stop(timeout=timeout)
 
 
-def AccelData(*kernels, accel=None, mapto=[], maptofrom=[], mapfrom=[],
-                mapalloc=[], cache=MEMCACHE, profile=NOPROF, debug=NODEBUG):
+def AccelData(*kernels, acctype=None, mapto=[], maptofrom=[], mapfrom=[],
+                mapalloc=[], cache=MEMCACHE, profile=NOPROF, debug=NODEBUG,
+                environ={}):
 
-    if isinstance(accel, str):
-        return AccelDataBase.avails[accel](*kernels, mapto=mapto,
-                    maptofrom=maptofrom, mapfrom=mapfrom, mapalloc=mapalloc,
-                    cache=cache, profile=profile, debug=debug)
+    if isinstance(acctype, str):
+        acctype = (acctype,)
 
-    elif accel is None:
-        return AccelDataBase.avails[kernels[0].name](*kernels, mapto=mapto,
-                    maptofrom=maptofrom, mapfrom=mapfrom, mapalloc=mapalloc,
-                    cache=cache, profile=profile, debug=debug)
+    accel = set(AccelDataBase.avails.keys()) if acctype is None else set(acctype)
 
-    elif isinstance(accel, (list, tuple)):
+    for kernel in kernels:
+        kernel.spec.eval_pysection(environ)
+        accel &= set(kernel.spec.list_sections())
 
-        errmsgs = []
+    errmsgs = []
 
-        for a in accel:
-            try:
-                accel = AccelDataBase.avails[a](*kernels, mapto=mapto,
-                                maptofrom=maptofrom, mapfrom=mapfrom,
-                                mapalloc=mapalloc, cache=cache,
-                                profile=profile, debug=debug)
-                return accel
+    for a in sorted(list(accel), key=(lambda x: accel_priority.index(x))):
+        try:
+            accel = AccelDataBase.avails[a](*kernels, mapto=mapto,
+                            maptofrom=maptofrom, mapfrom=mapfrom,
+                            mapalloc=mapalloc, cache=cache,
+                            profile=profile, debug=debug)
 
-            except Exception as err:
-                errmsgs.append(repr(err))
+            if debug > 0:
+                print("DEBUG: using '%s' acceldata" % accel.name)
 
-        raise Exception("No acceldata is available: %s" % "\n".join(errmsgs))
+            return accel
 
-    raise Exception("Accelerator '%s' is not valid." % str(accel))
+        except Exception as err:
+            errmsgs.append(repr(err))
+
+    raise Exception("No acceldata is available: %s" % "\n".join(errmsgs))
 
 

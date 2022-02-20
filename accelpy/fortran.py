@@ -5,7 +5,7 @@ import abc
 from uuid import uuid4
 from accelpy.accel import AccelDataBase
 from accelpy.kernel import KernelBase
-from accelpy.util import fortline_pack, f_dtypemap
+from accelpy.util import fortline_pack, f_dtypemap, getname_varmap
 from ctypes import c_int32, c_int64, c_float, c_double
 
 
@@ -139,9 +139,6 @@ class FortranKernel(KernelBase):
     def get_dtype(self, arg):
         return f_dtypemap[arg["data"].dtype.name][0]
 
-    def getname_varmap(self, arg):
-        return "accelpy_varmap_%s" % arg["curname"]
-
     def _get_datavars(self):
 
         out = []
@@ -166,7 +163,7 @@ class FortranKernel(KernelBase):
 
         for arg in self.data:
             dtype = self.get_dtype(arg)
-            funcname = self.getname_varmap(arg)
+            funcname = getname_varmap(arg)
             ndim = arg["data"].ndim
 
             if ndim > 0:
@@ -368,7 +365,7 @@ class FortranOpenAccelData(FortranAccelData):
             item["modname"] = gname
 
             enterargs.append(lname)
-            shape = ",".join([":%d"%s for s in item["data"].shape])
+            shape = ",".join([":"] * ndim)
             mapto.append("%s(%s)" % (gname, shape))
             bound = ",".join([str(s) for s in item["data"].shape])
             entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
@@ -390,7 +387,7 @@ class FortranOpenAccelData(FortranAccelData):
             item["modname"] = gname
 
             enterargs.append(lname)
-            shape = ",".join([":%d"%s for s in item["data"].shape])
+            shape = ",".join([":"] * ndim)
             maptofrom.append("%s(%s)" % (gname, shape))
             bound = ",".join([str(s) for s in item["data"].shape])
             entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
@@ -412,7 +409,7 @@ class FortranOpenAccelData(FortranAccelData):
             item["modname"] = gname
 
             enterargs.append(lname)
-            shape = ",".join([":%d"%s for s in item["data"].shape])
+            shape = ",".join([":"] * ndim)
             mapalloc.append("%s(%s)" % (gname, shape))
             bound = ",".join([str(s) for s in item["data"].shape])
             entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
@@ -434,7 +431,7 @@ class FortranOpenAccelData(FortranAccelData):
             item["modname"] = gname
 
             enterargs.append(lname)
-            shape = ",".join([":%d"%s for s in item["data"].shape])
+            shape = ",".join([":"] * ndim)
             mapfrom.append("%s(%s)" % (gname, shape))
             mapalloc.append("%s(%s)" % (gname, shape))
             bound = ",".join([str(s) for s in item["data"].shape])
