@@ -118,7 +118,7 @@ class AccelDataBase(Object):
 
         for comp in compilers:
 
-            cachekey = ckey + "_" + comp.vendor
+            cachekey = ckey + "_" + comp.vendor + "".join(comp.version)
 
             if self.cache >= FILECACHE and cachekey in slib_cache:
                 lang, basename, libext, libpath, bldpath = slib_cache[cachekey]

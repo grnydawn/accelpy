@@ -368,7 +368,8 @@ class FortranOpenAccelData(FortranAccelData):
             item["modname"] = gname
 
             enterargs.append(lname)
-            mapto.append(gname)
+            shape = ",".join([":%d"%s for s in item["data"].shape])
+            mapto.append("%s(%s)" % (gname, shape))
             bound = ",".join([str(s) for s in item["data"].shape])
             entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
                             dtype, bound, lname))
@@ -389,7 +390,8 @@ class FortranOpenAccelData(FortranAccelData):
             item["modname"] = gname
 
             enterargs.append(lname)
-            maptofrom.append(gname)
+            shape = ",".join([":%d"%s for s in item["data"].shape])
+            maptofrom.append("%s(%s)" % (gname, shape))
             bound = ",".join([str(s) for s in item["data"].shape])
             entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
                             dtype, bound, lname))
@@ -410,7 +412,8 @@ class FortranOpenAccelData(FortranAccelData):
             item["modname"] = gname
 
             enterargs.append(lname)
-            mapalloc.append(gname)
+            shape = ",".join([":%d"%s for s in item["data"].shape])
+            mapalloc.append("%s(%s)" % (gname, shape))
             bound = ",".join([str(s) for s in item["data"].shape])
             entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
                             dtype, bound, lname))
@@ -431,8 +434,9 @@ class FortranOpenAccelData(FortranAccelData):
             item["modname"] = gname
 
             enterargs.append(lname)
-            mapfrom.append(gname)
-            mapalloc.append(gname)
+            shape = ",".join([":%d"%s for s in item["data"].shape])
+            mapfrom.append("%s(%s)" % (gname, shape))
+            mapalloc.append("%s(%s)" % (gname, shape))
             bound = ",".join([str(s) for s in item["data"].shape])
             entertypedecls.append("%s, DIMENSION(%s), INTENT(INOUT), TARGET :: %s" % (
                             dtype, bound, lname))

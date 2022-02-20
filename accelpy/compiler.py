@@ -319,14 +319,15 @@ class GnuFortranCompiler(FortranCompiler):
 
     def get_option(self):
 
-        moddir = self.opt_moddir % get_config("blddir")
+        maxline = " -ffree-line-length-none -ffixed-line-length-none"
+        append_opts = self.opt_moddir % get_config("blddir") + maxline
 
         if sys.platform == "darwin":
-            opts = ("-dynamiclib -fPIC %s " % moddir  +
+            opts = ("-dynamiclib -fPIC %s " % append_opts  +
                     super(GnuFortranCompiler, self).get_option())
 
         elif sys.platform == "linux":
-            opts = ("-shared -fPIC %s " % moddir +
+            opts = ("-shared -fPIC %s " % append_opts +
                     super(GnuFortranCompiler, self).get_option())
 
         else:

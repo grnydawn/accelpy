@@ -79,13 +79,13 @@ cpp_enable = True
 [openacc_cpp]
     int length = shape_x[0];
 
-    #pragma acc data copyin(x[0:length], y[0:length]) copyout(z[0:length])
-    {
+    //#pragma acc data copyin(x[0:length], y[0:length]) copyout(z[0:length])
+    //{
     #pragma acc parallel loop worker 
     for (int id = 0; id < length; id++) {
         z[id] = x[id] + y[id];
     }
-    }
+    //}
 
 [openacc_fortran]
     INTEGER id, begin, end
@@ -93,14 +93,14 @@ cpp_enable = True
     begin = LBOUND(x,1) 
     end = UBOUND(x,1) 
 
-    !$acc data copyin(x(begin:end), y(begin:end)) copyout(z(begin:end))
+    !!$acc data copyin(x(begin:end), y(begin:end)) copyout(z(begin:end))
     !$acc parallel num_workers(end-begin+1) 
     !$acc loop worker
     DO id=begin, end
         z(id) = x(id) + y(id)
     END DO
     !$acc end parallel
-    !$acc end data
+    !!$acc end data
 
 [openmp_cpp]
 
@@ -203,8 +203,8 @@ set_argnames("x", "y", "z")
     int len1 = SHAPE(x, 1);
     int len2 = SHAPE(x, 2);
 
-    #pragma acc data copyin(x[0:len0][0:len1][0:len2], y[0:len0][0:len1][0:len2]) copyout(z[0:len0][0:len1][0:len2])
-    {
+    //#pragma acc data copyin(x[0:len0][0:len1][0:len2], y[0:len0][0:len1][0:len2]) copyout(z[0:len0][0:len1][0:len2])
+    //{
     #pragma acc parallel
     {
     #pragma acc loop gang
@@ -218,7 +218,7 @@ set_argnames("x", "y", "z")
         }
     }
     }
-    }
+    //}
 
 [openacc_fortran]
     INTEGER i, j, k, b1, b2, b3, e1, e2, e3
@@ -230,7 +230,7 @@ set_argnames("x", "y", "z")
     e2 = UBOUND(x,2) 
     e3 = UBOUND(x,3) 
 
-    !$acc data copyin(x(b1:e1, b2:e2, b3:e3), y(b1:e1, b2:e2, b3:e3)), copyout(z(b1:e1, b2:e2, b3:e3))
+    !!$acc data copyin(x(b1:e1, b2:e2, b3:e3), y(b1:e1, b2:e2, b3:e3)), copyout(z(b1:e1, b2:e2, b3:e3))
     !$acc parallel num_gangs(e1-b1+1) num_workers(e2-b2+1) vector_length(e3-b3+1)
     !$acc loop gang
     DO i=b1, e1
@@ -243,7 +243,7 @@ set_argnames("x", "y", "z")
         END DO
     END DO
     !$acc end parallel
-    !$acc end data
+    !!$acc end data
 
 [openmp_cpp]
     #pragma omp for
@@ -366,8 +366,8 @@ set_argnames("X", "Y", "Z")
     int z0 = SHAPE(Z, 0);
     int z1 = SHAPE(Z, 1);
 
-    #pragma acc data copyin(X[0:x0][0:x1], Y[0:y0][0:y1]) copyout(Z[0:z0][0:z1])
-    {
+    //#pragma acc data copyin(X[0:x0][0:x1], Y[0:y0][0:y1]) copyout(Z[0:z0][0:z1])
+    //{
     #pragma acc parallel
     {
     #pragma acc loop gang
@@ -381,7 +381,7 @@ set_argnames("X", "Y", "Z")
         }
     }
     }
-    }
+    //}
 
 [openacc_fortran]
     INTEGER i, j, k, xl1, xu1, xl2, xu2, yl1, yu1, yl2, yu2, zl1, zu1, zl2, zu2
@@ -399,7 +399,6 @@ set_argnames("X", "Y", "Z")
     zl2 = LBOUND(Z,2) 
     zu2 = UBOUND(Z,2) 
 
-    !!$acc data copyin(X(xl1:xu1, xl2:xu2), Y(yl1:yu1, yl2:yu2)), copyout(Z(zl1:zu1, zl2:zu2))
     !$acc parallel num_gangs(xu1-xl1+1) num_workers(yu2-yl2+1)
     !$acc loop gang
     DO i=xl1, xu1
@@ -412,7 +411,6 @@ set_argnames("X", "Y", "Z")
         END DO
     END DO
     !$acc end parallel
-    !!$acc end data
 
 [openmp_cpp]
 
@@ -475,7 +473,6 @@ set_argnames("X", "Y", "Z")
 
 [omptarget_cpp]
 
-    //#pragma omp target enter data map(to:X[0:SHAPE(X,0)], Y[0:SHAPE(Y,0)]) map(alloc: Z[0:SHAPE(Z,0)])
     #pragma omp target teams num_teams(SHAPE(X, 0))
     #pragma omp distribute
     for (int i = 0; i < SHAPE(X, 0); i++) {
@@ -487,7 +484,6 @@ set_argnames("X", "Y", "Z")
             }
         }
     }
-    //#pragma omp target exit data map(from: Z[0:SHAPE(Z,0)])
 
 """
 }

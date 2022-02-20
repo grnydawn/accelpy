@@ -248,7 +248,7 @@ class KernelBase(Object):
 
         for comp in compilers:
 
-            cachekey = ckey + "_" + comp.vendor
+            cachekey = ckey + "_" + comp.vendor + "".join(comp.version)
 
             if self.cache >= FILECACHE and cachekey in slib_cache:
                 lang, basename, libext, libpath, bldpath = slib_cache[cachekey]
@@ -285,7 +285,7 @@ class KernelBase(Object):
 
                 self.cachekey = cachekey
                 slib_cache[self.cachekey] = (comp.lang, basename, comp.libext,
-                                                    libdir, bldpath)
+                                                    libpath, bldpath)
                 return comp.lang, libpath, bldpath
 
             except Exception as err:
