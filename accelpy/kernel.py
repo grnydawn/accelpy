@@ -336,7 +336,7 @@ class Kernel:
         raise Exception("\n".join(errmsgs))
 
 
-    def set_kernel(self):
+    def set_kernel(self, acctype=None):
 
         if isinstance(self.acctype, str):
             acctype = (self.acctype,)
