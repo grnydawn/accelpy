@@ -20,6 +20,7 @@ class Compiler(Object):
     objext = "o"
     opt_compile_only = "-c"
     opt_debug = "-O0 -g"
+    hashkey = None 
 
     def __init__(self, path, option=None, debug=NODEBUG):
 
@@ -67,6 +68,7 @@ class Compiler(Object):
             raise Exception("Compiler version check fails: %s" % out.stderr)
 
         self.version = self.parse_version(out.stdout)
+        self.hashkey = hashlib.md5(out.stdout).hexdigest()[:10]
 
     def _compile(self, code, ext, macros):
 
@@ -1185,10 +1187,10 @@ def get_compilers(accname, lang, compile=None, debug=NODEBUG):
 
             else:
                 # TODO: vendor name search
-                for lang, langsubc in Compiler.avails.items():
-                    for kernel, kernelsubc in langsubc.items():
-                        for vendor, vendorsubc in kernelsubc.items():
-                            if vendor == citems[0]:
+                for clang, langsubc in Compiler.avails.items():
+                    for ckernel, kernelsubc in langsubc.items():
+                        for cvendor, vendorsubc in kernelsubc.items():
+                            if cvendor == citems[0] and clang == lang:
                                 try:
                                     compilers.append(vendorsubc(
                                         option=" ".join(citems[1:]),
@@ -1216,10 +1218,10 @@ def get_compilers(accname, lang, compile=None, debug=NODEBUG):
 
                     else:
                         # TODO: vendor name search
-                        for lang, langsubc in Compiler.avails.items():
-                            for kernel, kernelsubc in langsubc.items():
-                                for vendor, vendorsubc in kernelsubc.items():
-                                    if vendor == citems[0]:
+                        for clang, langsubc in Compiler.avails.items():
+                            for ckernel, kernelsubc in langsubc.items():
+                                for cvendor, vendorsubc in kernelsubc.items():
+                                    if cvendor == citems[0] and clang ==lang:
                                         try:
                                             compilers.append(vendorsubc(
                                                 option=" ".join(citems[1:]),

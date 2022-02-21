@@ -8,7 +8,8 @@ from numpy.ctypeslib import ndpointer, load_library
 from collections import OrderedDict
 
 from accelpy.const import (version, NOCACHE, MEMCACHE, FILECACHE, NODEBUG,
-                            MINDEBUG, MAXDEBUG, NOPROF, MINPROF, MAXPROF)
+                            MINDEBUG, MAXDEBUG, NOPROF, MINPROF, MAXPROF,
+                            accel_priority)
 from accelpy.util import (Object, gethash, get_config, set_config,
                             pack_arguments, getname_varmap)
 from accelpy.spec import Spec
@@ -139,15 +140,15 @@ class KernelBase(Object):
 
     avails = OrderedDict()
 
-    #def __init__(self, spec, compile=None, cache=MEMCACHE, profile=NOPROF, debug=NODEBUG):
-    def __init__(self, section, data):
+    #def __init__(self, spec, compile=None, debug=NODEBUG):
+    def __init__(self, section, data, cache=MEMCACHE, profile=NOPROF, debug=NODEBUG):
 
         self.section = section
         self.data = data
-#
-#        self.cache = cache
-#        self.profile = profile
-#        self.debug = debug
+        self.debug = debug
+        self.cache = cache
+        self.profile = profile
+
 #        self.spec = spec if isinstance(spec, Spec) else Spec(spec)
 #        self.compile = compile
 #        self.cachekey = None
@@ -155,7 +156,6 @@ class KernelBase(Object):
 #
 #        if self.spec is None:
 #            raise Exception("No kernel spec is found")
-        pass
 
     @abc.abstractmethod
     def get_dtype(self, arg):
@@ -207,6 +207,9 @@ class Kernel:
         if self.acctype is None:
             self.name = name
 
+        elif self.acctype == name:
+            self.name = name
+
         elif isinstance(self.acctype, (list, tuple)) and name in self.acctype:
             self.name = name
 
@@ -217,8 +220,13 @@ class Kernel:
     def launch(self, *data, environ={}):
 
         self.spec.eval_pysection(environ)
-        self.section = self.spec.get_section(self.name)
         self.data = pack_arguments(data)
+
+        if self.name is None or self._kernel is None:
+            self.set_kernel()
+
+        else:
+            self.section = self.spec.get_section(self.name)
 
         if self._kernel is None:
             if self.name is None:
@@ -282,7 +290,7 @@ class Kernel:
 
         for comp in compilers:
 
-            cachekey = ckey + "_" + comp.vendor + "".join(comp.version)
+            cachekey = ckey + "_" + comp.hashkey
 
             if self.cache >= FILECACHE and cachekey in slib_cache:
                 lang, basename, libext, libpath, bldpath = slib_cache[cachekey]
@@ -326,6 +334,32 @@ class Kernel:
                 errmsgs.append(str(err))
 
         raise Exception("\n".join(errmsgs))
+
+
+    def set_kernel(self):
+
+        if isinstance(self.acctype, str):
+            acctype = (self.acctype,)
+
+        accel = set(KernelBase.avails.keys()) if acctype is None else set(acctype)
+        accel &= set(self.spec.list_sections())
+
+        errmsgs = []
+
+        for a in sorted(list(accel), key=(lambda x: accel_priority.index(x))):
+            try:
+                section = self.spec.get_section(a)
+                self._kernel = KernelBase.avails[a](section, self.data, debug=self.debug)
+                self.name = self._kernel.name
+                self.section = section
+
+                return
+
+            except Exception as err:
+                errmsgs.append(repr(err))
+
+        raise Exception("No kernel is available: %s" % "\n".join(errmsgs))
+
 
 #def Kernel(spec, accel=None, compile=None, cache=MEMCACHE, profile=0, debug=NODEBUG):
 #

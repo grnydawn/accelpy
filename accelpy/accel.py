@@ -1,6 +1,6 @@
 """accelpy Accel module"""
 
-import abc, os, tempfile
+import abc, os, tempfile, shutil
 
 from ctypes import CDLL, RTLD_GLOBAL
 from numpy.ctypeslib import ndpointer
@@ -19,13 +19,14 @@ class AccelDataBase(Object):
     offload = False
 
     # get map info, build & load slib, run mapping, hand over slib to kernels
-    def __init__(self, *kernels, mapto=[], maptofrom=[], mapfrom=[],
+    def __init__(self, *kernels, mapto=[], maptofrom=[], mapfrom=[], compile=None,
                     mapalloc=[], cache=MEMCACHE, profile=NOPROF, debug=NODEBUG):
 
         self.kernels = kernels
         self.debug = debug
         self.profile = profile
         self.cache = cache
+        self.compile = compile
 
         if not self.offload:
             for kernel in self.kernels:
@@ -110,17 +111,26 @@ class AccelDataBase(Object):
         for kernel in self.kernels:
             kernel.set_name(self.name)
 
+        if (self.libpath and self.bldpath and not os.path.isfile(self.libpath)
+            and os.path.isfile(self.bldpath)):
+            try:
+                shutil.copyfile(self.bldpath, self.libpath)
+
+            except FileExistsError:
+                pass
+
+
     def build_sharedlib(self, ckey):
 
         errmsgs = []
 
-        compilers = get_compilers(self.name, self.lang,
-                                    compile=self.kernels[0].compile,
-                                    debug=self.debug)
+        compile = self.compile if self.compile else self.kernels[0].compile
 
+        compilers = get_compilers(self.name, self.lang, compile=compile,
+                                    debug=self.debug)
         for comp in compilers:
 
-            cachekey = ckey + "_" + comp.vendor + "".join(comp.version)
+            cachekey = ckey + "_" + comp.hashkey
 
             if self.cache >= FILECACHE and cachekey in slib_cache:
                 lang, basename, libext, libpath, bldpath = slib_cache[cachekey]
@@ -157,7 +167,7 @@ class AccelDataBase(Object):
 
                 self.cachekey = cachekey
                 slib_cache[self.cachekey] = (comp.lang, basename, comp.libext,
-                                                    libdir, bldpath)
+                                                    libpath, bldpath)
                 return comp.lang, libpath, bldpath
 
             except Exception as err:
@@ -210,7 +220,7 @@ class AccelDataBase(Object):
 
 def AccelData(*kernels, acctype=None, mapto=[], maptofrom=[], mapfrom=[],
                 mapalloc=[], cache=MEMCACHE, profile=NOPROF, debug=NODEBUG,
-                environ={}):
+                environ={}, compile=None):
 
     if isinstance(acctype, str):
         acctype = (acctype,)
@@ -219,25 +229,28 @@ def AccelData(*kernels, acctype=None, mapto=[], maptofrom=[], mapfrom=[],
 
     for kernel in kernels:
         kernel.spec.eval_pysection(environ)
-        accel &= set(kernel.spec.list_sections())
+
+        if kernel.acctype and kernel.acctype not in accel:
+            continue
+
+        accel &= set(kernel.spec.list_sections(acctype=acctype))
 
     errmsgs = []
 
     for a in sorted(list(accel), key=(lambda x: accel_priority.index(x))):
         try:
-            accel = AccelDataBase.avails[a](*kernels, mapto=mapto,
+            acc = AccelDataBase.avails[a](*kernels, mapto=mapto,
                             maptofrom=maptofrom, mapfrom=mapfrom,
                             mapalloc=mapalloc, cache=cache,
-                            profile=profile, debug=debug)
+                            profile=profile, debug=debug, compile=compile)
 
             if debug > 0:
-                print("DEBUG: using '%s' acceldata" % accel.name)
+                print("DEBUG: using '%s' acceldata" % acc.name)
 
-            return accel
+            return acc
 
         except Exception as err:
             errmsgs.append(repr(err))
 
     raise Exception("No acceldata is available: %s" % "\n".join(errmsgs))
-
 

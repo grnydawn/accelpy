@@ -196,7 +196,10 @@ class Spec(Object):
 
         raise Exception("No section with '%s' exists or is enabled." % accel)
 
-    def list_sections(self):
+    def list_sections(self, acctype=None):
+
+        if isinstance(acctype, str):
+            acctype = (acctype,)
 
         secs = []
 
@@ -205,6 +208,9 @@ class Spec(Object):
             sec.kwargs = funcargseval(",".join(sec._kwargs), self.env)
 
             if sec.is_enabled():
+                if acctype and sec.accel not in acctype:
+                    continue
+
                 secs.append(sec.accel)
 
         return secs
