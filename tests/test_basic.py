@@ -16,7 +16,7 @@ def run_around_tests():
     #assert files_before == files_after
 
 @mark.parametrize("acctype, compile", testable)
-def test_first(acctype, compile):
+def ttest_first(acctype, compile):
 
     lang = "fortran" if "fortran" in acctype else "cpp"
 
@@ -33,7 +33,7 @@ def test_first(acctype, compile):
     assert_testdata("vecadd1d", data)
 
 @mark.parametrize("acctype, compile", testable)
-def test_vecadd3d(acctype, compile):
+def ttest_vecadd3d(acctype, compile):
 
     lang = "fortran" if "fortran" in acctype else "cpp"
 
@@ -51,7 +51,7 @@ def test_vecadd3d(acctype, compile):
 
 
 @mark.parametrize("acctype, compile", testable)
-def test_matmul(acctype, compile):
+def ttest_matmul(acctype, compile):
 
     lang = "fortran" if "fortran" in acctype else "cpp"
 

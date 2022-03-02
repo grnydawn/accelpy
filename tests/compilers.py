@@ -3,7 +3,7 @@
 from accelpy.compiler import Compiler
 
 excepts = {
-    "cray": ["openacc_fortran", "openmp_fortran"],
+    "cray": ["openacc_fortran", "openmp_fortran", "omptarget_cpp"],
 }
 
 testable = []
@@ -27,7 +27,7 @@ for lang, accels in Compiler.avails.items():
 #testable = [("hip", "amd")]
 #testable = [("cpp", "cray")]
 #testable = [("omptarget_fortran", "cray")]
-#testable = [("openacc_fortran", "cray")]
+testable = [("openacc_fortran", "cray")]
 #testable = [("openacc_fortran", "gnu")]
 #testable = [("omptarget_fortran", "gnu")]
 #testable = [("omptarget_fortran", "amd")]
