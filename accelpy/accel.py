@@ -1,256 +1,49 @@
-"""accelpy Accel module"""
+"""Accelpy accel module"""
 
-import abc, os, tempfile, shutil
+import os
 
-from ctypes import CDLL, RTLD_GLOBAL
-from numpy.ctypeslib import ndpointer
-from collections import OrderedDict
-from accelpy.const import (version, NOCACHE, MEMCACHE, FILECACHE, NODEBUG,
-                            MINDEBUG, MAXDEBUG, NOPROF, MINPROF, MAXPROF,
-                            accel_priority)
-from accelpy.util import Object, gethash, get_config, set_config, pack_arguments
-from accelpy.compiler import get_compilers
+from accelpy.util import load_sharedlib, invoke_sharedlib
+from accelpy.compile import build_sharedlib
 
-from accelpy.cache import slib_cache
+class Accel:
 
-class AccelDataBase(Object):
+    def __init__(self, srcdatapath, outdatapath, srckernelpath, outkernelpath,
+                    vendor=None):
 
-    avails = OrderedDict()
-    offload = False
+        self.srcdatapath =srcdatapath
+        self.outdatapath = outdatapath
+        self.srckernelpath = srckernelpath
+        self.outkernelpath = outkernelpath
+        self.vendor = vendor
 
-    # get map info, build & load slib, run mapping, hand over slib to kernels
-    def __init__(self, *kernels, mapto=[], maptofrom=[], mapfrom=[], compile=None,
-                    mapalloc=[], cache=MEMCACHE, profile=NOPROF, debug=NODEBUG):
 
-        self.kernels = kernels
-        self.debug = debug
-        self.profile = profile
-        self.cache = cache
-        self.compile = compile
+    def run(self, *vargs):
 
-        if not self.offload:
-            for kernel in self.kernels:
-                kernel.set_name(self.name)
+        # build acceldata
+        build_sharedlib(self.srcdatapath, self.outdatapath, vendor=self.vendor)
+        assert os.path.isfile(self.outdatapath)
 
-            return
+        # load acceldata
+        libdata = load_sharedlib(self.outdatapath)
+        assert libdata is not None
 
-        self.cachekey = None
-        self.liblang = [None, None]
-        self.libpath = None 
-        self.bldpath = None
+        # invoke function in acceldata
+        resdata = invoke_sharedlib(libdata, "dataenter", *vargs)
+        assert resdata == 0
 
-        self.mapto      = pack_arguments(mapto)
-        self.maptofrom  = pack_arguments(maptofrom)
-        self.mapalloc  = pack_arguments(mapalloc)
-        self.mapfrom    = pack_arguments(mapfrom)
+        # build kernel
+        build_sharedlib(self.srckernelpath, self.outkernelpath, vendor=self.vendor)
+        assert os.path.isfile(self.outkernelpath)
 
-        keys = [os.uname().release, version, self.name, self.kernels[0].compile]
+        # load kernel
+        libkernel = load_sharedlib(self.outkernelpath)
+        assert libkernel is not None
 
-        argindex = 0
+        # invoke function in kernel
+        reskernel = invoke_sharedlib(libkernel, "runkernel", *vargs)
+        assert reskernel == 0
 
-        for maptype, data in zip(("to", "tofrom", "alloc", "from"),
-                (self.mapto, self.maptofrom, self.mapalloc, self.mapfrom)):
-
-            keys.append(maptype)
-
-            for item in data:
-                keys.append(item["data"].shape)
-                keys.append(item["data"].dtype)
-
-                item["index"] = argindex
-                argindex += 1
-
-        if self.liblang[0] is None or self.cache < MEMCACHE:
-            lang, libpath, bldpath = self.build_sharedlib(gethash(str(keys)))
-            self.liblang[0] = None
-            self.liblang[1] = lang
-            self.libpath = libpath
-            self.bldpath = bldpath
-
-        lib = None
-
-        if self.liblang[0] is None:
-            if self.libpath is not None and os.path.isfile(self.libpath):
-                try:
-                    lib = CDLL(self.libpath, mode=RTLD_GLOBAL)
-                except:
-                    pass
-
-            if (lib is None and self.bldpath is not None and
-                    os.path.isfile(self.bldpath)):
-                lib = CDLL(self.bldpath, mode=RTLD_GLOBAL)
-
-        if lib is not None:
-            self.liblang[0] = lib
-#
-#        self.mapto      = pack_arguments(mapto)
-#        self.maptofrom  = pack_arguments(maptofrom)
-#        self.mapalloc  = pack_arguments(mapalloc)
-
-        argtypes = []
-        argitems = self.mapto+self.maptofrom+self.mapalloc+self.mapfrom
-
-        for item in argitems:
-
-            if self.liblang[1] == "cpp":
-                flags = ["c_contiguous"]
-
-            elif self.liblang[1] == "fortran":
-                flags = ["f_contiguous"]
-
-            else:
-                raise Exception("Unknown language: %s" % self.liblang[1])
-
-            argtypes.append(ndpointer(item["data"].dtype, flags=",".join(flags)))
-
-        dataenter = getattr(self.liblang[0], "dataenter")
-        dataenter.argtypes = argtypes
-
-        dataenter(*[a["data"] for a in argitems])
-
-        for kernel in self.kernels:
-            kernel.set_name(self.name)
-
-        if (self.libpath and self.bldpath and not os.path.isfile(self.libpath)
-            and os.path.isfile(self.bldpath)):
-            try:
-                shutil.copyfile(self.bldpath, self.libpath)
-
-            except FileExistsError:
-                pass
-
-
-    def build_sharedlib(self, ckey):
-
-        errmsgs = []
-
-        compile = self.compile if self.compile else self.kernels[0].compile
-
-        compilers = get_compilers(self.name, self.lang, compile=compile,
-                                    debug=self.debug)
-        for comp in compilers:
-
-            cachekey = ckey + "_" + comp.hashkey
-
-            if self.cache >= FILECACHE and cachekey in slib_cache:
-                lang, basename, libext, libpath, bldpath = slib_cache[cachekey]
-                self.cachekey = cachekey
-
-                return lang, libpath, bldpath
-
-            libdir = os.path.join(get_config("libdir"), comp.vendor, cachekey[:2])
-
-            if not os.path.isdir(libdir):
-                try:
-                    os.makedirs(libdir)
-
-                except FileExistsError:
-                    pass
-
-            basename = cachekey[2:]
-            libname = basename + "." + comp.libext
-            libpath = os.path.join(libdir, libname)
-
-            if self.cache >= FILECACHE and os.path.isfile(libpath):
-                self.cachekey = cachekey
-                slib_cache[self.cachekey] = (comp.lang, basename, comp.libext,
-                                                    libpath, None)
-                return comp.lang, libpath, None
-
-            try:
-                codes, macros = self.gen_code(comp)
-
-                if not os.path.isdir(get_config("blddir")):
-                    set_config("blddir", tempfile.mkdtemp())
-
-                bldpath = comp.compile(codes, macros)
-
-                self.cachekey = cachekey
-                slib_cache[self.cachekey] = (comp.lang, basename, comp.libext,
-                                                    libpath, bldpath)
-                return comp.lang, libpath, bldpath
-
-            except Exception as err:
-                errmsgs.append(str(err))
-
-        raise Exception("\n".join(errmsgs))
-
-    @abc.abstractmethod
-    def get_dtype(self, arg):
-        pass
-
-    @abc.abstractmethod
-    def gen_code(self, compiler):
-        pass
-
-    def wait(self, timeout=None):
-
-        for kernel in self.kernels:
-            kernel.wait(timeout=timeout)
-
-        if self.offload:
-            argtypes = []
-            argitems = self.mapfrom
-
-            for item in argitems:
-
-                if self.liblang[1] == "cpp":
-                    flags = ["c_contiguous"]
-
-                elif self.liblang[1] == "fortran":
-                    flags = ["f_contiguous"]
-
-                else:
-                    raise Exception("Unknown language: %s" % self.liblang[1])
-
-                argtypes.append(ndpointer(item["data"].dtype, flags=",".join(flags)))
-
-            dataexit = getattr(self.liblang[0], "dataexit")
-            dataexit.argtypes = argtypes
-
-            dataexit(*[a["data"] for a in argitems])
-
-    def stop(self, timeout=None):
-
-        self.wait(timeout=timeout)
-
-        for kernel in self.kernels:
-            kernel.stop(timeout=timeout)
-
-
-def AccelData(*kernels, acctype=None, mapto=[], maptofrom=[], mapfrom=[],
-                mapalloc=[], cache=MEMCACHE, profile=NOPROF, debug=NODEBUG,
-                environ={}, compile=None):
-
-    if isinstance(acctype, str):
-        acctype = (acctype,)
-
-    accel = set(AccelDataBase.avails.keys()) if acctype is None else set(acctype)
-
-    for kernel in kernels:
-        kernel.spec.eval_pysection(environ)
-
-        if kernel.acctype and kernel.acctype not in accel:
-            continue
-
-        accel &= set(kernel.spec.list_sections(acctype=acctype))
-
-    errmsgs = []
-
-    for a in sorted(list(accel), key=(lambda x: accel_priority.index(x))):
-        try:
-            acc = AccelDataBase.avails[a](*kernels, mapto=mapto,
-                            maptofrom=maptofrom, mapfrom=mapfrom,
-                            mapalloc=mapalloc, cache=cache,
-                            profile=profile, debug=debug, compile=compile)
-
-            if debug > 0:
-                print("DEBUG: using '%s' acceldata" % acc.name)
-
-            return acc
-
-        except Exception as err:
-            errmsgs.append(repr(err))
-
-    raise Exception("No acceldata is available: %s" % "\n".join(errmsgs))
+        # invoke function in acceldata
+        resdata = invoke_sharedlib(libdata, "dataexit", vargs[-1])
+        assert resdata == 0
 

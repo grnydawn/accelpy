@@ -1,9 +1,6 @@
 """accelpy module"""
 
-from .kernel    import Kernel
-from .accel     import AccelData
-from .spec      import Spec
-from .fortran   import FortranKernel, OpenmpFortranKernel, OpenaccFortranKernel
-from .cpp       import CppKernel, OpenmpCppKernel, OpenaccCppKernel
-from .hip       import HipKernel
-from .cuda      import CudaKernel
+
+from .util import load_sharedlib, invoke_sharedlib
+from .compile import build_sharedlib
+from .accel import Accel

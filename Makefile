@@ -60,7 +60,7 @@ clean-test: ## remove test and coverage artifacts
 	rm -fr htmlcov/
 
 clean-compile:
-	rm -rf *.o *.s core _accelpy_debug_
+	rm -rf *.o *.s core _accelpy_debug_ *.mod results.*
 
 lint: ## check style with flake8
 	flake8 ${NAME} tests

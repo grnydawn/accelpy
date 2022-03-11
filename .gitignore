@@ -137,3 +137,5 @@ dmypy.json
 _accelpy_debug_
 core
 *.s
+testbackup
+*.mod
