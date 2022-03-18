@@ -139,3 +139,4 @@ core
 *.s
 testbackup
 *.mod
+*.csv

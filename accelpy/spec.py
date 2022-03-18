@@ -7,13 +7,12 @@ from accelpy.util import Object, _accelpy_builtins, appeval, funcargseval, getha
 
 class Section():
 
-    def __init__(self, accel, vargs, kwargs, body, env):
+    def __init__(self, accel, lang, fargs, body):
+
         self.accel = accel
-        self.argnames = vargs
-        self._kwargs = kwargs
-        self.kwargs = None
+        self.lang = lang
+        self.fargs = fargs
         self.body = body
-        self.env = env
         self.md5 = None
 
     def hash(self):
@@ -29,12 +28,26 @@ class Section():
     def kind(self):
         return self.accel 
 
-    def update_argnames(self, data):
+    def update_argnames(self, copyinout, copyin, copyout, alloc):
 
-        for idx, arg in enumerate(data):
+        dsts = (copyinout, copyin, copyout, alloc)
+        srcs = (self.copyinout_argnames, self.copyin_argnames,
+                self.copyout_argnames, self.alloc_argnames)
 
-            if self.argnames is not None and len(self.argnames) > idx:
-                arg["curname"] = self.argnames[idx]
+        for dst, src in zip(dsts, srcs):
+
+            lensrc = len(src)
+            lendst = len(dst)
+
+            if lensrc == 0:
+                continue
+
+            if lensrc != lendst:
+                raise Exception("The number of arguments mismatch.")
+
+            for idx, arg in enumerate(dst):
+
+                arg["curname"] = src[idx]
 
 
 class Spec(Object):
@@ -42,7 +55,10 @@ class Spec(Object):
     def __init__(self, spec):
 
         # invargs, outvars, kwargs
-        self._argnames = None
+        self._copyinout_argnames = []
+        self._copyin_argnames = []
+        self._copyout_argnames = []
+        self._alloc_argnames = []
 
         if isinstance(spec, str):
             if os.path.isfile(spec):
@@ -57,9 +73,13 @@ class Spec(Object):
         else:
             raise Exception("Wrong spec type: %s" % str(spec))
 
-    def _of_set_argnames(self, *vargs):
+    def _of_set_argnames(self, *vargs, **kwargs):
 
-        self._argnames = list(vargs)
+        self._copyinout_argnames.extend(vargs)
+        self._copyinout_argnames.extend(kwargs.get("copyinout", []))
+        self._copyin_argnames.extend(kwargs.get("copyin", []))
+        self._copyout_argnames.extend(kwargs.get("copyout", []))
+        self._alloc_argnames.extend(kwargs.get("alloc", []))
 
     def _parse_spec(self, spec):
 
@@ -76,11 +96,6 @@ class Spec(Object):
 
         sec_starts.append(len(rawlines))
 
-        self._env = dict(_accelpy_builtins)
-        self._env["set_argnames"] =  self._of_set_argnames
-
-        self.env = self._env.copy()
-
         self._pysection = rawlines[0:sec_starts[0]]
 
         sections = []
@@ -92,7 +107,8 @@ class Spec(Object):
 
     def eval_pysection(self, env):
 
-        self.env = self._env.copy()
+        self.env = dict(_accelpy_builtins)
+        self.env["set_argnames"] =  self._of_set_argnames
 
         if isinstance(env, dict):
             self.env.update(env)
@@ -134,8 +150,16 @@ class Spec(Object):
 
         assert names
 
-        accels = [n.strip() for n in "".join(names).split(",")]
-        
+        #accels = [n.strip() for n in "".join(names).split(",")]
+        accels = []
+        for accid in "".join(names).split(","):
+            acclang = accid.strip().split("_")
+            if len(acclang) == 2:
+                accels.append(acclang)
+    
+            elif len(acclang) == 1:
+                accels.append(acclang*2)
+
         args = []
 
         char, row, col = arg_start
@@ -157,8 +181,6 @@ class Spec(Object):
 
                 try:
                     fargs = " ".join(args).split(",")
-                    vargs = [a.strip() for a in fargs if "=" not in a]
-                    kwargs = [a.strip() for a in fargs[len(vargs):]]
                     body = rawlines[row+1:]
                     break
 
@@ -166,33 +188,53 @@ class Spec(Object):
                     row += 1
                     col = 0
         else:
-            vargs, kwargs, body = [], {}, rawlines[row+1:]
+            fargs, body = [], rawlines[row+1:]
 
         sections = []
 
-        for accel in accels:
-            sections.append(Section(accel, vargs, kwargs, body, self.env))
+        for acc, lang in accels:
+            sections.append(Section(acc, lang, fargs, body))
 
         return sections
 
-    def update_argnames(self, data):
+    def update_argnames(self, copyinout, copyin, copyout, alloc):
 
-        for idx, arg in enumerate(data):
+        dsts = (copyinout, copyin, copyout, alloc)
+        srcs = (self._copyinout_argnames, self._copyin_argnames,
+                self._copyout_argnames, self._alloc_argnames)
 
-            if self._argnames is not None and len(self._argnames) > idx:
-                arg["curname"] = self._argnames[idx]
+        for dst, src in zip(dsts, srcs):
 
-            else:
-                arg["curname"] = "accpy_var%d" % idx
+            lensrc = len(src)
+            lendst = len(dst)
 
-    def get_section(self, accel):
+            if lensrc == 0:
+                src = ["accpy_var%d" % idx for idx in range(lendst)]
+                lensrc = lendst
+
+            if lensrc != lendst:
+                raise Exception("The number of arguments mismatch.")
+
+            for idx, arg in enumerate(dst):
+
+                arg["curname"] = src[idx]
+
+    def get_section(self, accel, lang):
 
         for sec in self._sections:
 
-            if sec.kwargs is None:
-                sec.kwargs = funcargseval(",".join(sec._kwargs), self.env)
+            if sec.accel != accel or sec.lang != lang:
+                continue
 
-            if sec.accel == accel and sec.is_enabled():
+            if not hasattr(self, "vargs") or not hasattr(self, "kwargs"):
+                sec.vargs, sec.kwargs = funcargseval(",".join(sec.fargs), self.env)
+
+                sec.copyinout_argnames = sec.vargs
+                sec.copyinout_argnames.extend(sec.kwargs.get("copyinout", []))
+                sec.copyin_argnames = sec.kwargs.get("copyout", [])
+                sec.copyout_argnames = sec.kwargs.get("copyin", [])
+                sec.alloc_argnames = sec.kwargs.get("alloc", [])
+
+            if sec.is_enabled():
                 return sec
 
-        raise Exception("No section with '%s' exists or is enabled." % accel)

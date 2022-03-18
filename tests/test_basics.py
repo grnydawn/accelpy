@@ -1,90 +1,98 @@
 
-import os, sys
-import numpy as np
-from accelpy import Accel, build_sharedlib, load_sharedlib, invoke_sharedlib
+import shutil
 
-N1 = 2
-N2 = 3
+from tempfile import TemporaryDirectory
 
-X = np.ones(N1*N2, order="F").reshape((N1, N2))
-Y = np.ones(N1*N2, order="F").reshape((N1, N2)) * 2
-Z = np.zeros(N1*N2, order="F").reshape((N1, N2))
+from accelpy import Spec, Kernel, build_sharedlib, load_sharedlib, invoke_sharedlib
+from testdata import get_testdata, assert_testdata
 
-here = os.path.dirname(__file__)
-resdir = os.path.join(here, "res")
 
-libext = "dylib" if sys.platform == "darwin" else "so"
-
-srcdatapath = os.path.join(resdir, "ompdata.F90")
-outdatapath = os.path.join(resdir, "libompdata." + libext)
-srckernelpath = os.path.join(resdir, "ompkernel.F90")
-outkernelpath = os.path.join(resdir, "libompkernel." + libext)
+test_vendors = ("cray", "ibm", "gnu")
 
 def test_omptarget1():
 
+    import os, sys
+    import numpy as np
+
+    lang = "fortran"
+
+    N1 = 2
+    N2 = 3
+
+    X = np.ones(N1*N2).reshape((N1, N2), order="F")
+    Y = np.ones(N1*N2).reshape((N1, N2), order="F") * 2
+    Z = np.zeros(N1*N2).reshape((N1, N2), order="F")
+
+    here = os.path.dirname(__file__)
+    resdir = os.path.join(here, "res")
+
+    libext = "dylib" if sys.platform == "darwin" else "so"
+
+    srcdatafile = "ompdata.F90"
+    outdatafile = "libompdata." + libext
+    srckernelfile = "ompkernel.F90" 
+    outkernelfile = "libompkernel." + libext
+
+    srcdatapath = os.path.join(resdir, srcdatafile)
+    outdatapath = os.path.join(resdir, outdatafile)
+
+    srckernelpath = os.path.join(resdir, srckernelfile)
+    outkernelpath = os.path.join(resdir, outkernelfile)
+
     # build acceldata
-    build_sharedlib(srcdatapath, outdatapath, vendor="cray")
-    assert os.path.isfile(outdatapath)
+    with TemporaryDirectory() as workdir:
 
-    # load acceldata
-    libdata = load_sharedlib(outdatapath)
-    assert libdata is not None
+        if os.path.exists(outdatapath):
+            os.remove(outdatapath)
+        
+        shutil.copy(srcdatapath, workdir)
+        datapath = build_sharedlib(srcdatafile, outdatafile, workdir,
+                        vendor=test_vendors)
 
-    # invoke function in acceldata
-    resdata = invoke_sharedlib(libdata, "dataenter", X, Y, Z)
-    assert resdata == 0
+        assert os.path.isfile(datapath)
 
-    # build kernel
-    build_sharedlib(srckernelpath, outkernelpath, vendor="cray")
-    assert os.path.isfile(outkernelpath)
+        # load acceldata
+        libdata = load_sharedlib(datapath)
+        assert libdata is not None
 
-    # load kernel
-    libkernel = load_sharedlib(outkernelpath)
-    assert libkernel is not None
+        # invoke function in acceldata
+        resdata = invoke_sharedlib(lang, libdata, "dataenter", X, Y, Z)
+        assert resdata == 0
 
-    # invoke function in kernel
-    reskernel = invoke_sharedlib(libkernel, "runkernel", X, Y, Z)
-    assert reskernel == 0
+        # build kernel
+        if os.path.exists(outkernelpath):
+            os.remove(outkernelpath)
 
-    # invoke function in acceldata
-    resdata = invoke_sharedlib(libdata, "dataexit", Z)
-    assert resdata == 0
+        shutil.copy(srckernelpath, workdir)
+        kernelpath = build_sharedlib(srckernelfile, outkernelfile, workdir,
+                        vendor=test_vendors)
 
-    # check result
-    assert np.array_equal(Z, X+Y)
+        assert os.path.isfile(kernelpath)
+
+        # load kernel
+        libkernel = load_sharedlib(kernelpath)
+        assert libkernel is not None
+
+        # invoke function in kernel
+        reskernel = invoke_sharedlib(lang, libkernel, "runkernel", X, Y, Z)
+        assert reskernel == 0
+
+        # invoke function in acceldata
+        resdata = invoke_sharedlib(lang, libdata, "dataexit", Z)
+        assert resdata == 0
+
+        # check result
+        assert np.array_equal(Z, X+Y)
 
 def test_omptarget2():
 
-    accel = Accel(srcdatapath, outdatapath, srckernelpath, outkernelpath, vendor="cray")
-    accel.run(X, Y, Z)
+    data, spec  = get_testdata("vecadd1d", "fortran")
 
-#    # build acceldata
-#    build_sharedlib(srcdatapath, outdatapath, vendor="cray")
-#    assert os.path.isfile(outdatapath)
-#
-#    # load acceldata
-#    libdata = load_sharedlib(outdatapath)
-#    assert libdata is not None
-#
-#    # invoke function in acceldata
-#    resdata = invoke_sharedlib(libdata, "dataenter", X, Y, Z)
-#    assert resdata == 0
-#
-#    # build kernel
-#    build_sharedlib(srckernelpath, outkernelpath, vendor="cray")
-#    assert os.path.isfile(outkernelpath)
-#
-#    # load kernel
-#    libkernel = load_sharedlib(outkernelpath)
-#    assert libkernel is not None
-#
-#    # invoke function in kernel
-#    reskernel = invoke_sharedlib(libkernel, "runkernel", X, Y, Z)
-#    assert reskernel == 0
-#
-#    # invoke function in acceldata
-#    resdata = invoke_sharedlib(libdata, "dataexit", Z)
-#    assert resdata == 0
+    kernel = Kernel(Spec(spec))
+    kernel.launch(**data)
 
-    # check result
-    assert np.array_equal(Z, X+Y)
+    kernel.stop()
+
+    assert_testdata("vecadd1d", data)
+
+

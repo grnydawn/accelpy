@@ -69,6 +69,13 @@ test: ## run tests quickly with the default Python: --tb=short
 	#pytest ./tests -s -vv --pyargs accelpy
 	pytest ./tests -s -vv --pyargs accelpy --tb=short
 
+testnv:
+	#nvprof --profile-child-processes -- pytest ./tests -s -vv --pyargs accelpy --tb=short
+	jsrun -n1 -g1 -- nvprof --profile-child-processes -- pytest ./tests -s -vv --pyargs accelpy --tb=short
+
+testamd:
+	rocprof pytest ./tests -s -vv --pyargs accelpy --tb=short
+
 test-one: ## run tests quickly with the default Python: --tb=short
 	pytest ./tests/${FILE} -s -vv --pyargs accelpy
 
