@@ -1,183 +1,194 @@
-"""Accelpy kernel module"""
+"""accelpy Kernel module"""
 
-import os, sys, abc, tempfile, shutil
+import os, hashlib
 
-from collections import OrderedDict
+from accelpy.util import Object, _accelpy_builtins, appeval, funcargseval, gethash
 
-from accelpy.util import Object, load_sharedlib, invoke_sharedlib, pack_arguments, shellcmd
-from accelpy.compile import build_sharedlib, builtin_compilers
 
-class KernelBase(Object):
+class Section():
 
-    avails = OrderedDict()
+    def __init__(self, accel, lang, fargs, body):
 
-    @abc.abstractmethod
-    def gen_srcfiles(cls, section, workdir, copyinout, copyin, copyout, alloc):
-        pass
-
-class Task:
-
-    def __init__(self, lang, libdata, copyinout, copyout):
-
+        self.accel = accel
         self.lang = lang
-        self.libdata = libdata
-        self.copyinout = copyinout
-        self.copyout = copyout
+        self.fargs = fargs
+        self.body = body
+        self.md5 = None
 
-    def stop(self):
+    def hash(self):
 
-        # invoke exit function in acceldata
-        exitargs = []
-        exitargs.extend([cio["data"] for cio in self.copyinout])
-        exitargs.extend([co["data"] for co in self.copyout])
+        if self.md5 is None:
+            self.md5 = gethash("".join(self.body))
 
-        resdata = invoke_sharedlib(self.lang, self.libdata, "dataexit", *exitargs)
-        assert resdata == 0
+        return self.md5
 
-class Kernel:
+    def is_enabled(self):
+        return self.kwargs.get("enable", True)
+
+    def kind(self):
+        return self.accel 
+
+    def update_argnames(self, args):
+
+        for idx in range(len(self.vargs)):
+            args[idx]["curname"] = self.vargs[idx]
+
+
+class Kernel(Object):
 
     def __init__(self, spec):
 
-        self.spec = spec
-        self._tasks = []
-        self._workdir = tempfile.mkdtemp()
+        # invargs, outvars, kwargs
+        self._argnames = []
 
+        if isinstance(spec, str):
+            if os.path.isfile(spec):
+                with open(spec) as fs:
+                    spec = Kernel(fs.read())
 
-    def __del__(self):
+            self._sections = self._parse_spec(spec)
 
-        if os.path.isdir(self._workdir):
-            shutil.rmtree(self._workdir)
+        elif isinstance(spec, Kernel):
+            self._sections = spec._sections 
 
+        else:
+            raise Exception("Wrong spec type: %s" % str(spec))
 
-    def stop(self):
+    def _of_set_argnames(self, *vargs, **kwargs):
 
-        for task in self._tasks:
-            task.stop()
+        self._argnames.extend(vargs)
 
-    def launch(self, copyinout=None, copyin=None, copyout=None, alloc=None,
-                compile=None, lang=None, vendor=None, accel=None, environ={}):
+    def _parse_spec(self, spec):
 
-        # generate code and save to file
+        rawlines = spec.split("\n")
 
-        self.spec.eval_pysection(environ)
+        sec_starts = []
 
-        copyinout = pack_arguments(copyinout)
-        copyin = pack_arguments(copyin)
-        copyout = pack_arguments(copyout)
-        alloc = pack_arguments(alloc)
-            
-        # user or system defined compilers
-        for comptype, comps in builtin_compilers.items():
-            
-            _vendor, _lang, _accel = comptype.split("_")
+        for lineno, rawline in enumerate(rawlines):
+            if rawline and rawline[0] == "[":
+                    sec_starts.append(lineno)
 
-            if isinstance(vendor, (list, tuple)):
-                if _vendor not in vendor: continue
+        if len(sec_starts) == 0:
+            raise Exception("No spec is found.")
 
-            elif isinstance(vendor, str):
-                if _vendor != vendor: continue
+        sec_starts.append(len(rawlines))
 
-            if isinstance(lang, (list, tuple)):
-                if _lang not in lang: continue
+        self._pysection = rawlines[0:sec_starts[0]]
 
-            elif isinstance(lang, str):
-                if _lang != lang: continue
+        sections = []
+        for sec_start, sec_end in zip(sec_starts[0:-1], sec_starts[1:]):
+            section = self._parse_section(rawlines[sec_start:sec_end])
+            sections.extend(section)
 
-            if isinstance(accel, (list, tuple)):
-                if _accel not in accel: continue
+        return sections
 
-            elif isinstance(accel, str):
-                if _accel != accel: continue
-            
-            srcdata, srckernel = self._gen_srcfiles(_lang, _accel, copyinout,
-                                    copyin, copyout, alloc)
+    def eval_pysection(self, env):
 
-            if srcdata is None or srckernel is None: continue
+        self.env = dict(_accelpy_builtins)
+        self.env["set_argnames"] =  self._of_set_argnames
 
-        #if isinstance(compile, str):
-        #    return self._build_load_run(srcdata, srckernel, compile,
-        #                                copyinout, copyin, copyout, alloc)
+        if isinstance(env, dict):
+            self.env.update(env)
 
-            for compid, compinfo in comps.items():
+        _, lenv = appeval("\n".join(self._pysection), self.env)
+
+        self.env.update(lenv)
+
+    def _parse_section(self, rawlines):
+
+        assert (rawlines[0] and rawlines[0][0] == "[")
+
+        maxlineno = len(rawlines)
+        row = 0
+        col = 1
+
+        names = []
+        arg_start = None
+
+        # collect accelerator names
+        while(row < maxlineno):
+
+            if rawlines[row].lstrip().startswith("#"):
+                row += 1
+                col = 0
+                continue
+
+            for idx in range(col, len(rawlines[row])):
+                c = rawlines[row][idx]
+                if c in (":", "]"):
+                    names.append(rawlines[row][col:idx])
+                    arg_start = [c, row, idx+1]
+                    row = maxlineno
+                    break
+            if row < maxlineno:
+                names.append(rawlines[row])
+            row += 1
+            col = 0
+
+        assert names
+
+        #accels = [n.strip() for n in "".join(names).split(",")]
+        accels = []
+        for accid in "".join(names).split(","):
+            acclang = accid.strip().split("_")
+            if len(acclang) == 2:
+                accels.append(acclang)
+    
+            elif len(acclang) == 1:
+                accels.append(acclang*2)
+
+        args = []
+
+        char, row, col = arg_start
+
+        # collect accelerator arguments
+        if char != "]":
+
+            while(row < maxlineno):
+
+                line = rawlines[row][col:].rstrip()
+
+                if not line or line[-1] != "]":
+                    args.append(line)
+                    row += 1
+                    col = 0
+                    continue
+                else:
+                    args.append(line[:-1])
+
                 try:
-                    res = shellcmd(compinfo["check"][0])
-                    avail = compinfo["check"][1](res.stdout)
-                    if avail is None:
-                        avail = compinfo["check"][1](res.stderr)
-
-                    if not avail: continue
-
-                    return self._build_load_run(_lang, srcdata, srckernel,
-                                        compinfo["build"], copyinout, copyin,
-                                        copyout, alloc)
+                    fargs = " ".join(args).split(",")
+                    body = rawlines[row+1:]
+                    break
 
                 except Exception as err:
-                    print("command fail: %s" % str(err))
+                    row += 1
+                    col = 0
+        else:
+            fargs, body = [], rawlines[row+1:]
 
-        raise Exception("All build commands were failed")
+        sections = []
 
-    def _build_load_run(self, lang, srcdata, srckernel, command,
-                            copyinout, copyin, copyout, alloc):
+        for acc, lang in accels:
+            sections.append(Section(acc, lang, fargs, body))
 
-        libext = ".dylib" if sys.platform == "darwin" else ".so"
+        return sections
 
-        # build acceldata
-        dstdata = os.path.splitext(srcdata)[0] + libext
-        cmd = command.format(moddir=self._workdir, outpath=dstdata)
-        out = shellcmd(cmd + " " + srcdata, cwd=self._workdir)
-        assert os.path.isfile(dstdata)
+    def update_argnames(self, args):
 
-        # load acceldata
-        libdata = load_sharedlib(dstdata)
-        assert libdata is not None
+        for idx in range(len(self._argnames)):
+            args[idx]["curname"] = self._argnames[idx]
 
-        # invoke function in acceldata
-        enterargs = []
-        enterargs.extend([cio["data"] for cio in copyinout])
-        enterargs.extend([ci["data"] for ci in copyin])
-        enterargs.extend([co["data"] for co in copyout])
-        enterargs.extend([a["data"] for a in alloc])
+    def get_section(self, accel, lang):
 
-        resdata = invoke_sharedlib(lang, libdata, "dataenter", *enterargs)
-        assert resdata == 0
+        for sec in self._sections:
 
-        # build kernel
-        dstkernel = os.path.splitext(srckernel)[0] + libext
-        cmd = command.format(moddir=self._workdir, outpath=dstkernel)
-        out = shellcmd(cmd + " " + srckernel, cwd=self._workdir)
-        assert os.path.isfile(dstkernel)
+            if sec.accel != accel or sec.lang != lang:
+                continue
 
-        # load accelkernel
-        libkernel = load_sharedlib(dstkernel)
-        assert libkernel is not None
+            if not hasattr(self, "vargs") or not hasattr(self, "kwargs"):
+                sec.vargs, sec.kwargs = funcargseval(",".join(sec.fargs), self.env)
 
-        # invoke function in accelkernel
-        kernelargs = []
-        kernelargs.extend([cio["data"] for cio in copyinout])
-        kernelargs.extend([ci["data"] for ci in copyin])
-        kernelargs.extend([co["data"] for co in copyout])
-        kernelargs.extend([a["data"] for a in alloc])
-
-        reskernel = invoke_sharedlib(lang, libkernel, "runkernel", *kernelargs)
-        assert reskernel == 0
-
-        task = Task(lang, libdata, copyinout, copyout)
-        self._tasks.append(task)
-
-    def _gen_srcfiles(self, lang, accel, copyinout, copyin, copyout, alloc):
-
-        section = self.spec.get_section(accel, lang)
-
-        if (section is None or section.lang not in KernelBase.avails or
-            section.accel not in KernelBase.avails[section.lang]):
-            return None, None
-
-        self.spec.update_argnames(copyinout, copyin, copyout, alloc)
-        section.update_argnames(copyinout, copyin, copyout, alloc)
- 
-        srcdata, srckernel = KernelBase.avails[section.lang][section.accel
-                                ].gen_srcfiles(section, self._workdir,
-                                copyinout, copyin, copyout, alloc)
-
-        return srcdata, srckernel
+            if sec.is_enabled():
+                return sec
 

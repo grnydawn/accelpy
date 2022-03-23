@@ -9,7 +9,7 @@ import numpy as np
 specs = {
     "vecadd1d": """
 
-set_argnames(copyin=("x", "y"), copyout=("z",))
+set_argnames("x", "y", "z")
 attrspec = { 'x': { 'dimension': '1:' } }
 
 cpp_enable = True
@@ -140,6 +140,7 @@ cpp_enable = True
 """,
 
     "vecadd3d": """
+
 set_argnames("x", "y", "z")
 
 [cpp]
@@ -289,11 +290,35 @@ set_argnames("x", "y", "z")
     END DO
     !$omp end do
 
+[omptarget_fortran]
+    INTEGER i, j, k, b1, b2, b3, e1, e2, e3
+
+    b1 = LBOUND(x,1) 
+    b2 = LBOUND(x,2) 
+    b3 = LBOUND(x,3) 
+    e1 = UBOUND(x,1) 
+    e2 = UBOUND(x,2) 
+    e3 = UBOUND(x,3) 
+
+    !$omp target
+    !$omp teams num_teams(e1-b1+1)
+    !$omp distribute
+    DO i=b1, e1
+        !$omp parallel do 
+        DO j=b2, e2
+            DO k=b3, e3
+                z(i, j, k) = x(i, j, k) + y(i, j, k)
+            END DO
+        END DO
+    END DO
+    !$omp end teams
+    !$omp end target
+
 """,
 
     "matmul": """
 
-set_argnames("X", "Y", "Z")
+set_argnames("A", "B", "C")
 
 [cpp]
 
@@ -462,6 +487,32 @@ set_argnames("X", "Y", "Z")
     END DO
     !$omp end do
 
+[omptarget_fortran]
+
+    INTEGER i, j, k, xl1, xu1, yl1, yu1, yl2, yu2
+
+    xl1 = LBOUND(A,1) 
+    xu1 = UBOUND(A,1) 
+    yl1 = LBOUND(B,1) 
+    yu1 = UBOUND(B,1) 
+    yl2 = LBOUND(B,2) 
+    yu2 = UBOUND(B,2) 
+
+    !$omp target
+    !$omp teams num_teams(xu1-xl1+1)
+    !$omp distribute
+    DO i=xl1, xu1
+        !$omp parallel do
+        DO j=yl2, yu2
+            C(i, j) = 0
+            DO k=yl1, yu1
+                C(i, j) = C(i, j) + A(i, k) * B(k, j)
+            END DO
+        END DO
+    END DO
+    !$omp end teams
+    !$omp end target
+
 """
 }
 
@@ -509,10 +560,10 @@ def check_result(testname, data):
         assert np.array_equal(data["copyout"][0], data["copyin"][0] + data["copyin"][1])
 
     elif testname == "matmul":
-        assert np.array_equal(data[2], np.matmul(data[0], data[1]))
+        assert np.array_equal(data["copyout"][0], np.matmul(data["copyin"][0], data["copyin"][1]))
 
     elif testname == "vecadd3d":
-        assert np.array_equal(data[2], data[0] + data[1])
+        assert np.array_equal(data["copyout"][0], data["copyin"][0] + data["copyin"][1])
 
     else:
         assert False

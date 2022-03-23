@@ -1,13 +1,26 @@
 
-import shutil
+import shutil, itertools
 
 from tempfile import TemporaryDirectory
+from pytest import mark
 
-from accelpy import Spec, Kernel, build_sharedlib, load_sharedlib, invoke_sharedlib
+from accelpy import Kernel, Accel, build_sharedlib, load_sharedlib, invoke_sharedlib
 from testdata import get_testdata, assert_testdata
 
+debug = True
 
-test_vendors = ("cray", "ibm", "gnu")
+#test_vendors = ("cray", "ibm", "amd", "gnu")
+test_vendors = ("cray",)
+
+#test_codes = ("vecadd1d", "vecadd3d", "matmul")
+test_codes = ("matmul", "vecadd3d", "vecadd1d", "matmul", "vecadd3d", "vecadd1d")
+#test_codes = ("matmul",)
+
+test_langs = ("fortran",)
+
+testcases = itertools.product(test_vendors, test_codes, test_langs)
+
+#test_vendors = ("gnu",)
 
 def test_omptarget1():
 
@@ -84,15 +97,27 @@ def test_omptarget1():
         # check result
         assert np.array_equal(Z, X+Y)
 
-def test_omptarget2():
+@mark.parametrize("vendor, code, lang", testcases)
+def test_omptarget2(vendor, code, lang):
 
-    data, spec  = get_testdata("vecadd1d", "fortran")
+    data, knl  = get_testdata(code, lang)
 
-    kernel = Kernel(Spec(spec))
-    kernel.launch(**data)
+    # TODO: generate data var names
+    acc = Accel(**data, vendor=vendor, _debug=True)
 
-    kernel.stop()
+    # TODO: testif data var names are used in launch
+    args = []
+    args.extend(data["copyinout"])
+    args.extend(data["copyin"])
+    args.extend(data["copyout"])
+    args.extend(data["alloc"])
 
-    assert_testdata("vecadd1d", data)
+    acc.launch(Kernel(knl), *args)
+
+    acc.stop()
+
+
+    assert_testdata(code, data)
+
 
 

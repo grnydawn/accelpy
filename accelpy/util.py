@@ -200,7 +200,8 @@ def gethash(text, length=10):
 
 def load_sharedlib(libpath):
 
-    return CDLL(libpath, mode=RTLD_GLOBAL)
+    #return CDLL(libpath, mode=RTLD_GLOBAL)
+    return CDLL(libpath)
 
 def invoke_sharedlib(lang, libobj, funcname, *args):
 
@@ -221,16 +222,19 @@ def invoke_sharedlib(lang, libobj, funcname, *args):
 def get_system():
     return System()
 
-def pack_arguments(data):
+def pack_arguments(data, prefix=None, setnames=None):
 
     res = []
 
     if data is not None:
-        for arg in data:
+        for idx, arg in enumerate(data):
             idarg = id(arg)
-            narg = arg if isinstance(arg, numpy.ndarray) else  numpy.asarray(arg)
-            res.append({"data": narg, "id": idarg, "curname": None, "orgdata": arg,
-                        "index": None, "modname": None})
+            narg = arg if isinstance(arg, numpy.ndarray) else numpy.asarray(arg)
+            curname = None if prefix is None else prefix+str(idx)
+            if setnames is not None:
+                curname = setnames[idx]
+            res.append({"data": narg, "id": idarg, "curname": curname,
+                        "orgdata": arg})
 
     return res
 

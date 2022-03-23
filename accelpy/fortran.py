@@ -1,11 +1,11 @@
 """accelpy Fortran-based Accelerator module"""
 
-import os
+import os, uuid
 
 from collections import OrderedDict
 
 from accelpy.util import get_f_dtype
-from accelpy.kernel import KernelBase
+from accelpy.accel import AccelBase
 
 
 moddatasrc = """
@@ -21,8 +21,7 @@ INTEGER (C_INT64_T) FUNCTION dataenter({enterargs}) BIND(C, name="dataenter")
 
     {entervardefs}
 
-    !!$omp target enter data map(to: X(:,:), Y(:,:)) map(alloc: Z(:,:))
-    !$omp target enter data map(to: X, Y) map(alloc: Z)
+    {enterdirective}
 
     dataenter = 0
 
@@ -31,11 +30,9 @@ END FUNCTION
 INTEGER (C_INT64_T) FUNCTION dataexit({exitargs}) BIND(C, name="dataexit")
     USE, INTRINSIC :: ISO_C_BINDING
 
-    !REAL(C_DOUBLE), DIMENSION(2, 3), INTENT(OUT) :: Z
     {exitvardefs}
 
-    !!$omp target exit data map(from: Z(:,:))
-    !$omp target exit data map(from: Z)
+    {exitdirective}
 
     dataexit = 0
 
@@ -58,19 +55,6 @@ INTEGER (C_INT64_T) FUNCTION runkernel({kernelargs}) BIND(C, name="runkernel")
 
     {kernelbody}
 
-!    INTEGER i, j
-!
-!    !$omp target teams num_teams(2)
-!    !$omp distribute
-!    DO i=1, 2
-!        !$omp parallel do
-!        DO j=1, 3
-!            Z(i, j) = X(i, j) + Y(i, j)
-!        END DO
-!        !$omp end parallel do
-!    END DO
-!    !$omp end target teams
-
     runkernel = 0
 
 END FUNCTION
@@ -79,17 +63,17 @@ END MODULE
 """
 
 
-class FortranKernel(KernelBase):
+class FortranAccel(AccelBase):
 
     lang = "fortran"
     accel = "fortran"
 
 
-class OpenmpFortranKernel(FortranKernel):
+class OpenmpFortranAccel(FortranAccel):
     accel = "openmp"
 
 
-class OmptargetFortranKernel(OpenmpFortranKernel):
+class OmptargetFortranAccel(OpenmpFortranAccel):
     accel = "omptarget"
 
 
@@ -99,83 +83,140 @@ class OmptargetFortranKernel(OpenmpFortranKernel):
 
     @classmethod
     def _vardefs(cls, arg, intent):
-        return "%s, DIMENSION(%s), INTENT(%s) :: %s" % (get_f_dtype(arg),
-                cls._shape(arg), intent, arg["curname"])
+        shape = cls._shape(arg)
+        if shape:
+            return "%s, DIMENSION(%s), INTENT(%s) :: %s" % (get_f_dtype(arg),
+                shape, intent, arg["curname"])
+
+        else:
+            return "%s, INTENT(%s) :: %s" % (get_f_dtype(arg), intent,
+                arg["curname"])
 
     @classmethod
-    def gen_srcfiles(cls, section, workdir, copyinout, copyin, copyout, alloc):
+    def gen_datafile(cls, workdir, copyinout, copyin, copyout, alloc):
 
-        datapath = os.path.join(workdir, "omptargetdata.F90")
-        kernelpath = os.path.join(workdir, "omptargetkernel.F90")
+        filename = uuid.uuid4().hex[:10]
+
+        datapath = os.path.join(workdir, "data-%s.F90" % filename)
 
         dataparams = {}
-        kernelparams = {}
 
         enterargs = []
         exitargs = []
-        kernelargs = []
 
         entervardefs = []
         exitvardefs = []
-        kernelvardefs = []
+
+        enterdirective = []
+        exitdirective = []
+
+        alnames = []
+
+        cionames = []
 
         for cio in copyinout:
-            enterargs.append(cio["curname"])
-            entervardefs.append(cls._vardefs(cio, "INT"))
+            cioname = cio["curname"]
+            cionames.append(cioname)
 
-            exitargs.append(cio["curname"])
+            enterargs.append(cioname)
+            entervardefs.append(cls._vardefs(cio, "IN"))
+
+            exitargs.append(cioname)
             exitvardefs.append(cls._vardefs(cio, "OUT"))
 
-            kernelargs.append(cio["curname"])
-            kernelvardefs.append(cls._vardefs(cio, "INOUT"))
+        if cionames:
+            enterdirective.append("!$omp target enter data map(to:" +
+                                    ", ".join(cionames) + ")")
+            exitdirective.append("!$omp target exit data map(from:" +
+                                    ", ".join(cionames) + ")")
+
+        cinames = []
 
         for ci in copyin:
-            enterargs.append(ci["curname"])
+            ciname = ci["curname"]
+            cinames.append(ciname)
+
+            enterargs.append(ciname)
             entervardefs.append(cls._vardefs(ci, "IN"))
 
-            kernelargs.append(ci["curname"])
-            kernelvardefs.append(cls._vardefs(ci, "IN"))
+        if cinames:
+            enterdirective.append("!$omp target enter data map(to:" +
+                                    ", ".join(cinames) + ")")
+
+        conames = []
 
         for co in copyout:
-            enterargs.append(co["curname"])
-            entervardefs.append(cls._vardefs(co, "OUT"))
+            coname = co["curname"]
+            conames.append(coname)
 
-            exitargs.append(co["curname"])
+            enterargs.append(coname)
+            entervardefs.append(cls._vardefs(co, "IN"))
+
+            exitargs.append(coname)
             exitvardefs.append(cls._vardefs(co, "OUT"))
 
-            kernelargs.append(co["curname"])
-            kernelvardefs.append(cls._vardefs(co, "OUT"))
+        if conames:
+            alnames.extend(conames)
+            exitdirective.append("!$omp target exit data map(from:" +
+                                    ", ".join(conames) + ")")
+
 
         for al in alloc:
-            enterargs.append(al["curname"])
+            alname = al["curname"]
+            alnames.append(alname)
+
+            enterargs.append(alname)
             entervardefs.append(cls._vardefs(al, "IN"))
 
-            kernelargs.append(al["curname"])
-            kernelvardefs.append(cls._vardefs(co, "IN"))
+        if alnames:
+            enterdirective.append("!$omp target enter data map(alloc:" +
+                                    ", ".join(alnames) + ")")
 
         dataparams["enterargs"] = ", ".join(enterargs)
         dataparams["entervardefs"] = "\n".join(entervardefs)
+        dataparams["enterdirective"] = "\n".join(enterdirective)
 
         dataparams["exitargs"] = ", ".join(exitargs)
         dataparams["exitvardefs"] = "\n".join(exitvardefs)
+        dataparams["exitdirective"] = "\n".join(exitdirective)
+
+        with open(datapath, "w") as fdata:
+            fdata.write(moddatasrc.format(**dataparams))
+
+        #import pdb; pdb.set_trace()
+        return datapath
+
+    @classmethod
+    def gen_kernelfile(cls, section, workdir, localvars):
+
+        filename = uuid.uuid4().hex[:10]
+
+        kernelpath = os.path.join(workdir, "kernel-%s.F90" % filename)
+
+        kernelparams = {}
+        kernelargs = []
+        kernelvardefs = []
+
+        for lvar in localvars:
+
+            kernelargs.append(lvar["curname"])
+            kernelvardefs.append(cls._vardefs(lvar, "INOUT"))
 
         kernelparams["kernelargs"] = ", ".join(kernelargs)
         kernelparams["kernelvardefs"] = "\n".join(kernelvardefs)
         kernelparams["kernelbody"] = "\n".join(section.body)
 
-        with open(datapath, "w") as fdata:
-            fdata.write(moddatasrc.format(**dataparams))
-
         with open(kernelpath, "w") as fkernel:
             fkernel.write(modkernelsrc.format(**kernelparams))
 
-        return datapath, kernelpath
+        #import pdb; pdb.set_trace()
+        return kernelpath
 
 
 _fortaccels = OrderedDict()
-KernelBase.avails[FortranKernel.lang] = _fortaccels
+AccelBase.avails[FortranAccel.lang] = _fortaccels
 
-_fortaccels[FortranKernel.accel] = FortranKernel
-_fortaccels[OpenmpFortranKernel.accel] = OpenmpFortranKernel
-_fortaccels[OmptargetFortranKernel.accel] = OmptargetFortranKernel
+_fortaccels[FortranAccel.accel] = FortranAccel
+_fortaccels[OpenmpFortranAccel.accel] = OpenmpFortranAccel
+_fortaccels[OmptargetFortranAccel.accel] = OmptargetFortranAccel
 

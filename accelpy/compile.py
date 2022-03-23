@@ -37,7 +37,7 @@ if system.name == "cray":
         }
 
     builtin_compilers["amd_fortran_omptarget"]["ftnwrapper"] = {
-            "check": ("ftn --version",_cray_version_check_omptarget),
+            "check": ("ftn --version",_amd_version_check_omptarget),
             "build": "ftn -shared -fPIC -fopenmp -J {moddir} -o {outpath}"
         }
 
@@ -52,7 +52,7 @@ builtin_compilers["cray_fortran_omptarget"]["generic"] = {
     }
 
 builtin_compilers["amd_fortran_omptarget"]["generic"] = {
-        "check": ("amdflang --version",_cray_version_check_omptarget),
+        "check": ("amdflang --version",_amd_version_check_omptarget),
         "build": "amdflang -shared -fPIC -fopenmp -J {moddir} -o {outpath}"
     }
 
@@ -67,7 +67,6 @@ builtin_compilers["gnu_fortran_omptarget"]["generic"] = {
     }
 
 def build_sharedlib(srcfile, outfile, workdir, compile=None, opts="", vendor=None, lang=None, accel=None):
-
 
     srcpath = os.path.join(workdir, srcfile)
     outpath = os.path.join(workdir, outfile)
@@ -109,12 +108,14 @@ def build_sharedlib(srcfile, outfile, workdir, compile=None, opts="", vendor=Non
             if _accel != accel: continue
         
         for compid, compinfo in comps.items():
+
             try:
                 res = shellcmd(compinfo["check"][0])
                 avail = compinfo["check"][1](res.stdout)
                 if avail is None:
                     avail = compinfo["check"][1](res.stderr)
 
+                #print(avail, compid, compinfo["check"])
                 if not avail: continue
 
                 cmd = compinfo["build"].format(moddir=moddir, outpath=outpath)
@@ -124,9 +125,6 @@ def build_sharedlib(srcfile, outfile, workdir, compile=None, opts="", vendor=Non
                 #import pdb; pdb.set_trace()
                 if out.returncode == 0:
                     return outpath
-
-                else:
-                    return
 
             except Exception as err:
                 print("command fail: %s" % cmd)
