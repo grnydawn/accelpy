@@ -59,7 +59,7 @@ class Accel:
 
     def __init__(self, copyinout=None, copyin=None, copyout=None,
                     alloc=None, compile=None, lang=None, vendor=None,
-                    accel=None, environ={}, _debug=False):
+                    accel=None, _debug=False):
 
         self._id = next(self._ids)
         self._debug = _debug
@@ -146,7 +146,7 @@ class Accel:
         for task in self._tasks:
             task.stop()
 
-    def launch(self, spec, *kargs, environ={}):
+    def launch(self, spec, *kargs, macro={}, environ={}):
 
         localvars = pack_arguments(kargs)
 
@@ -159,6 +159,8 @@ class Accel:
         if (self.section is None or self._lang not in AccelBase.avails or
             self._accel not in AccelBase.avails[self._lang]):
             return
+
+        self.macro = macro
 
         srckernel = AccelBase.avails[self._lang][self._accel
                                 ].gen_kernelfile(self.section, self._workdir,
@@ -198,10 +200,21 @@ class Accel:
 
         libext = ".dylib" if sys.platform == "darwin" else ".so"
 
+        macros = []
+        for m, d in self.macro.items():
+            if d is None or d is False:
+                continue
+
+            if d is True:
+                d = 1
+
+            macros.append("-D%s=%s" % (str(m), str(d)))
+        
         # build kernel
         dstkernel = os.path.splitext(srckernel)[0] + libext
         cmd = self._compile.format(moddir=self._workdir, outpath=dstkernel)
-        out = shellcmd(cmd + " " + srckernel, cwd=self._workdir)
+        out = shellcmd("%s %s %s" % (cmd, " ".join(macros), srckernel),
+                        cwd=self._workdir)
         assert os.path.isfile(dstkernel), str(out.stderr)
 
         # load accelkernel
