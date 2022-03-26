@@ -33,29 +33,30 @@ class Task:
 
         if self._debug:
             print("DEBUG: " + " ".join([str(o) for o in objs]))
-
-    def stop(self):
-
-        # invoke exit function in acceldata
-        exitargs = []
-        exitargs.extend([cio["data"] for cio in self.copyinout])
-        exitargs.extend([co["data"] for co in self.copyout])
-
-        resdata = invoke_sharedlib(self.lang, self.libdata, "dataexit", *exitargs)
-        #del self.libdata
-
-        self.debug("after dataexit cio", *[cio["data"] for cio in self.copyinout])
-        self.debug("after dataexit co", *[co["data"] for co in self.copyout])
-
-        assert resdata == 0, "dataexit invoke fail"
+#
+#    def stop(self):
+#
+#        return self.wait()
+#
+#    def wait(self):
+#
+#        # invoke exit function in acceldata
+#        exitargs = []
+#        exitargs.extend([cio["data"] for cio in self.copyinout])
+#        exitargs.extend([co["data"] for co in self.copyout])
+#
+#        resdata = invoke_sharedlib(self.lang, self.libdata, "dataexit", *exitargs)
+#        #del self.libdata
+#
+#        self.debug("after dataexit cio", *[cio["data"] for cio in self.copyinout])
+#        self.debug("after dataexit co", *[co["data"] for co in self.copyout])
+#
+#        assert resdata == 0, "dataexit invoke fail"
 
 
 class Accel:
 
     _ids = itertools.count(0)
-
-#
-#    def launch(self):
 
     def __init__(self, copyinout=None, copyin=None, copyout=None,
                     alloc=None, compile=None, lang=None, vendor=None,
@@ -65,7 +66,8 @@ class Accel:
         self._debug = _debug
         self._lang = None
         self._accel = None
-        self._tasks = []
+        #self._tasks = []
+        self._tasks = {}
         self._workdir = tempfile.mkdtemp()
         self.debug("creating workdir: %s" % self._workdir)
 
@@ -74,6 +76,8 @@ class Accel:
         self.copyout = pack_arguments(copyout, prefix="co%d" % self._id)
         self.alloc = pack_arguments(alloc, prefix="al%d" % self._id)
             
+        self._libkernel = None
+
         # user or system defined compilers
         for comptype, comps in builtin_compilers.items():
             
@@ -143,30 +147,51 @@ class Accel:
 
     def stop(self):
 
-        for task in self._tasks:
-            task.stop()
+        # invoke exit function in acceldata
+        exitargs = []
+        exitargs.extend([cio["data"] for cio in self.copyinout])
+        exitargs.extend([co["data"] for co in self.copyout])
+
+        resdata = invoke_sharedlib(self._lang, self._libdata, "dataexit", *exitargs)
+        #del self.libdata
+
+        self.debug("after dataexit cio", *[cio["data"] for cio in self.copyinout])
+        self.debug("after dataexit co", *[co["data"] for co in self.copyout])
+
+        assert resdata == 0, "dataexit invoke fail"
+
+        #for task in self._tasks:
+        #    task.stop()
 
     def launch(self, spec, *kargs, macro={}, environ={}):
 
         localvars = pack_arguments(kargs)
 
-        self.spec = spec
-        self.spec.eval_pysection(environ)
-        self.spec.update_argnames(localvars)
-        self.section = self.spec.get_section(self._accel, self._lang)
-        self.section.update_argnames(localvars)
+        if spec in self._tasks:
+            _libkernel = self._tasks[spec]
 
-        if (self.section is None or self._lang not in AccelBase.avails or
-            self._accel not in AccelBase.avails[self._lang]):
-            return
+        else:
 
-        self.macro = macro
+            self.spec = spec
+            self.spec.eval_pysection(environ)
+            self.spec.update_argnames(localvars)
+            self.section = self.spec.get_section(self._accel, self._lang)
+            self.section.update_argnames(localvars)
 
-        srckernel = AccelBase.avails[self._lang][self._accel
-                                ].gen_kernelfile(self.section, self._workdir,
-                                localvars)
+            if (self.section is None or self._lang not in AccelBase.avails or
+                self._accel not in AccelBase.avails[self._lang]):
+                return
 
-        self._build_run_kernel(srckernel, localvars)
+            self.macro = macro
+
+            srckernel = AccelBase.avails[self._lang][self._accel
+                                    ].gen_kernelfile(self.section, self._workdir,
+                                    localvars)
+
+            _libkernel = self._build_kernel(srckernel)
+            self._tasks[spec] = _libkernel
+
+        self._run_kernel(localvars, _libkernel)
 
     def _build_run_enter(self, lang, srcdata, command):
 
@@ -176,6 +201,7 @@ class Accel:
         dstdata = os.path.splitext(srcdata)[0] + libext
         cmd = command.format(moddir=self._workdir, outpath=dstdata)
         out = shellcmd(cmd + " " + srcdata, cwd=self._workdir)
+        #import pdb; pdb.set_trace()
         assert os.path.isfile(dstdata), str(out.stderr)
 
         # load acceldata
@@ -193,10 +219,12 @@ class Accel:
         resdata = invoke_sharedlib(lang, libdata, "dataenter", *enterargs)
         assert resdata == 0, "dataenter invoke fail"
 
-        task = Task(lang, libdata, self.copyinout, self.copyout, self._debug)
-        self._tasks.append(task)
+        #task = Task(lang, libdata, self.copyinout, self.copyout, self._debug)
+        #self._tasks.append(task)
 
-    def _build_run_kernel(self, srckernel, localvars):
+        return libdata
+
+    def _build_kernel(self, srckernel):
 
         libext = ".dylib" if sys.platform == "darwin" else ".so"
 
@@ -215,24 +243,27 @@ class Accel:
         cmd = self._compile.format(moddir=self._workdir, outpath=dstkernel)
         out = shellcmd("%s %s %s" % (cmd, " ".join(macros), srckernel),
                         cwd=self._workdir)
-        assert os.path.isfile(dstkernel), str(out.stderr)
+        #print(str(out.stdout).replace("\\n", "\n"))
+        #import pdb; pdb.set_trace()
+        #assert os.path.isfile(dstkernel), str(out.stderr)
+        assert os.path.isfile(dstkernel), str(out.stderr).replace("\\n", "\n")
 
         # load accelkernel
         libkernel = load_sharedlib(dstkernel)
         self.debug("libkernel sharedlib", libkernel)
         assert libkernel is not None, "libkernel load fail"
 
+        return libkernel
+
+
+    def _run_kernel(self, localvars, libkernel):
+
         # invoke function in accelkernel
         kernelargs = [lvar["data"] for lvar in localvars]
-        kernelargs.extend([cio["data"] for cio in self.copyinout])
-        kernelargs.extend([ci["data"] for ci in self.copyin])
-        kernelargs.extend([co["data"] for co in self.copyout])
-        kernelargs.extend([a["data"] for a in self.alloc])
 
         self.debug("before kernel", *kernelargs)
 
         reskernel = invoke_sharedlib(self._lang, libkernel, "runkernel", *kernelargs)
-        #del libkernel
 
         self.debug("after kernel cio", *kernelargs)
 

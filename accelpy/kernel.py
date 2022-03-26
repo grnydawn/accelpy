@@ -15,6 +15,8 @@ class Section():
         self.body = body
         self.md5 = None
 
+        # NOTE: vargs, kwargs will be created when this section is retrieved
+
     def hash(self):
 
         if self.md5 is None:
@@ -30,7 +32,7 @@ class Section():
 
     def update_argnames(self, args):
 
-        for idx in range(len(self.vargs)):
+        for idx in range(min(len(self.vargs), len(args))):
             args[idx]["curname"] = self.vargs[idx]
 
 
@@ -176,7 +178,7 @@ class Kernel(Object):
 
     def update_argnames(self, args):
 
-        for idx in range(len(self._argnames)):
+        for idx in range(min(len(self._argnames), len(args))):
             args[idx]["curname"] = self._argnames[idx]
 
     def get_section(self, accel, lang):

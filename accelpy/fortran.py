@@ -76,17 +76,23 @@ class OpenmpFortranAccel(FortranAccel):
 class OmptargetFortranAccel(OpenmpFortranAccel):
     accel = "omptarget"
 
-
     @classmethod
-    def _shape(cls, arg):
+    def _dimension(cls, arg, attrspec):
+
+        curname = arg["curname"]
+
+        if curname in attrspec and "dimension" in attrspec[curname]:
+            return attrspec[curname]["dimension"]
+                
         return ", ".join([str(s) for s in arg["data"].shape])
 
     @classmethod
-    def _vardefs(cls, arg, intent):
-        shape = cls._shape(arg)
-        if shape:
+    def _vardefs(cls, arg, intent, attrspec={}):
+
+        dim = cls._dimension(arg, attrspec)
+        if dim:
             return "%s, DIMENSION(%s), INTENT(%s) :: %s" % (get_f_dtype(arg),
-                shape, intent, arg["curname"])
+                dim, intent, arg["curname"])
 
         else:
             return "%s, INTENT(%s) :: %s" % (get_f_dtype(arg), intent,
@@ -197,10 +203,12 @@ class OmptargetFortranAccel(OpenmpFortranAccel):
         kernelargs = []
         kernelvardefs = []
 
+        attrspec = section.kwargs.get("attrspec", {})
+
         for lvar in localvars:
 
             kernelargs.append(lvar["curname"])
-            kernelvardefs.append(cls._vardefs(lvar, "INOUT"))
+            kernelvardefs.append(cls._vardefs(lvar, "INOUT", attrspec=attrspec))
 
         kernelparams["kernelargs"] = ", ".join(kernelargs)
         kernelparams["kernelvardefs"] = "\n".join(kernelvardefs)
