@@ -201,7 +201,6 @@ def gethash(text, length=10):
 def load_sharedlib(libpath):
 
     return CDLL(libpath, mode=RTLD_GLOBAL)
-    #return CDLL(libpath)
 
 def invoke_sharedlib(lang, libobj, funcname, *args):
 

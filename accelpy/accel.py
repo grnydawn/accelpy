@@ -60,13 +60,13 @@ class Accel:
 
     def __init__(self, copyinout=None, copyin=None, copyout=None,
                     alloc=None, compile=None, lang=None, vendor=None,
-                    accel=None, _debug=False):
+                    accel=None, attr={}, _debug=False):
 
         self._id = next(self._ids)
         self._debug = _debug
         self._lang = None
         self._accel = None
-        #self._tasks = []
+        self._attr = attr
         self._tasks = {}
         self._workdir = tempfile.mkdtemp()
         self.debug("creating workdir: %s" % self._workdir)
@@ -101,8 +101,8 @@ class Accel:
             elif isinstance(accel, str):
                 if _accel != accel: continue
             
-            srcdata = AccelBase.avails[_lang][_accel].gen_datafile(self._workdir,
-                        self.copyinout, self.copyin, self.copyout, self.alloc)
+            srcdata = AccelBase.avails[_lang][_accel].gen_datafile(self._id, self._workdir,
+                        self.copyinout, self.copyin, self.copyout, self.alloc, self._attr)
 
             if srcdata is None: continue
 
@@ -149,10 +149,10 @@ class Accel:
 
         # invoke exit function in acceldata
         exitargs = []
-        exitargs.extend([cio["data"] for cio in self.copyinout])
-        exitargs.extend([co["data"] for co in self.copyout])
+        #exitargs.extend([cio["data"] for cio in self.copyinout])
+        #exitargs.extend([co["data"] for co in self.copyout])
 
-        resdata = invoke_sharedlib(self._lang, self._libdata, "dataexit", *exitargs)
+        resdata = invoke_sharedlib(self._lang, self._libdata, "dataexit_%d" % self._id, *exitargs)
         #del self.libdata
 
         self.debug("after dataexit cio", *[cio["data"] for cio in self.copyinout])
@@ -167,16 +167,30 @@ class Accel:
 
         localvars = pack_arguments(kargs)
 
+        self.spec = spec
+        self.spec.eval_pysection(environ)
+        self.spec.update_argnames(localvars)
+        self.section = self.spec.get_section(self._accel, self._lang, environ)
+        self.section.update_argnames(localvars)
+
+        _kargs = []
+        _uonly = []
+
+        dids = dict((d["id"], d["curname"]) for d in
+                        self.copyinout+self.copyin+self.copyout+self.alloc)
+
+        for lvar in localvars:
+
+            if lvar["id"] in dids:
+                _uonly.append((dids[lvar["id"]], lvar["curname"]))
+
+            else:
+                _kargs.append(lvar)
+
         if spec in self._tasks:
             _libkernel = self._tasks[spec]
 
         else:
-
-            self.spec = spec
-            self.spec.eval_pysection(environ)
-            self.spec.update_argnames(localvars)
-            self.section = self.spec.get_section(self._accel, self._lang)
-            self.section.update_argnames(localvars)
 
             if (self.section is None or self._lang not in AccelBase.avails or
                 self._accel not in AccelBase.avails[self._lang]):
@@ -185,13 +199,13 @@ class Accel:
             self.macro = macro
 
             srckernel = AccelBase.avails[self._lang][self._accel
-                                    ].gen_kernelfile(self.section, self._workdir,
-                                    localvars)
+                                    ].gen_kernelfile(self._id, self.section, self._workdir,
+                                    _kargs, _uonly)
 
             _libkernel = self._build_kernel(srckernel)
             self._tasks[spec] = _libkernel
 
-        self._run_kernel(localvars, _libkernel)
+        self._run_kernel(_kargs, _libkernel)
 
     def _build_run_enter(self, lang, srcdata, command):
 
@@ -201,8 +215,13 @@ class Accel:
         dstdata = os.path.splitext(srcdata)[0] + libext
         cmd = command.format(moddir=self._workdir, outpath=dstdata)
         out = shellcmd(cmd + " " + srcdata, cwd=self._workdir)
-        #import pdb; pdb.set_trace()
         assert os.path.isfile(dstdata), str(out.stderr)
+
+#        shutil.copy(dstdata, os.path.join(self._workdir, "libdata.so"))
+#        dstdataobj = os.path.join(os.path.dirname(srcdata), "data.o")
+#        cmd2 = command.format(moddir=self._workdir, outpath=dstdataobj)
+#        out2 = shellcmd(cmd2 + " -c " + srcdata, cwd=self._workdir)
+#        assert os.path.isfile(dstdataobj), str(out2.stderr)
 
         # load acceldata
         libdata = load_sharedlib(dstdata)
@@ -216,7 +235,7 @@ class Accel:
         enterargs.extend([co["data"] for co in self.copyout])
         enterargs.extend([a["data"] for a in self.alloc])
 
-        resdata = invoke_sharedlib(lang, libdata, "dataenter", *enterargs)
+        resdata = invoke_sharedlib(lang, libdata, "dataenter_%d" % self._id, *enterargs)
         assert resdata == 0, "dataenter invoke fail"
 
         #task = Task(lang, libdata, self.copyinout, self.copyout, self._debug)
@@ -263,7 +282,7 @@ class Accel:
 
         self.debug("before kernel", *kernelargs)
 
-        reskernel = invoke_sharedlib(self._lang, libkernel, "runkernel", *kernelargs)
+        reskernel = invoke_sharedlib(self._lang, libkernel, "runkernel_%d" % self._id, *kernelargs)
 
         self.debug("after kernel cio", *kernelargs)
 

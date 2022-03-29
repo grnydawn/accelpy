@@ -7,11 +7,12 @@ from accelpy.util import Object, _accelpy_builtins, appeval, funcargseval, getha
 
 class Section():
 
-    def __init__(self, accel, lang, fargs, body):
+    def __init__(self, accel, lang, vargs, kwargs, body):
 
         self.accel = accel
         self.lang = lang
-        self.fargs = fargs
+        self.argnames = vargs
+        self._kwargs = kwargs
         self.body = body
         self.md5 = None
 
@@ -32,8 +33,8 @@ class Section():
 
     def update_argnames(self, args):
 
-        for idx in range(min(len(self.vargs), len(args))):
-            args[idx]["curname"] = self.vargs[idx]
+        for idx in range(min(len(self.argnames), len(args))):
+            args[idx]["curname"] = self.argnames[idx]
 
 
 class Kernel(Object):
@@ -160,19 +161,31 @@ class Kernel(Object):
 
                 try:
                     fargs = " ".join(args).split(",")
+                    vargs = [a.strip() for a in fargs if "=" not in a]
+                    kwargs = [a.strip() for a in fargs[len(vargs):]]
                     body = rawlines[row+1:]
                     break
 
                 except Exception as err:
                     row += 1
                     col = 0
+#
+#                try:
+#                    fargs = " ".join(args).split(",")
+#                    body = rawlines[row+1:]
+#                    break
+#
+#                except Exception as err:
+#                    row += 1
+#                    col = 0
         else:
-            fargs, body = [], rawlines[row+1:]
+            #fargs, body = [], rawlines[row+1:]
+            vargs, kwargs, body = [], {}, rawlines[row+1:]
 
         sections = []
 
         for acc, lang in accels:
-            sections.append(Section(acc, lang, fargs, body))
+            sections.append(Section(acc, lang, vargs, kwargs, body))
 
         return sections
 
@@ -181,7 +194,10 @@ class Kernel(Object):
         for idx in range(min(len(self._argnames), len(args))):
             args[idx]["curname"] = self._argnames[idx]
 
-    def get_section(self, accel, lang):
+    def get_section(self, accel, lang, environ):
+
+        env = dict(self.env)
+        env.update(environ)
 
         for sec in self._sections:
 
@@ -189,7 +205,9 @@ class Kernel(Object):
                 continue
 
             if not hasattr(self, "vargs") or not hasattr(self, "kwargs"):
-                sec.vargs, sec.kwargs = funcargseval(",".join(sec.fargs), self.env)
+
+                _, sec.kwargs = funcargseval(",".join(sec._kwargs), env)
+                #sec.vargs, sec.kwargs = funcargseval(",".join(sec.fargs), self.env)
 
             if sec.is_enabled():
                 return sec

@@ -123,7 +123,7 @@ cpp_enable = True
     END DO
     !$omp end do
 
-[omptarget_fortran]
+[omptarget_fortran: x, y, z]
     INTEGER id, begin, end 
 
     begin = LBOUND(x,1) 
@@ -290,7 +290,7 @@ set_argnames("x", "y", "z")
     END DO
     !$omp end do
 
-[omptarget_fortran]
+[omptarget_fortran: x, y, z]
     INTEGER i, j, k, b1, b2, b3, e1, e2, e3
 
     b1 = LBOUND(x,1) 
@@ -487,7 +487,7 @@ set_argnames("A", "B", "C")
     END DO
     !$omp end do
 
-[omptarget_fortran]
+[omptarget_fortran: A, B, C]
 
     INTEGER i, j, k, xl1, xu1, yl1, yu1, yl2, yu2
 

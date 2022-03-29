@@ -10,11 +10,12 @@ from testdata import get_testdata, assert_testdata
 debug = True
 
 #test_vendors = ("cray", "ibm", "amd", "gnu")
-test_vendors = ("cray",)
+#test_vendors = ("cray",)
+test_vendors = ("amd",)
 
-#test_codes = ("vecadd1d", "vecadd3d", "matmul")
-test_codes = ("matmul", "vecadd3d", "vecadd1d", "matmul", "vecadd3d", "vecadd1d")
-#test_codes = ("matmul",)
+test_codes = ("vecadd1d", "vecadd3d", "matmul")
+#test_codes = ("matmul", "vecadd3d", "vecadd1d", "matmul", "vecadd3d", "vecadd1d")
+#test_codes = ("matmul", "matmul", "vecadd1d")
 
 test_langs = ("fortran",)
 
