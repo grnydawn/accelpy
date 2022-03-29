@@ -4,7 +4,8 @@ import os, sys, abc, tempfile, shutil, itertools
 
 from collections import OrderedDict
 
-from accelpy.util import Object, load_sharedlib, invoke_sharedlib, pack_arguments, shellcmd
+from accelpy.util import (Object, load_sharedlib, invoke_sharedlib,
+                            pack_arguments, shellcmd, gethash) 
 from accelpy.compile import build_sharedlib, builtin_compilers
 
 class AccelBase(Object):
@@ -187,8 +188,11 @@ class Accel:
             else:
                 _kargs.append(lvar)
 
-        if spec in self._tasks:
-            _libkernel = self._tasks[spec]
+        kernelid = gethash(self.section.hash() +
+                    "".join([str(lvar["id"]) for lvar in localvars]))
+
+        if kernelid in self._tasks:
+            _libkernel = self._tasks[kernelid]
 
         else:
 
@@ -199,11 +203,12 @@ class Accel:
             self.macro = macro
 
             srckernel = AccelBase.avails[self._lang][self._accel
-                                    ].gen_kernelfile(self._id, self.section, self._workdir,
+                                    ].gen_kernelfile(self._id,
+                                    self.section, self._workdir,
                                     _kargs, _uonly)
 
             _libkernel = self._build_kernel(srckernel)
-            self._tasks[spec] = _libkernel
+            self._tasks[kernelid] = _libkernel
 
         self._run_kernel(_kargs, _libkernel)
 
