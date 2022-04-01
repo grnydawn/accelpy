@@ -11,7 +11,7 @@ INTEGER (C_INT64_T) FUNCTION dataenter(X, Y, Z) BIND(C, name="dataenter")
     REAL(C_DOUBLE), DIMENSION(2, 3), INTENT(IN) :: X, Y, Z
 
     !!$omp target enter data map(to: X(:,:), Y(:,:)) map(alloc: Z(:,:))
-    !$omp target enter data map(to: X, Y) map(alloc: Z)
+    !!$omp target enter data map(to: X, Y) map(alloc: Z)
 
     dataenter = 0
 
@@ -23,7 +23,7 @@ INTEGER (C_INT64_T) FUNCTION dataexit(Z) BIND(C, name="dataexit")
     REAL(C_DOUBLE), DIMENSION(2, 3), INTENT(OUT) :: Z
 
     !!$omp target exit data map(from: Z(:,:))
-    !$omp target exit data map(from: Z)
+    !!$omp target exit data map(from: Z)
 
     dataexit = 0
 

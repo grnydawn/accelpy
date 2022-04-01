@@ -21,7 +21,7 @@ cpp_enable = True
         z[id] = x[id] + y[id];
     }
 
-[fortran: copyin=("a", "b"), copyout=("c",), attrspec=attrspec]
+[fortran:a, b, c, attrspec=attrspec]
     INTEGER id, begin, end
 
     begin = LBOUND(a,1) 

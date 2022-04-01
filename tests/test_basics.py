@@ -20,13 +20,15 @@ test_codes = ("vecadd1d", )
 test_langs = ("fortran",)
 
 #test_accels = ("omptarget", )
-test_accels = ("openacc", )
+#test_accels = ("openacc", )
+test_accels = ("openmp", )
+#test_accels = ("fortran", )
 
 testcases = itertools.product(test_vendors, test_codes, test_langs, test_accels)
 
 #test_vendors = ("gnu",)
 
-def test_omptarget1():
+def test_fortran():
 
     import os, sys
     import numpy as np

@@ -12,16 +12,16 @@ INTEGER (C_INT64_T) FUNCTION runkernel(X, Y, Z) BIND(C, name="runkernel")
 
     INTEGER i, j
 
-    !$omp target teams num_teams(2)
-    !$omp distribute
+    !!$omp target teams num_teams(2)
+    !!$omp distribute
     DO i=1, 2
-        !$omp parallel do
+        !!$omp parallel do
         DO j=1, 3
             Z(i, j) = X(i, j) + Y(i, j)
         END DO
-        !$omp end parallel do
+        !!$omp end parallel do
     END DO
-    !$omp end target teams
+    !!$omp end target teams
 
     runkernel = 0
 
