@@ -229,7 +229,7 @@ def pack_arguments(data, prefix=None, setnames=None):
         for idx, arg in enumerate(data):
             idarg = id(arg)
             narg = arg if isinstance(arg, numpy.ndarray) else numpy.asarray(arg)
-            curname = None if prefix is None else prefix+str(idx)
+            curname = "apyvar_" if prefix is None else prefix+str(idx)
             if setnames is not None:
                 curname = setnames[idx]
             res.append({"data": narg, "id": idarg, "curname": curname,

@@ -230,7 +230,6 @@ class OmptargetFortranAccel(OpenmpFortranAccel):
         with open(datapath, "w") as fdata:
             fdata.write(moddatasrc.format(**dataparams))
 
-        #import pdb; pdb.set_trace()
         return datapath
 
     @classmethod

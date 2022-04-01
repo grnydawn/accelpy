@@ -82,7 +82,7 @@ class Accel:
             
         self._libkernel = None
 
-        keys = [os.uname().release, version]
+        keys = [os.uname().release, version, self._id]
 
         for data in (self.copyinout, self.copyin, self.copyout, self.alloc):
             for item in data:
@@ -122,7 +122,6 @@ class Accel:
             self._dfdir = os.path.join(libdir, self._dsrchash[:2])
             dsrcpath = os.path.join(self._dfdir, dfname)
             self._dmodname = "mod" + self._dsrchash[2:]
-
 
             if os.path.isfile(dsrcpath): 
                 srcdata = dsrcpath
@@ -206,6 +205,7 @@ class Accel:
         #exitargs.extend([cio["data"] for cio in self.copyinout])
         #exitargs.extend([co["data"] for co in self.copyout])
 
+        self.debug("libdata exit sharedlib", self._libdata)
         resdata = invoke_sharedlib(self._lang, self._libdata, "dataexit_%d" % self._id, *exitargs)
         #del self.libdata
 
@@ -249,7 +249,8 @@ class Accel:
 
 
         keys = [os.uname().release, version, self._dlibhash]
-        keys.extend([u[1] for u in _uonly])
+        #keys.extend([u[1] for u in _uonly])
+        keys.extend(_uonly)
 
         for item in _kargs:
             keys.append(item["data"].shape)

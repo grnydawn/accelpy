@@ -290,15 +290,15 @@ set_argnames("x", "y", "z")
     END DO
     !$omp end do
 
-[omptarget_fortran: x, y, z]
+[omptarget_fortran: a, b, c]
     INTEGER i, j, k, b1, b2, b3, e1, e2, e3
 
-    b1 = LBOUND(x,1) 
-    b2 = LBOUND(x,2) 
-    b3 = LBOUND(x,3) 
-    e1 = UBOUND(x,1) 
-    e2 = UBOUND(x,2) 
-    e3 = UBOUND(x,3) 
+    b1 = LBOUND(a,1) 
+    b2 = LBOUND(a,2) 
+    b3 = LBOUND(a,3) 
+    e1 = UBOUND(a,1) 
+    e2 = UBOUND(a,2) 
+    e3 = UBOUND(a,3) 
 
     !$omp target
     !$omp teams num_teams(e1-b1+1)
@@ -307,13 +307,14 @@ set_argnames("x", "y", "z")
         !$omp parallel do 
         DO j=b2, e2
             DO k=b3, e3
-                z(i, j, k) = x(i, j, k) + y(i, j, k)
+                c(i, j, k) = a(i, j, k) + b(i, j, k)
             END DO
         END DO
     END DO
     !$omp end teams
     !$omp end target
 
+    !$omp target update from(c)
 """,
 
     "matmul": """
@@ -513,6 +514,7 @@ set_argnames("A", "B", "C")
     !$omp end teams
     !$omp end target
 
+    !$omp target update from(C)
 """
 }
 

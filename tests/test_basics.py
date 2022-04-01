@@ -1,5 +1,5 @@
 
-import shutil, itertools
+import shutil, itertools, time
 
 from tempfile import TemporaryDirectory
 from pytest import mark
