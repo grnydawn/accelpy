@@ -126,6 +126,7 @@ def build_sharedlib(srcfile, outfile, workdir, compile=None, opts="", vendor=Non
                 if out.returncode == 0:
                     return outpath
 
+                #print(str(out.stderr).replace("\\n", "\n"))
             except Exception as err:
                 print("command fail: %s" % cmd)
 

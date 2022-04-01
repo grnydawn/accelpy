@@ -4,8 +4,9 @@ import os, sys, abc, tempfile, shutil, itertools
 
 from collections import OrderedDict
 
+from accelpy.const import version 
 from accelpy.util import (Object, load_sharedlib, invoke_sharedlib,
-                            pack_arguments, shellcmd, gethash) 
+                            pack_arguments, shellcmd, gethash, get_config) 
 from accelpy.compile import build_sharedlib, builtin_compilers
 
 class AccelBase(Object):
@@ -13,11 +14,13 @@ class AccelBase(Object):
     avails = OrderedDict()
 
     @abc.abstractmethod
-    def gen_datafile(cls, workdir, copyinout, copyin, copyout, alloc):
+    def gen_datafile(cls, filename, runid, workdir, copyinout,
+                        copyin, copyout, alloc, attr):
         pass
 
     @abc.abstractmethod
-    def gen_kernelfile(cls, section, workdir, localvars):
+    def gen_kernelfile(cls, datamodname, runid, section, workdir,
+                        localvars, modvars):
         pass
 
 class Task:
@@ -79,6 +82,15 @@ class Accel:
             
         self._libkernel = None
 
+        keys = [os.uname().release, version]
+
+        for data in (self.copyinout, self.copyin, self.copyout, self.alloc):
+            for item in data:
+                keys.append(item["data"].shape)
+                keys.append(item["data"].dtype)
+
+        orghash = gethash(str(keys))
+
         # user or system defined compilers
         for comptype, comps in builtin_compilers.items():
             
@@ -101,15 +113,29 @@ class Accel:
 
             elif isinstance(accel, str):
                 if _accel != accel: continue
+
+            libdir = get_config("libdir")
+
+            self._dsrchash = gethash(orghash + str(comptype) + str(_lang) + str(_accel))
             
-            srcdata = AccelBase.avails[_lang][_accel].gen_datafile(self._id, self._workdir,
-                        self.copyinout, self.copyin, self.copyout, self.alloc, self._attr)
+            dfname = "D" + self._dsrchash[2:] + AccelBase.avails[_lang][_accel].srcext
+            self._dfdir = os.path.join(libdir, self._dsrchash[:2])
+            dsrcpath = os.path.join(self._dfdir, dfname)
+            self._dmodname = "mod" + self._dsrchash[2:]
+
+
+            if os.path.isfile(dsrcpath): 
+                srcdata = dsrcpath
+
+            else:
+                srcdata = AccelBase.avails[_lang][_accel].gen_datafile(
+                        self._dmodname, dfname, self._id, self._workdir,
+                        self.copyinout, self.copyin, self.copyout, self.alloc,
+                        self._attr)
 
             if srcdata is None: continue
 
-        #if isinstance(compile, str):
-        #    return self._build_load_run(srcdata, srckernel, compile,
-        #                                copyinout, copyin, copyout, alloc)
+            self.debug("data src from: %s" % srcdata)
 
             for compid, compinfo in comps.items():
                 try:
@@ -118,13 +144,40 @@ class Accel:
                     if avail is None:
                         avail = compinfo["check"][1](res.stderr)
 
-                    #print(avail, compid, compinfo["check"])
                     if not avail: continue
 
-                    self._libdata = self._build_run_enter(_lang, srcdata,
-                                        compinfo["build"])
+                    cmdline = compinfo["build"]
 
-                    self._compile = compinfo["build"]
+                    self._dlibhash = gethash(self._dsrchash +str(compid) + str(cmdline))
+                    dlname = "D" + self._dlibhash[2:] + AccelBase.avails[_lang][_accel].libext
+                    dldir = os.path.join(libdir, self._dlibhash[:2])
+                    dlibpath = os.path.join(dldir, dlname)
+
+                    if os.path.isfile(dlibpath): 
+                        self._libdata = self._load_run_enter(dlibpath, _lang)
+                        self.debug("data lib from lib: %s" % dlibpath)
+
+                    else:
+                        dstpath = os.path.join(self._workdir, dlname)
+                        modname, self._libdata = self._build_run_enter(dstpath, _lang,
+                                            srcdata, cmdline)
+                        self.debug("data lib from build: %s" % dstpath)
+
+                        if not os.path.isfile(dsrcpath):
+                            if not os.path.isdir(self._dfdir):
+                                os.makedirs(self._dfdir)
+
+                            shutil.copy(srcdata, dsrcpath)
+                            shutil.copy(os.path.join(self._workdir,
+                                        modname), self._dfdir)
+
+                        if not os.path.isfile(dlibpath):
+                            if not os.path.isdir(dldir):
+                                os.makedirs(dldir)
+
+                            shutil.copy(dstpath, dlibpath)
+
+                    self._compile = cmdline
                     self._lang = _lang
                     self._accel = _accel
 
@@ -172,8 +225,14 @@ class Accel:
         self.spec.eval_pysection(environ)
         self.spec.update_argnames(localvars)
         self.section = self.spec.get_section(self._accel, self._lang, environ)
+
+        if (self.section is None or self._lang not in AccelBase.avails or
+            self._accel not in AccelBase.avails[self._lang]):
+            raise Exception("Kernel can not be crated.")
+
         self.section.update_argnames(localvars)
 
+        dids = {}
         _kargs = []
         _uonly = []
 
@@ -188,45 +247,57 @@ class Accel:
             else:
                 _kargs.append(lvar)
 
-        kernelid = gethash(self.section.hash() +
-                    "".join([str(lvar["id"]) for lvar in localvars]))
 
-        if kernelid in self._tasks:
-            _libkernel = self._tasks[kernelid]
+        keys = [os.uname().release, version, self._dlibhash]
+        keys.extend([u[1] for u in _uonly])
+
+        for item in _kargs:
+            keys.append(item["data"].shape)
+            keys.append(item["data"].dtype)
+
+        self._knlhash = gethash(self.section.hash() + str(keys) + str(macro) +
+                            str(environ))
+
+        libdir = get_config("libdir")
+
+        klib = None
+
+        klname = "K" + self._knlhash[2:] + AccelBase.avails[
+                        self._lang][self._accel].libext
+        kldir = os.path.join(libdir, self._knlhash[:2])
+        klibpath = os.path.join(kldir, klname)
+
+        if self._knlhash in self._tasks:
+            self._run_kernel(self._tasks[self._knlhash], _kargs)
+            self.debug("kernel run using memory cache")
+
+        elif os.path.isfile(klibpath): 
+            klib = self._load_run_kernel(klibpath, _kargs)
+            self._tasks[self._knlhash] = klib
+            self.debug("kernel run using %s" % klibpath)
 
         else:
-
-            if (self.section is None or self._lang not in AccelBase.avails or
-                self._accel not in AccelBase.avails[self._lang]):
-                return
 
             self.macro = macro
 
             srckernel = AccelBase.avails[self._lang][self._accel
-                                    ].gen_kernelfile(self._id,
-                                    self.section, self._workdir,
-                                    _kargs, _uonly)
+                                ].gen_kernelfile(self._knlhash, self._dmodname,
+                                self._id, self.section, self._workdir, _kargs,
+                                _uonly)
 
-            _libkernel = self._build_kernel(srckernel)
-            self._tasks[kernelid] = _libkernel
+            dstpath, klib = self._build_load_run_kernel(srckernel, _kargs)
 
-        self._run_kernel(_kargs, _libkernel)
+            if not os.path.isfile(klibpath):
+                if not os.path.isdir(kldir):
+                    os.makedirs(kldir)
 
-    def _build_run_enter(self, lang, srcdata, command):
+                shutil.copy(dstpath, klibpath)
+            self.debug("kernel run using %s" % dstpath)
 
-        libext = ".dylib" if sys.platform == "darwin" else ".so"
+        if klib and self._knlhash not in self._tasks:
+            self._tasks[self._knlhash] = klib
 
-        # build acceldata
-        dstdata = os.path.splitext(srcdata)[0] + libext
-        cmd = command.format(moddir=self._workdir, outpath=dstdata)
-        out = shellcmd(cmd + " " + srcdata, cwd=self._workdir)
-        assert os.path.isfile(dstdata), str(out.stderr)
-
-#        shutil.copy(dstdata, os.path.join(self._workdir, "libdata.so"))
-#        dstdataobj = os.path.join(os.path.dirname(srcdata), "data.o")
-#        cmd2 = command.format(moddir=self._workdir, outpath=dstdataobj)
-#        out2 = shellcmd(cmd2 + " -c " + srcdata, cwd=self._workdir)
-#        assert os.path.isfile(dstdataobj), str(out2.stderr)
+    def _load_run_enter(self, dstdata, lang):
 
         # load acceldata
         libdata = load_sharedlib(dstdata)
@@ -248,9 +319,31 @@ class Accel:
 
         return libdata
 
-    def _build_kernel(self, srckernel):
+    def _build_run_enter(self, dstdata, lang, srcdata, command):
 
-        libext = ".dylib" if sys.platform == "darwin" else ".so"
+        # build acceldata
+        cmd = command.format(moddir=self._workdir, outpath=dstdata)
+        out = shellcmd(cmd + " " + srcdata, cwd=self._workdir)
+        assert os.path.isfile(dstdata), str(out.stderr)
+
+#        shutil.copy(dstdata, os.path.join(self._workdir, "libdata.so"))
+#        dstdataobj = os.path.join(os.path.dirname(srcdata), "data.o")
+#        cmd2 = command.format(moddir=self._workdir, outpath=dstdataobj)
+#        out2 = shellcmd(cmd2 + " -c " + srcdata, cwd=self._workdir)
+#        assert os.path.isfile(dstdataobj), str(out2.stderr)
+
+        modname = None
+
+        for fname in os.listdir(self._workdir):
+            if fname.lower().endswith(".mod"):
+                modname = fname
+                break
+
+        return modname, self._load_run_enter(dstdata, lang)
+
+    def _build_load_run_kernel(self, srckernel, localvars):
+
+        libext = AccelBase.avails[self._lang][self._accel].libext
 
         macros = []
         for m, d in self.macro.items():
@@ -262,25 +355,33 @@ class Accel:
 
             macros.append("-D%s=%s" % (str(m), str(d)))
         
+        include = "-I %s" % self._dfdir
+
         # build kernel
         dstkernel = os.path.splitext(srckernel)[0] + libext
         cmd = self._compile.format(moddir=self._workdir, outpath=dstkernel)
-        out = shellcmd("%s %s %s" % (cmd, " ".join(macros), srckernel),
-                        cwd=self._workdir)
+        out = shellcmd("%s %s %s %s" % (cmd, " ".join(macros), include,
+                        srckernel), cwd=self._workdir)
         #print(str(out.stdout).replace("\\n", "\n"))
+        #print(str(out.stderr).replace("\\n", "\n"))
         #import pdb; pdb.set_trace()
-        #assert os.path.isfile(dstkernel), str(out.stderr)
         assert os.path.isfile(dstkernel), str(out.stderr).replace("\\n", "\n")
 
+        return dstkernel, self._load_run_kernel(dstkernel, localvars)
+
+    def _load_run_kernel(self, libpath, localvars):
+
         # load accelkernel
-        libkernel = load_sharedlib(dstkernel)
+        libkernel = load_sharedlib(libpath)
         self.debug("libkernel sharedlib", libkernel)
         assert libkernel is not None, "libkernel load fail"
+
+        self._run_kernel(libkernel, localvars)
 
         return libkernel
 
 
-    def _run_kernel(self, localvars, libkernel):
+    def _run_kernel(self, libkernel, localvars):
 
         # invoke function in accelkernel
         kernelargs = [lvar["data"] for lvar in localvars]

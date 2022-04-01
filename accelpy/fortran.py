@@ -1,6 +1,6 @@
 """accelpy Fortran-based Accelerator module"""
 
-import os, uuid
+import os, uuid, sys
 
 from collections import OrderedDict
 
@@ -9,7 +9,7 @@ from accelpy.accel import AccelBase
 
 
 moddatasrc = """
-module modompdata_{runid}
+module {datamodname}
 USE, INTRINSIC :: ISO_C_BINDING
 
 {modvardefs}
@@ -45,7 +45,7 @@ end module
 """
 
 modkernelsrc = """
-MODULE modompkernel_{runid}
+MODULE {kernelmodname}
 
 public runkernel_{runid}
 
@@ -71,6 +71,8 @@ class FortranAccel(AccelBase):
 
     lang = "fortran"
     accel = "fortran"
+    srcext = ".F90"
+    libext = ".dylib" if sys.platform == "darwin" else ".so"
 
 
 class OpenmpFortranAccel(FortranAccel):
@@ -132,13 +134,11 @@ class OmptargetFortranAccel(OpenmpFortranAccel):
             return "%s, INTENT(IN) :: %s" % (get_f_dtype(arg), arg["curname"])
 
     @classmethod
-    def gen_datafile(cls, runid, workdir, copyinout, copyin, copyout, alloc, attr):
+    def gen_datafile(cls, modname, filename, runid, workdir, copyinout, copyin, copyout, alloc, attr):
 
-        filename = uuid.uuid4().hex[:10]
+        datapath = os.path.join(workdir, filename)
 
-        datapath = os.path.join(workdir, "data-%s.F90" % filename)
-
-        dataparams = {"runid": str(runid)}
+        dataparams = {"runid": str(runid), "datamodname": modname}
 
         modvardefs = []
         modvars = []
@@ -234,11 +234,9 @@ class OmptargetFortranAccel(OpenmpFortranAccel):
         return datapath
 
     @classmethod
-    def gen_kernelfile(cls, runid, section, workdir, localvars, modvars):
+    def gen_kernelfile(cls, knlhash, dmodname, runid, section, workdir, localvars, modvars):
 
-        filename = uuid.uuid4().hex[:10]
-
-        kernelpath = os.path.join(workdir, "kernel-%s.F90" % filename)
+        kernelpath = os.path.join(workdir, "K%s%s" % (knlhash[2:], cls.srcext))
 
         kernelparams = {"runid": str(runid)}
         kernelargs = []
@@ -246,7 +244,7 @@ class OmptargetFortranAccel(OpenmpFortranAccel):
         kernelvardefs = []
 
         for old, new in modvars:
-            uonlyvars.append("USE MODOMPDATA_%d, ONLY : %s => %s" % (runid, new, old))
+            uonlyvars.append("USE %s, ONLY : %s => %s" % (dmodname, new, old))
 
         attrspec = section.kwargs.get("attrspec", {})
 
@@ -255,6 +253,7 @@ class OmptargetFortranAccel(OpenmpFortranAccel):
             kernelargs.append(lvar["curname"])
             kernelvardefs.append(cls._kernelvardefs(lvar, "INOUT", attrspec=attrspec))
 
+        kernelparams["kernelmodname"] = "MOD%s" % knlhash[2:].upper()
         kernelparams["kernelargs"] = ", ".join(kernelargs)
         kernelparams["useonlyvars"] = "\n".join(uonlyvars)
         kernelparams["kernelvardefs"] = "\n".join(kernelvardefs)
