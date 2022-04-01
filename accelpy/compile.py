@@ -11,6 +11,7 @@ from accelpy.util import shellcmd, get_system
 builtin_compilers = OrderedDict()
 
 builtin_compilers["cray_fortran_omptarget"] = OrderedDict()
+builtin_compilers["cray_fortran_openacc"] = OrderedDict()
 builtin_compilers["amd_fortran_omptarget"] = OrderedDict()
 builtin_compilers["ibm_fortran_omptarget"] = OrderedDict()
 builtin_compilers["gnu_fortran_omptarget"] = OrderedDict()
@@ -36,6 +37,11 @@ if system.name == "cray":
             "build": "ftn -shared -fPIC -fopenmp -J {moddir} -o {outpath}"
         }
 
+    builtin_compilers["cray_fortran_openacc"]["ftnwrapper"] = {
+            "check": ("ftn --version",_cray_version_check_omptarget),
+            "build": "ftn -shared -fPIC -h acc,noomp -J {moddir} -o {outpath}"
+        }
+
     builtin_compilers["amd_fortran_omptarget"]["ftnwrapper"] = {
             "check": ("ftn --version",_amd_version_check_omptarget),
             "build": "ftn -shared -fPIC -fopenmp -J {moddir} -o {outpath}"
@@ -49,6 +55,11 @@ if system.name == "cray":
 builtin_compilers["cray_fortran_omptarget"]["generic"] = {
         "check": ("crayftn --version",_cray_version_check_omptarget),
         "build": "crayftn -shared -fPIC -h omp,noacc -J {moddir} -o {outpath}"
+    }
+
+builtin_compilers["cray_fortran_openacc"]["generic"] = {
+        "check": ("crayftn --version",_cray_version_check_omptarget),
+        "build": "crayftn -shared -fPIC -h acc,noomp -J {moddir} -o {outpath}"
     }
 
 builtin_compilers["amd_fortran_omptarget"]["generic"] = {

@@ -4,6 +4,7 @@ PY := python3
 #### NOTE ####
 # run "module load craype-accel-amd-gfx90a" on Crusher to support GPU
 # run "export CRAY_ACC_DEBUG=2" to display acc debug from Cray compiler
+# install with pip install accelpy --force --no-cache-dir --no-binary=accelpy
 
 .PHONY: clean clean-test clean-pyc clean-build doc help
 .DEFAULT_GOAL := help

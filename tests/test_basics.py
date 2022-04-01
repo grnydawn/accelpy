@@ -7,19 +7,22 @@ from pytest import mark
 from accelpy import Kernel, Accel, build_sharedlib, load_sharedlib, invoke_sharedlib
 from testdata import get_testdata, assert_testdata
 
-debug = True
+DEBUG = False
 
 #test_vendors = ("cray", "ibm", "amd", "gnu")
 test_vendors = ("cray",)
 #test_vendors = ("amd",)
 
-test_codes = ("vecadd1d", "vecadd3d", "matmul")
-#test_codes = ("matmul", "vecadd3d", "vecadd1d", "matmul", "vecadd3d", "vecadd1d")
+#test_codes = ("vecadd1d", "vecadd3d", "matmul")
 #test_codes = ("matmul", "matmul", "vecadd1d")
+test_codes = ("vecadd1d", )
 
 test_langs = ("fortran",)
 
-testcases = itertools.product(test_vendors, test_codes, test_langs)
+#test_accels = ("omptarget", )
+test_accels = ("openacc", )
+
+testcases = itertools.product(test_vendors, test_codes, test_langs, test_accels)
 
 #test_vendors = ("gnu",)
 
@@ -98,13 +101,13 @@ def test_omptarget1():
         # check result
         assert np.array_equal(Z, X+Y)
 
-@mark.parametrize("vendor, code, lang", testcases)
-def test_omptarget2(vendor, code, lang):
+@mark.parametrize("vendor, code, lang, accel", testcases)
+def test_omptarget2(vendor, code, lang, accel):
 
     data, knl  = get_testdata(code, lang)
 
     # TODO: generate data var names
-    acc = Accel(**data, vendor=vendor, _debug=True)
+    acc = Accel(**data, vendor=vendor, accel=accel, _debug=DEBUG)
 
     # TODO: testif data var names are used in launch
     args = []
