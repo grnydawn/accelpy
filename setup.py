@@ -12,7 +12,8 @@ try:
     import wheel.bdist_wheel
     class bdist_wheel(wheel.bdist_wheel.bdist_wheel):
         def run(self, *args, **kwargs):
-            raise DistutilsClassError("No!")
+            pass
+            #raise DistutilsClassError("No!")
 except ModuleNotFoundError:
     pass
 

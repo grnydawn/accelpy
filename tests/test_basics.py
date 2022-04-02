@@ -10,8 +10,9 @@ from testdata import get_testdata, assert_testdata
 DEBUG = False
 
 #test_vendors = ("cray", "ibm", "amd", "gnu")
-test_vendors = ("cray",)
+#test_vendors = ("cray",)
 #test_vendors = ("amd",)
+test_vendors = ("ibm",)
 
 #test_codes = ("vecadd1d", "vecadd3d", "matmul")
 test_codes = ("vecadd1d", "matmul", "vecadd3d")

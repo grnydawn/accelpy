@@ -16,12 +16,17 @@ builtin_compilers["cray_fortran_openmp"] = OrderedDict()
 builtin_compilers["cray_fortran_fortran"] = OrderedDict()
 
 builtin_compilers["amd_fortran_omptarget"] = OrderedDict()
+builtin_compilers["amd_fortran_openacc"] = OrderedDict()
 builtin_compilers["amd_fortran_openmp"] = OrderedDict()
 builtin_compilers["amd_fortran_fortran"] = OrderedDict()
 
 builtin_compilers["ibm_fortran_omptarget"] = OrderedDict()
 builtin_compilers["ibm_fortran_openmp"] = OrderedDict()
 builtin_compilers["ibm_fortran_fortran"] = OrderedDict()
+
+builtin_compilers["intel_fortran_omptarget"] = OrderedDict()
+builtin_compilers["intel_fortran_openmp"] = OrderedDict()
+builtin_compilers["intel_fortran_fortran"] = OrderedDict()
 
 builtin_compilers["gnu_fortran_omptarget"] = OrderedDict()
 builtin_compilers["gnu_fortran_openmp"] = OrderedDict()
@@ -39,6 +44,10 @@ def _amd_version_check_omptarget(check):
 
 def _ibm_version_check_omptarget(check):
     return check.lower().startswith(b"ibm")
+
+def _intel_version_check_omptarget(check):
+    return check.lower().startswith(b"ifort")
+
 
 system = get_system()
 
@@ -69,6 +78,11 @@ if system.name == "cray":
             "build": "ftn -shared -fPIC -fopenmp -J {moddir} -o {outpath}"
         }
 
+    builtin_compilers["amd_fortran_omptarget"]["ftnwrapper"] = {
+            "check": ("ftn --version",_amd_version_check_omptarget),
+            "build": "ftn -shared -fPIC -fopenacc -J {moddir} -o {outpath}"
+        }
+
     builtin_compilers["amd_fortran_openmp"]["ftnwrapper"] = {
             "check": ("ftn --version",_amd_version_check_omptarget),
             "build": "ftn -shared -fPIC -fopenmp -J {moddir} -o {outpath}"
@@ -79,19 +93,34 @@ if system.name == "cray":
             "build": "ftn -shared -fPIC -J {moddir} -o {outpath}"
         }
 
+    builtin_compilers["intel_fortran_omptarget"]["ftnwrapper"] = {
+            "check": ("ftn --version",_intel_version_check_omptarget),
+            "build": "ftn -shared -fpic -qopenacc -module {moddir} -o {outpath}"
+        }
+
+    builtin_compilers["intel_fortran_openmp"]["ftnwrapper"] = {
+            "check": ("ftn --version",_intel_version_check_omptarget),
+            "build": "ftn -shared -fpic -qopenmp -module {moddir} -o {outpath}"
+        }
+
+    builtin_compilers["intel_fortran_fortran"]["ftnwrapper"] = {
+            "check": ("ftn --version",_intel_version_check_omptarget),
+            "build": "ftn -shared -fpic -module {moddir} -o {outpath}"
+        }
+
     builtin_compilers["gnu_fortran_omptarget"]["ftnwrapper"] = {
             "check": ("ftn --version", _gnu_version_check_omptarget),
-            "build": "ftn -shared -fPIC -fopenmp -J {moddir} -o {outpath}"
+            "build": "ftn -shared -fPIC -fopenmp -J {moddir} -o {outpath} -ffree-line-length-none"
         }
 
     builtin_compilers["gnu_fortran_openmp"]["ftnwrapper"] = {
             "check": ("ftn --version", _gnu_version_check_omptarget),
-            "build": "ftn -shared -fPIC -fopenmp -J {moddir} -o {outpath}"
+            "build": "ftn -shared -fPIC -fopenmp -J {moddir} -o {outpath} -ffree-line-length-none"
         }
 
     builtin_compilers["gnu_fortran_fortran"]["ftnwrapper"] = {
             "check": ("ftn --version", _gnu_version_check_omptarget),
-            "build": "ftn -shared -fPIC -J {moddir} -o {outpath}"
+            "build": "ftn -shared -fPIC -J {moddir} -o {outpath} -ffree-line-length-none"
         }
 
 builtin_compilers["cray_fortran_omptarget"]["generic"] = {
@@ -119,6 +148,11 @@ builtin_compilers["amd_fortran_omptarget"]["generic"] = {
         "build": "amdflang -shared -fPIC -fopenmp -J {moddir} -o {outpath}"
     }
 
+builtin_compilers["amd_fortran_openacc"]["generic"] = {
+        "check": ("amdflang --version",_amd_version_check_omptarget),
+        "build": "amdflang -shared -fPIC -fopenacc -J {moddir} -o {outpath}"
+    }
+
 builtin_compilers["amd_fortran_openmp"]["generic"] = {
         "check": ("amdflang --version",_amd_version_check_omptarget),
         "build": "amdflang -shared -fPIC -fopenmp -J {moddir} -o {outpath}"
@@ -127,6 +161,21 @@ builtin_compilers["amd_fortran_openmp"]["generic"] = {
 builtin_compilers["amd_fortran_fortran"]["generic"] = {
         "check": ("amdflang --version",_amd_version_check_omptarget),
         "build": "amdflang -shared -fPIC -J {moddir} -o {outpath}"
+    }
+
+builtin_compilers["intel_fortran_omptarget"]["ifortwrapper"] = {
+        "check": ("ifort --version",_intel_version_check_omptarget),
+        "build": "ifort -shared -fpic -qopenacc -module {moddir} -o {outpath}"
+    }
+
+builtin_compilers["intel_fortran_openmp"]["ifortwrapper"] = {
+        "check": ("ifort --version",_intel_version_check_omptarget),
+        "build": "ifort -shared -fpic -qopenmp -module {moddir} -o {outpath}"
+    }
+
+builtin_compilers["intel_fortran_fortran"]["ifortwrapper"] = {
+        "check": ("ifort --version",_intel_version_check_omptarget),
+        "build": "ifort -shared -fpic -module {moddir} -o {outpath}"
     }
 
 builtin_compilers["ibm_fortran_omptarget"]["generic"] = {
@@ -146,17 +195,17 @@ builtin_compilers["ibm_fortran_fortran"]["generic"] = {
 
 builtin_compilers["gnu_fortran_omptarget"]["generic"] = {
         "check": ("gfortran --version", _gnu_version_check_omptarget),
-        "build": "gfortran -shared -fPIC -fopenmp -J {moddir} -o {outpath}"
+        "build": "gfortran -shared -fPIC -fopenmp -J {moddir} -o {outpath} -ffree-line-length-none"
     }
 
 builtin_compilers["gnu_fortran_openmp"]["generic"] = {
         "check": ("gfortran --version", _gnu_version_check_omptarget),
-        "build": "gfortran -shared -fPIC -fopenmp -J {moddir} -o {outpath}"
+        "build": "gfortran -shared -fPIC -fopenmp -J {moddir} -o {outpath} -ffree-line-length-none"
     }
 
 builtin_compilers["gnu_fortran_fortran"]["generic"] = {
         "check": ("gfortran --version", _gnu_version_check_omptarget),
-        "build": "gfortran -shared -fPIC -J {moddir} -o {outpath}"
+        "build": "gfortran -shared -fPIC -J {moddir} -o {outpath} -ffree-line-length-none"
     }
 
 
