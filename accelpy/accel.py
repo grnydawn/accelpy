@@ -75,10 +75,10 @@ class Accel:
         self._workdir = tempfile.mkdtemp()
         self.debug("creating workdir: %s" % self._workdir)
 
-        self.copyinout = pack_arguments(copyinout, prefix="cio%d" % self._id)
-        self.copyin = pack_arguments(copyin, prefix="ci%d" % self._id)
-        self.copyout = pack_arguments(copyout, prefix="co%d" % self._id)
-        self.alloc = pack_arguments(alloc, prefix="al%d" % self._id)
+        self.copyinout = pack_arguments(copyinout, prefix="cio%d_" % self._id)
+        self.copyin = pack_arguments(copyin, prefix="ci%d_" % self._id)
+        self.copyout = pack_arguments(copyout, prefix="co%d_" % self._id)
+        self.alloc = pack_arguments(alloc, prefix="al%d_" % self._id)
             
         self._libkernel = None
 

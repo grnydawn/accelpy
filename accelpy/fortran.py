@@ -45,11 +45,11 @@ end module
 """
 
 modkernelsrc = """
-MODULE {kernelmodname}
+!MODULE {kernelmodname}
 
-public runkernel_{runid}
+!public runkernel_{runid}
 
-CONTAINS
+!CONTAINS
 
 INTEGER (C_INT64_T) FUNCTION runkernel_{runid}({kernelargs}) BIND(C, name="runkernel_{runid}")
     USE, INTRINSIC :: ISO_C_BINDING
@@ -63,7 +63,7 @@ INTEGER (C_INT64_T) FUNCTION runkernel_{runid}({kernelargs}) BIND(C, name="runke
 
 END FUNCTION
 
-END MODULE
+!END MODULE
 """
 
 
