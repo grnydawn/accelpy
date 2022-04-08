@@ -12,19 +12,23 @@ DEBUG = False
 #test_vendors = ("cray", "ibm", "amd", "gnu")
 #test_vendors = ("cray",)
 #test_vendors = ("amd",)
-test_vendors = ("ibm",)
+#test_vendors = ("ibm",)
+test_vendors = ("pgi",)
 
-#test_codes = ("vecadd1d", "vecadd3d", "matmul")
-test_codes = ("vecadd1d", "matmul", "vecadd3d")
-#test_codes = ("matmul", "matmul", "vecadd1d")
+test_codes = ("vecadd1d", "vecadd3d", "matmul")
+#test_codes = ("vecadd1d",)
 #test_codes = ("matmul", )
 
-test_langs = ("fortran",)
+#test_langs = ("fortran",)
+test_langs = ("cpp",)
 
-test_accels = ("omptarget", )
+#test_accels = ("omptarget", )
 #test_accels = ("openacc", )
 #test_accels = ("openmp", )
 #test_accels = ("fortran", )
+#test_accels = ("cpp", )
+#test_accels = ("openmp", )
+test_accels = ("openacc", )
 
 testcases = itertools.product(test_vendors, test_codes, test_langs, test_accels)
 
@@ -111,7 +115,7 @@ def test_omptarget2(vendor, code, lang, accel):
     data, knl  = get_testdata(code, lang)
 
     # TODO: generate data var names
-    acc = Accel(**data, vendor=vendor, accel=accel, _debug=DEBUG)
+    acc = Accel(**data, vendor=vendor, accel=accel, lang=lang, recompile=False, _debug=DEBUG)
 
     # TODO: testif data var names are used in launch
     args = []
@@ -124,7 +128,7 @@ def test_omptarget2(vendor, code, lang, accel):
 
     acc.stop()
 
-
+    #import pdb; pdb.set_trace()
     assert_testdata(code, data)
 
 

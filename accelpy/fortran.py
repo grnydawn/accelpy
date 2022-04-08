@@ -211,8 +211,8 @@ class FortranAccel(FortranAccelBase):
         uonlyvars = []
         kernelvardefs = []
 
-        for old, new in modvars:
-            uonlyvars.append("USE %s, ONLY : %s => %s" % (dmodname, new, old))
+        for old, newdata in modvars:
+            uonlyvars.append("USE %s, ONLY : %s => %s" % (dmodname, newdata["curname"], old))
 
         attrspec = section.kwargs.get("attrspec", {})
 
@@ -323,6 +323,7 @@ class AcctargetFortranAccel(FortranAccelBase):
 
         for cio in copyinout:
             cioname = cio["curname"]
+            #cionames.append("%s(%d)" % (cioname, cio["data"].size))
             cionames.append(cioname)
 
             modvars.append(cioname)
@@ -343,6 +344,7 @@ class AcctargetFortranAccel(FortranAccelBase):
 
         for ci in copyin:
             ciname = ci["curname"]
+            #cinames.append("%s(%d)" % (ciname, ci["data"].size))
             cinames.append(ciname)
 
             modvars.append(ciname)
@@ -360,6 +362,7 @@ class AcctargetFortranAccel(FortranAccelBase):
 
         for co in copyout:
             coname = co["curname"]
+            #conames.append("%s(%d)" % (coname, co["data"].size))
             conames.append(coname)
 
             modvars.append(coname)
@@ -377,6 +380,7 @@ class AcctargetFortranAccel(FortranAccelBase):
 
         for al in alloc:
             alname = al["curname"]
+            #alnames.append("%s(%d)" % (alname, al["data"].size))
             alnames.append(alname)
 
             modvars.append(alname)
@@ -414,8 +418,8 @@ class AcctargetFortranAccel(FortranAccelBase):
         uonlyvars = []
         kernelvardefs = []
 
-        for old, new in modvars:
-            uonlyvars.append("USE %s, ONLY : %s => %s" % (dmodname, new, old))
+        for old, newobj in modvars:
+            uonlyvars.append("USE %s, ONLY : %s => %s" % (dmodname, newobj["curname"], old))
 
         attrspec = section.kwargs.get("attrspec", {})
 

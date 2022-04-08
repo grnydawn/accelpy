@@ -21,12 +21,22 @@ builtin_compilers["amd_fortran_openmp"] = OrderedDict()
 builtin_compilers["amd_fortran_fortran"] = OrderedDict()
 
 builtin_compilers["ibm_fortran_omptarget"] = OrderedDict()
+builtin_compilers["ibm_cpp_omptarget"] = OrderedDict()
 builtin_compilers["ibm_fortran_openmp"] = OrderedDict()
+builtin_compilers["ibm_cpp_openmp"] = OrderedDict()
 builtin_compilers["ibm_fortran_fortran"] = OrderedDict()
+builtin_compilers["ibm_cpp_cpp"] = OrderedDict()
 
 builtin_compilers["intel_fortran_omptarget"] = OrderedDict()
 builtin_compilers["intel_fortran_openmp"] = OrderedDict()
 builtin_compilers["intel_fortran_fortran"] = OrderedDict()
+
+builtin_compilers["pgi_fortran_openacc"] = OrderedDict()
+builtin_compilers["pgi_cpp_openacc"] = OrderedDict()
+builtin_compilers["pgi_fortran_openmp"] = OrderedDict()
+builtin_compilers["pgi_cpp_openmp"] = OrderedDict()
+builtin_compilers["pgi_fortran_fortran"] = OrderedDict()
+builtin_compilers["pgi_cpp_cpp"] = OrderedDict()
 
 builtin_compilers["gnu_fortran_omptarget"] = OrderedDict()
 builtin_compilers["gnu_fortran_openmp"] = OrderedDict()
@@ -34,19 +44,23 @@ builtin_compilers["gnu_fortran_fortran"] = OrderedDict()
 
 
 def _gnu_version_check_omptarget(check):
-    return check.lower().startswith(b"gnu")
+    return check.lower().lstrip().startswith(b"gnu")
+
+def _pgi_version_check_omptarget(check):
+    return check.lower().lstrip().startswith(b"pg")
 
 def _cray_version_check_omptarget(check):
-    return check.lower().startswith(b"cray")
+    return check.lower().lstrip().startswith(b"cray")
 
 def _amd_version_check_omptarget(check):
-    return check.lower().startswith(b"amd")
+    return check.lower().lstrip().startswith(b"amd")
 
 def _ibm_version_check_omptarget(check):
-    return check.lower().startswith(b"ibm")
+    return check.lower().lstrip().startswith(b"ibm")
 
 def _intel_version_check_omptarget(check):
-    return check.lower().startswith(b"ifort")
+    temp = check.lower().lstrip()
+    return temp.startswith(b"ifort") or temp.startswith(b"icpc")
 
 
 system = get_system()
@@ -183,14 +197,59 @@ builtin_compilers["ibm_fortran_omptarget"]["generic"] = {
         "build": "xlf_r -qmkshrobj -qpic -qsmp=omp -qoffload -qmoddir={moddir} -o {outpath}"
     }
 
+builtin_compilers["ibm_cpp_omptarget"]["generic"] = {
+        "check": ("xlc++_r -qversion",_ibm_version_check_omptarget),
+        "build": "xlc++_r -qmkshrobj -qpic -qsmp=omp -qoffload -o {outpath}"
+    }
+
 builtin_compilers["ibm_fortran_openmp"]["generic"] = {
         "check": ("xlf_r -qversion",_ibm_version_check_omptarget),
         "build": "xlf_r -qmkshrobj -qpic -qsmp=omp -qmoddir={moddir} -o {outpath}"
     }
 
+builtin_compilers["ibm_cpp_openmp"]["generic"] = {
+        "check": ("xlc++_r -qversion",_ibm_version_check_omptarget),
+        "build": "xlc++_r -qmkshrobj -qpic -qsmp=omp -o {outpath}"
+    }
+
 builtin_compilers["ibm_fortran_fortran"]["generic"] = {
         "check": ("xlf_r -qversion",_ibm_version_check_omptarget),
         "build": "xlf_r -qmkshrobj -qpic -qmoddir={moddir} -o {outpath}"
+    }
+
+builtin_compilers["ibm_cpp_cpp"]["generic"] = {
+        "check": ("xlc++_r -qversion",_ibm_version_check_omptarget),
+        "build": "xlc++_r -qmkshrobj -qpic -o {outpath}"
+    }
+
+builtin_compilers["pgi_fortran_openacc"]["generic"] = {
+        "check": ("pgfortran --version", _pgi_version_check_omptarget),
+        "build": "pgfortran -shared -fpic -acc -module {moddir} -o {outpath}"
+    }
+
+builtin_compilers["pgi_cpp_openacc"]["generic"] = {
+        "check": ("pgc++ --version", _pgi_version_check_omptarget),
+        "build": "pgc++ -shared -fpic -acc -o {outpath}"
+    }
+
+builtin_compilers["pgi_fortran_openmp"]["generic"] = {
+        "check": ("pgfortran --version", _pgi_version_check_omptarget),
+        "build": "pgfortran -shared -fpic -mp -module {moddir} -o {outpath}"
+    }
+
+builtin_compilers["pgi_cpp_openmp"]["generic"] = {
+        "check": ("pgc++ --version", _pgi_version_check_omptarget),
+        "build": "pgc++ -shared -fpic -mp -o {outpath}"
+    }
+
+builtin_compilers["pgi_fortran_fortran"]["generic"] = {
+        "check": ("pgfortran --version", _pgi_version_check_omptarget),
+        "build": "pgfortran -shared -fpic -module {moddir} -o {outpath}"
+    }
+
+builtin_compilers["pgi_cpp_cpp"]["generic"] = {
+        "check": ("pgc++ --version", _pgi_version_check_omptarget),
+        "build": "pgc++ -shared -fpic -o {outpath}"
     }
 
 builtin_compilers["gnu_fortran_omptarget"]["generic"] = {

@@ -14,7 +14,7 @@ class AccelBase(Object):
     avails = OrderedDict()
 
     @abc.abstractmethod
-    def gen_datafile(cls, filename, runid, workdir, copyinout,
+    def gen_datafile(cls, modname, filename, runid, workdir, copyinout,
                         copyin, copyout, alloc, attr):
         pass
 
@@ -64,7 +64,7 @@ class Accel:
 
     def __init__(self, copyinout=None, copyin=None, copyout=None,
                     alloc=None, compile=None, lang=None, vendor=None,
-                    accel=None, attr={}, _debug=False):
+                    accel=None, attr={}, recompile=False, _debug=False):
 
         self._id = next(self._ids)
         self._debug = _debug
@@ -123,7 +123,7 @@ class Accel:
             dsrcpath = os.path.join(self._dfdir, dfname)
             self._dmodname = "mod" + self._dsrchash[2:]
 
-            if os.path.isfile(dsrcpath): 
+            if os.path.isfile(dsrcpath) and not recompile: 
                 srcdata = dsrcpath
 
             else:
@@ -152,7 +152,7 @@ class Accel:
                     dldir = os.path.join(libdir, self._dlibhash[:2])
                     dlibpath = os.path.join(dldir, dlname)
 
-                    if os.path.isfile(dlibpath): 
+                    if os.path.isfile(dlibpath) and not recompile: 
                         self._libdata = self._load_run_enter(dlibpath, _lang)
                         self.debug("data lib from lib: %s" % dlibpath)
 
@@ -167,7 +167,9 @@ class Accel:
                                 os.makedirs(self._dfdir)
 
                             shutil.copy(srcdata, dsrcpath)
-                            shutil.copy(os.path.join(self._workdir,
+
+                            if modname:
+                                shutil.copy(os.path.join(self._workdir,
                                         modname), self._dfdir)
 
                         if not os.path.isfile(dlibpath):
@@ -242,7 +244,7 @@ class Accel:
         for lvar in localvars:
 
             if lvar["id"] in dids:
-                _uonly.append((dids[lvar["id"]], lvar["curname"]))
+                _uonly.append((dids[lvar["id"]], lvar))
 
             else:
                 _kargs.append(lvar)
@@ -310,7 +312,7 @@ class Accel:
         enterargs.extend([cio["data"] for cio in self.copyinout])
         enterargs.extend([ci["data"] for ci in self.copyin])
         enterargs.extend([co["data"] for co in self.copyout])
-        enterargs.extend([a["data"] for a in self.alloc])
+        enterargs.extend([al["data"] for al in self.alloc])
 
         resdata = invoke_sharedlib(lang, libdata, "dataenter_%d" % self._id, *enterargs)
         assert resdata == 0, "dataenter invoke fail"

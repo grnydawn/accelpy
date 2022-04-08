@@ -79,12 +79,9 @@ cpp_enable = True
 [openacc_cpp]
     int length = shape_x[0];
 
-    #pragma acc data copyin(x[0:length], y[0:length]) copyout(z[0:length])
-    {
     #pragma acc parallel loop worker 
     for (int id = 0; id < length; id++) {
         z[id] = x[id] + y[id];
-    }
     }
 
 [openacc_fortran]
@@ -93,14 +90,12 @@ cpp_enable = True
     begin = LBOUND(x,1) 
     end = UBOUND(x,1) 
 
-    !$acc data copyin(x(begin:end), y(begin:end)) copyout(z(begin:end))
     !$acc parallel num_workers(end-begin+1) 
     !$acc loop worker
     DO id=begin, end
         z(id) = x(id) + y(id)
     END DO
     !$acc end parallel
-    !$acc end data
 
 [openmp_cpp]
 
@@ -218,8 +213,6 @@ set_argnames("x", "y", "z")
     int len1 = SHAPE(x, 1);
     int len2 = SHAPE(x, 2);
 
-    #pragma acc data copyin(x[0:len0][0:len1][0:len2], y[0:len0][0:len1][0:len2]) copyout(z[0:len0][0:len1][0:len2])
-    {
     #pragma acc parallel
     {
     #pragma acc loop gang
@@ -233,7 +226,6 @@ set_argnames("x", "y", "z")
         }
     }
     }
-    }
 
 [openacc_fortran]
     INTEGER i, j, k, b1, b2, b3, e1, e2, e3
@@ -245,7 +237,6 @@ set_argnames("x", "y", "z")
     e2 = UBOUND(x,2) 
     e3 = UBOUND(x,3) 
 
-    !$acc data copyin(x(b1:e1, b2:e2, b3:e3), y(b1:e1, b2:e2, b3:e3)), copyout(z(b1:e1, b2:e2, b3:e3))
     !$acc parallel num_gangs(e1-b1+1) num_workers(e2-b2+1) vector_length(e3-b3+1)
     !$acc loop gang
     DO i=b1, e1
@@ -258,7 +249,6 @@ set_argnames("x", "y", "z")
         END DO
     END DO
     !$acc end parallel
-    !$acc end data
 
 [openmp_cpp]
     #pragma omp for
@@ -321,7 +311,7 @@ set_argnames("x", "y", "z")
 
 set_argnames("A", "B", "C")
 
-[cpp]
+[cpp: X, Y, Z]
 
     for (int i = 0; i < SHAPE(X, 0); i++) {
         for (int j = 0; j < SHAPE(Y, 1); j++) {
@@ -332,7 +322,7 @@ set_argnames("A", "B", "C")
         }
     }
 
-[fortran]
+[fortran: X, Y, Z]
     INTEGER i, j, k
 
     DO i=LBOUND(X, 1), UBOUND(X, 1)
@@ -344,7 +334,7 @@ set_argnames("A", "B", "C")
         END DO
     END DO
 
-[cuda: kernel="kernel"]
+[cuda: X, Y, Z, kernel="kernel"]
 
     cudaMalloc((void **)&DPTR(X), SIZE(X) * sizeof(TYPE(X)));
     cudaMemcpy(DVAR(X), VAR(X), SIZE(X) * sizeof(TYPE(X)), cudaMemcpyHostToDevice);
@@ -363,7 +353,7 @@ set_argnames("A", "B", "C")
     cudaFree(DPTR(Y));
     cudaFree(DPTR(Z));
 
-[hip: kernel="kernel"]
+[hip: X, Y, Z, kernel="kernel"]
 
     hipMalloc((void **)&DPTR(X), SIZE(X) * sizeof(TYPE(X)));
     hipMemcpyHtoD(DVAR(X), VAR(X), SIZE(X) * sizeof(TYPE(X)));
@@ -382,7 +372,7 @@ set_argnames("A", "B", "C")
     hipFree(DPTR(Y));
     hipFree(DPTR(Z));
 
-[kernel]
+[kernel: X, Y, Z]
 
     __global__ void accelpy_kernel(ARG(X), ARG(Y), ARG(Z)){
 
@@ -397,7 +387,7 @@ set_argnames("A", "B", "C")
         }
     }
 
-[openacc_cpp]
+[openacc_cpp: X, Y, Z]
 
     int x0 = SHAPE(X, 0);
     int x1 = SHAPE(X, 1);
@@ -406,8 +396,6 @@ set_argnames("A", "B", "C")
     int z0 = SHAPE(Z, 0);
     int z1 = SHAPE(Z, 1);
 
-    #pragma acc data copyin(X[0:x0][0:x1], Y[0:y0][0:y1]) copyout(Z[0:z0][0:z1])
-    {
     #pragma acc parallel
     {
     #pragma acc loop gang
@@ -421,9 +409,8 @@ set_argnames("A", "B", "C")
         }
     }
     }
-    }
 
-[openacc_fortran]
+[openacc_fortran: X, Y, Z]
     INTEGER i, j, k, xl1, xu1, xl2, xu2, yl1, yu1, yl2, yu2, zl1, zu1, zl2, zu2
 
     xl1 = LBOUND(X,1) 
@@ -439,7 +426,6 @@ set_argnames("A", "B", "C")
     zl2 = LBOUND(Z,2) 
     zu2 = UBOUND(Z,2) 
 
-    !$acc data copyin(X(xl1:xu1, xl2:xu2), Y(yl1:yu1, yl2:yu2)), copyout(Z(zl1:zu1, zl2:zu2))
     !$acc parallel num_gangs(xu1-xl1+1) num_workers(yu2-yl2+1)
     !$acc loop gang
     DO i=xl1, xu1
@@ -452,9 +438,8 @@ set_argnames("A", "B", "C")
         END DO
     END DO
     !$acc end parallel
-    !$acc end data
 
-[openmp_cpp]
+[openmp_cpp: X, Y, Z]
 
     #pragma omp for
     for (int i = 0; i < SHAPE(X, 0); i++) {
@@ -466,7 +451,7 @@ set_argnames("A", "B", "C")
         }
     }
 
-[openmp_fortran]
+[openmp_fortran: X, Y, Z]
 
     INTEGER i, j, k, xl1, xu1, yl1, yu1, yl2, yu2
 
@@ -576,7 +561,39 @@ def check_result(testname, data):
 ###################
 
 def get_testdata(testname, lang):
-    return _gendata(testname, lang), specs[testname]
+    #return _gendata(testname, lang), specs[testname]
+
+#def _gendata(testname, lang):
+
+    N1 = 100
+    N3 = (2, 5, 10)
+
+    if lang == "cpp":
+        order = "C"
+
+    elif lang == "fortran":
+        order = "F"
+
+    data = {"copyinout": [], "copyin":[], "copyout":[], "alloc":[]}
+
+    if testname == "vecadd1d":
+        data["copyin"].append(np.reshape(np.arange(N1, dtype=np.int64), (N1,), order=order))
+        data["copyin"].append(np.reshape(np.arange(N1, dtype=np.int64) * 2, (N1,), order=order))
+        data["copyout"].append(np.reshape(np.zeros(N1, dtype=np.int64), (N1,), order=order))
+    elif testname == "matmul":
+        data["copyin"].append(np.reshape(np.arange(100, dtype=np.float64), (4, 25), order=order))
+        data["copyin"].append(np.reshape(np.arange(100, dtype=np.float64) * 2, (25, 4), order=order))
+        data["copyout"].append(np.reshape(np.zeros(16, dtype=np.float64), (4, 4), order=order))
+
+    elif testname == "vecadd3d":
+        data["copyin"].append(np.reshape(np.arange(100, dtype=np.int64), N3, order=order))
+        data["copyin"].append(np.reshape(np.arange(100, dtype=np.int64) * 2, N3, order=order))
+        data["copyout"].append(np.reshape(np.zeros(100, dtype=np.int64), N3, order=order))
+
+    else:
+        assert False
+
+    return data, specs[testname]
 
 
 def assert_testdata(testname, data):
