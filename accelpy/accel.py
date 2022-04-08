@@ -194,6 +194,8 @@ class Accel:
 
         self.section.update_argnames(localvars)
 
+        keys = [os.uname().release, version, self._dlibhash]
+
         dids = {}
         _kargs = []
         _uonly = []
@@ -205,14 +207,10 @@ class Accel:
 
             if lvar["id"] in dids:
                 _uonly.append((dids[lvar["id"]], lvar))
+                keys.append((dids[lvar["id"]], lvar["curname"]))
 
             else:
                 _kargs.append(lvar)
-
-
-        keys = [os.uname().release, version, self._dlibhash]
-        #keys.extend([u[1] for u in _uonly])
-        keys.extend(_uonly)
 
         for item in _kargs:
             keys.append(item["data"].shape)
