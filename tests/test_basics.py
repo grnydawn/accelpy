@@ -12,8 +12,8 @@ DEBUG = False
 #test_vendors = ("cray", "ibm", "amd", "gnu")
 #test_vendors = ("cray",)
 #test_vendors = ("amd",)
-#test_vendors = ("ibm",)
-test_vendors = ("pgi",)
+test_vendors = ("ibm",)
+#test_vendors = ("pgi",)
 
 test_codes = ("vecadd1d", "vecadd3d", "matmul")
 #test_codes = ("vecadd1d",)
@@ -24,11 +24,11 @@ test_langs = ("cpp",)
 
 #test_accels = ("omptarget", )
 #test_accels = ("openacc", )
-#test_accels = ("openmp", )
+test_accels = ("openmp", )
 #test_accels = ("fortran", )
 #test_accels = ("cpp", )
 #test_accels = ("openmp", )
-test_accels = ("openacc", )
+#test_accels = ("openacc", )
 
 testcases = itertools.product(test_vendors, test_codes, test_langs, test_accels)
 
