@@ -19,8 +19,8 @@ test_codes = ("vecadd1d", "vecadd3d", "matmul")
 #test_codes = ("vecadd1d",)
 #test_codes = ("matmul", )
 
-#test_langs = ("fortran",)
-test_langs = ("cpp",)
+test_langs = ("fortran",)
+#test_langs = ("cpp",)
 
 #test_accels = ("omptarget", )
 #test_accels = ("openacc", )
