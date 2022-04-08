@@ -23,40 +23,6 @@ class AccelBase(Object):
                         localvars, modvars):
         pass
 
-class Task:
-
-    def __init__(self, lang, libdata, copyinout, copyout, _debug):
-
-        self._debug = _debug
-        self.lang = lang
-        self.libdata = libdata
-        self.copyinout = copyinout
-        self.copyout = copyout
-
-    def debug(self, *objs):
-
-        if self._debug:
-            print("DEBUG: " + " ".join([str(o) for o in objs]))
-#
-#    def stop(self):
-#
-#        return self.wait()
-#
-#    def wait(self):
-#
-#        # invoke exit function in acceldata
-#        exitargs = []
-#        exitargs.extend([cio["data"] for cio in self.copyinout])
-#        exitargs.extend([co["data"] for co in self.copyout])
-#
-#        resdata = invoke_sharedlib(self.lang, self.libdata, "dataexit", *exitargs)
-#        #del self.libdata
-#
-#        self.debug("after dataexit cio", *[cio["data"] for cio in self.copyinout])
-#        self.debug("after dataexit co", *[co["data"] for co in self.copyout])
-#
-#        assert resdata == 0, "dataexit invoke fail"
-
 
 class Accel:
 
@@ -204,20 +170,14 @@ class Accel:
 
         # invoke exit function in acceldata
         exitargs = []
-        #exitargs.extend([cio["data"] for cio in self.copyinout])
-        #exitargs.extend([co["data"] for co in self.copyout])
 
         self.debug("libdata exit sharedlib", self._libdata)
         resdata = invoke_sharedlib(self._lang, self._libdata, "dataexit_%d" % self._id, *exitargs)
-        #del self.libdata
 
         self.debug("after dataexit cio", *[cio["data"] for cio in self.copyinout])
         self.debug("after dataexit co", *[co["data"] for co in self.copyout])
 
         assert resdata == 0, "dataexit invoke fail"
-
-        #for task in self._tasks:
-        #    task.stop()
 
     def launch(self, spec, *kargs, macro={}, environ={}):
 
@@ -317,9 +277,6 @@ class Accel:
         resdata = invoke_sharedlib(lang, libdata, "dataenter_%d" % self._id, *enterargs)
         assert resdata == 0, "dataenter invoke fail"
 
-        #task = Task(lang, libdata, self.copyinout, self.copyout, self._debug)
-        #self._tasks.append(task)
-
         return libdata
 
     def _build_run_enter(self, dstdata, lang, srcdata, command):
@@ -327,13 +284,8 @@ class Accel:
         # build acceldata
         cmd = command.format(moddir=self._workdir, outpath=dstdata)
         out = shellcmd(cmd + " " + srcdata, cwd=self._workdir)
+        #import pdb; pdb.set_trace()
         assert os.path.isfile(dstdata), str(out.stderr)
-
-#        shutil.copy(dstdata, os.path.join(self._workdir, "libdata.so"))
-#        dstdataobj = os.path.join(os.path.dirname(srcdata), "data.o")
-#        cmd2 = command.format(moddir=self._workdir, outpath=dstdataobj)
-#        out2 = shellcmd(cmd2 + " -c " + srcdata, cwd=self._workdir)
-#        assert os.path.isfile(dstdataobj), str(out2.stderr)
 
         modname = None
 
@@ -390,7 +342,6 @@ class Accel:
         kernelargs = [lvar["data"] for lvar in localvars]
 
         self.debug("before kernel", *kernelargs)
-
         reskernel = invoke_sharedlib(self._lang, libkernel, "runkernel_%d" % self._id, *kernelargs)
 
         self.debug("after kernel cio", *kernelargs)

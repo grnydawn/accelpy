@@ -7,13 +7,14 @@ from pytest import mark
 from accelpy import Kernel, Accel, build_sharedlib, load_sharedlib, invoke_sharedlib
 from testdata import get_testdata, assert_testdata
 
-DEBUG = False
+DEBUG = True
 
 #test_vendors = ("cray", "ibm", "amd", "gnu")
-#test_vendors = ("cray",)
+test_vendors = ("cray",)
 #test_vendors = ("amd",)
-test_vendors = ("ibm",)
+#test_vendors = ("ibm",)
 #test_vendors = ("pgi",)
+#test_vendors = ("gnu",)
 
 test_codes = ("vecadd1d", "vecadd3d", "matmul")
 #test_codes = ("vecadd1d",)
@@ -22,17 +23,13 @@ test_codes = ("vecadd1d", "vecadd3d", "matmul")
 test_langs = ("fortran",)
 #test_langs = ("cpp",)
 
-#test_accels = ("omptarget", )
+test_accels = ("omptarget", )
 #test_accels = ("openacc", )
-test_accels = ("openmp", )
+#test_accels = ("openmp", )
 #test_accels = ("fortran", )
 #test_accels = ("cpp", )
-#test_accels = ("openmp", )
-#test_accels = ("openacc", )
 
 testcases = itertools.product(test_vendors, test_codes, test_langs, test_accels)
-
-#test_vendors = ("gnu",)
 
 def test_fortran():
 

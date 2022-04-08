@@ -105,6 +105,14 @@ cpp_enable = True
         //printf("thread = %d\\n", omp_get_thread_num());
     }
 
+[omptarget_cpp]
+
+    #pragma omp target teams distribute parallel for
+    for (int id = 0; id < shape_x[0]; id++) {
+        z[id] = x[id] + y[id];
+        //printf("thread = %d\\n", omp_get_thread_num());
+    }
+
 [openmp_fortran]
     INTEGER id, begin, end 
 
@@ -260,6 +268,18 @@ set_argnames("x", "y", "z")
         }
     }
 
+[omptarget_cpp]
+
+    #pragma omp target teams num_teams(SHAPE(x, 0))
+    #pragma omp distribute
+    for (int i = 0; i < SHAPE(x, 0); i++) {
+        #pragma omp parallel for
+        for (int j = 0; j < SHAPE(x, 1); j++) {
+            for (int k = 0; k < SHAPE(x, 2); k++) {
+                z[i][j][k] = x[i][j][k] + y[i][j][k];
+            }
+        }
+    }
 [openmp_fortran]
     INTEGER i, j, k, b1, b2, b3, e1, e2, e3
 
@@ -443,6 +463,20 @@ set_argnames("A", "B", "C")
 
     #pragma omp for
     for (int i = 0; i < SHAPE(X, 0); i++) {
+        for (int j = 0; j < SHAPE(Y, 1); j++) {
+            Z[i][j] = 0.0;
+            for (int k = 0; k < SHAPE(Y, 0); k++) {
+                Z[i][j] = Z[i][j] + X[i][k] * Y[k][j];
+            }
+        }
+    }
+
+[omptarget_cpp: X, Y, Z]
+
+    #pragma omp target teams num_teams(SHAPE(X, 0))
+    #pragma omp distribute
+    for (int i = 0; i < SHAPE(X, 0); i++) {
+        #pragma omp parallel for
         for (int j = 0; j < SHAPE(Y, 1); j++) {
             Z[i][j] = 0.0;
             for (int k = 0; k < SHAPE(Y, 0); k++) {
