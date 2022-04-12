@@ -101,12 +101,12 @@ class CppAccelBase(AccelBase):
         macros.append("#define TYPE(varname) apy_type_##varname")
         macros.append("#define SHAPE(varname, dim) apy_shape_##varname##dim")
         macros.append("#define SIZE(varname) apy_size_##varname")
-        macros.append("#define ARG(varname) apy_type_##varname varname apy_shapestr_##varname")
-        macros.append("#define VAR(varname) (*apy_ptr_##varname)")
-        macros.append("#define DVAR(varname) (*apy_dptr_##varname)")
-        macros.append("#define PTR(varname) apy_ptr_##varname")
-        macros.append("#define DPTR(varname) apy_dptr_##varname")
-        macros.append("#define FLATTEN(varname) accelpy_var_##varname")
+#        macros.append("#define ARG(varname) apy_type_##varname varname apy_shapestr_##varname")
+#        macros.append("#define VAR(varname) (*apy_ptr_##varname)")
+#        macros.append("#define DVAR(varname) (*apy_dptr_##varname)")
+#        macros.append("#define PTR(varname) apy_ptr_##varname")
+#        macros.append("#define DPTR(varname) apy_dptr_##varname")
+#        macros.append("#define FLATTEN(varname) accelpy_var_##varname")
 
         for oldname, arg in modvars:
             dtype = get_c_dtype(arg)
@@ -119,7 +119,7 @@ class CppAccelBase(AccelBase):
             if ndim > 0:
 
                 shapestr = "".join(["[%d]"%s for s in arg["data"].shape])
-                macros.append("#define apy_shapestr_%s %s" % (name, shapestr))
+                #macros.append("#define apy_shapestr_%s %s" % (name, shapestr))
                 for d, s in enumerate(arg["data"].shape):
                     consts.append("const int64_t apy_shape_%s%d = %d;" % (name, d, s))
             else:
@@ -136,7 +136,7 @@ class CppAccelBase(AccelBase):
             if ndim > 0:
 
                 shapestr = "".join(["[%d]"%s for s in arg["data"].shape])
-                macros.append("#define apy_shapestr_%s %s" % (name, shapestr))
+                #macros.append("#define apy_shapestr_%s %s" % (name, shapestr))
                 for d, s in enumerate(arg["data"].shape):
                     consts.append("const int64_t apy_shape_%s%d = %d;" % (name, d, s))
             else:

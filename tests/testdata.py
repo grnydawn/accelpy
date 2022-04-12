@@ -31,7 +31,7 @@ cpp_enable = True
         c(id) = a(id) + b(id)
     END DO
 
-[cuda, hip: launch=LAUNCH_CONF]
+[cuda, hip: gridsize=GRID, blocksize=BLOCK]
 
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     if(id < SHAPE(x, 0)) z[id] = x[id] + y[id];
@@ -127,7 +127,7 @@ set_argnames("x", "y", "z")
         END DO
     END DO
 
-[cuda, hip: launch=LAUNCH_CONF]
+[cuda, hip: gridsize=GRID, blocksize=BLOCK]
 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
@@ -275,26 +275,7 @@ set_argnames("A", "B", "C")
         END DO
     END DO
 
-[cuda: X, Y, Z, kernel="kernel"]
-
-    cudaMalloc((void **)&DPTR(X), SIZE(X) * sizeof(TYPE(X)));
-    cudaMemcpy(DVAR(X), VAR(X), SIZE(X) * sizeof(TYPE(X)), cudaMemcpyHostToDevice);
-
-    cudaMalloc((void **)&DPTR(Y), SIZE(Y) * sizeof(TYPE(Y)));
-    cudaMemcpy(DVAR(Y), VAR(Y), SIZE(Y) * sizeof(TYPE(Y)), cudaMemcpyHostToDevice);
-
-    cudaMalloc((void **)&DPTR(Z), SIZE(Z) * sizeof(TYPE(Z)));
-
-    const dim3 workers = dim3(SHAPE(X,0), SHAPE(Y,1));
-    accelpy_kernel<<<1, workers >>>(DVAR(X), DVAR(Y), DVAR(Z));
-
-    cudaMemcpy(VAR(Z), DVAR(Z), SIZE(Z) * sizeof(TYPE(Z)), cudaMemcpyDeviceToHost);
-
-    cudaFree(DPTR(Y));
-    cudaFree(DPTR(Y));
-    cudaFree(DPTR(Z));
-
-[cuda, hip: X, Y, Z, launch=LAUNCH_CONF]
+[cuda, hip: X, Y, Z, gridsize=GRID, blocksize=BLOCK]
 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;

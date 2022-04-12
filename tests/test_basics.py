@@ -12,13 +12,13 @@ DEBUG = True
 #test_vendors = ("cray", "ibm", "amd", "gnu")
 #test_vendors = ("cray",)
 #test_vendors = ("amd",)
+test_vendors = ("nvidia",)
 #test_vendors = ("ibm",)
 #test_vendors = ("pgi",)
 #test_vendors = ("gnu",)
-test_vendors = ("nvidia",)
 
-#test_codes = ("vecadd1d", "vecadd3d", "matmul")
-test_codes = ("vecadd1d",)
+test_codes = ("vecadd1d", "vecadd3d", "matmul")
+#test_codes = ("vecadd1d",)
 #test_codes = ("vecadd3d",)
 #test_codes = ("matmul", )
 
@@ -128,7 +128,8 @@ def test_omptarget2(vendor, code, lang, accel):
     attr = {}
 
     if accel in ("cuda", "hip"):
-        attr["LAUNCH_CONF"] = launchconf
+        attr["GRID"] = launchconf[0]
+        attr["BLOCK"] = launchconf[1]
 
     acc.launch(Kernel(knl), *args, environ=attr)
 

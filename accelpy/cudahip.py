@@ -81,18 +81,6 @@ class CudaHipAccelBase(AccelBase):
 
     lang = "cpp"
 
-    def _mapto(cls, vname, dname, size, tname):
-        raise NotImplementedError("_mapto")
-
-    def _mapfrom(cls, vname, dname, size, tname):
-        raise NotImplementedError("_mapfrom")
-
-    def _mapalloc(cls, dname, size, tname):
-        raise NotImplementedError("_mapalloc")
-
-    def _mapdelete(cls, dname):
-        raise NotImplementedError("_mapdelete")
-
     @classmethod
     def _gen_macrodefs(cls, localvars, modvars):
 
@@ -141,37 +129,27 @@ class CudaHipAccelBase(AccelBase):
     @classmethod
     def _gen_launchconf(cls, secattr):
 
-        if "launch" in secattr:
-            _conf = secattr["launch"]
+        grid, block = "1", "1"
 
-            if isinstance(_conf, str):
-                return _conf
+        if "gridsize" in secattr:
+            _grid = secattr["gridsize"]
 
-            elif isinstance(_conf, int):
-                return "1, %d" % _conf
+            if isinstance(_grid, (int, str)):
+                grid = str(_grid)
 
-            elif len(_conf) == 2:
+            else:
+                grid= "dim3(%s)" % ", ".join([str(i) for i in _grid])
 
-                conf0 = _conf[0]
+        if "blocksize" in secattr:
+            _block = secattr["blocksize"]
 
-                if isinstance(_conf[0], int):
-                    conf0 = str(_conf[0])
+            if isinstance(_block, (int, str)):
+                block = str(_block)
 
-                elif isinstance(_conf[0], (tuple, list)): 
-                    conf0= "dim3(%s)" % ", ".join([str(i) for i in _conf[0]])
+            else:
+                block= "dim3(%s)" % ", ".join([str(i) for i in _block])
 
-                conf1 = _conf[1]
-
-                if isinstance(_conf[1], int):
-                    conf1 = str(_conf[1])
-
-                elif isinstance(_conf[1], (tuple, list)): 
-                    conf1= "dim3(%s)" % ", ".join([str(i) for i in _conf[1]])
-
-                return "%s, %s" % (conf0, conf1)
-
-        else:
-            return "1, 1"
+        return "%s, %s" % (grid, block)
 
     @classmethod
     def gen_kernelfile(cls, knlhash, dmodname, runid, section, workdir, localvars, modvars):
@@ -307,6 +285,9 @@ class CudaHipAccelBase(AccelBase):
                 entercopy.append(cls._mapalloc(dname, al["data"].size, dtype))
                 exitcopy.append(cls._mapdelete(dname))
 
+        entercopy.append(cls._gen_enterfini())
+        exitcopy.append(cls._gen_exitfini())
+
         dataparams["moddvars"]  = "\n".join(moddvars)
         dataparams["entercopy"] = "\n".join(entercopy)
         dataparams["exitcopy"]  = "\n".join(exitcopy)
@@ -377,6 +358,14 @@ void CHECK_API(void)
 }
 """
 
+    @classmethod
+    def _gen_enterfini(cls):
+        return "cudaDeviceSynchronize();\nCHECK_API();"
+
+    @classmethod
+    def _gen_exitfini(cls):
+        return "cudaDeviceSynchronize();\nCHECK_API();"
+
 
 class HipAccel(CudaHipAccelBase):
     accel = "hip"
@@ -433,6 +422,15 @@ void CHECK_API(void)
     }
 }
 """
+
+    @classmethod
+    def _gen_enterfini(cls):
+        return "hipDeviceSynchronize();\nCHECK_API();"
+
+    @classmethod
+    def _gen_exitfini(cls):
+        return "hipDeviceSynchronize();\nCHECK_API();"
+
 
 _chaccels = OrderedDict()
 AccelBase.avails[CudaHipAccelBase.lang] = _chaccels
