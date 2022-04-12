@@ -10,20 +10,21 @@ from testdata import get_testdata, assert_testdata
 DEBUG = True
 
 #test_vendors = ("cray", "ibm", "amd", "gnu")
-test_vendors = ("cray",)
-#test_vendors = ("amd",)
+#test_vendors = ("cray",)
+test_vendors = ("amd",)
 #test_vendors = ("ibm",)
 #test_vendors = ("pgi",)
 #test_vendors = ("gnu",)
 
-test_codes = ("vecadd1d", "vecadd3d", "matmul")
-#test_codes = ("vecadd1d",)
+#test_codes = ("vecadd1d", "vecadd3d", "matmul")
+test_codes = ("vecadd1d",)
 #test_codes = ("matmul", )
 
-test_langs = ("fortran",)
-#test_langs = ("cpp",)
+#test_langs = ("fortran",)
+test_langs = ("cpp",)
 
-test_accels = ("omptarget", )
+#test_accels = ("omptarget", )
+test_accels = ("hip", )
 #test_accels = ("openacc", )
 #test_accels = ("openmp", )
 #test_accels = ("fortran", )
@@ -121,12 +122,14 @@ def test_omptarget2(vendor, code, lang, accel):
     args.extend(data["copyout"])
     args.extend(data["alloc"])
 
-    acc.launch(Kernel(knl), *args)
+    attr = {}
+
+    if accel == "hip":
+        attr["HIP_LAUNCH"] = args[0].size
+
+    acc.launch(Kernel(knl), *args, environ=attr)
 
     acc.stop()
 
     #import pdb; pdb.set_trace()
     assert_testdata(code, data)
-
-
-

@@ -138,7 +138,12 @@ class Kernel(Object):
                 accels.append(acclang)
     
             elif len(acclang) == 1:
-                accels.append(acclang*2)
+
+                if acclang[0] in ("hip", "cuda"):
+                    accels.append((acclang[0], "cpp"))
+
+                else:
+                    accels.append(acclang*2)
 
         args = []
 

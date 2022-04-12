@@ -170,6 +170,8 @@ class Accel:
 
         # invoke exit function in acceldata
         exitargs = []
+        exitargs.extend([cio["data"] for cio in self.copyinout])
+        exitargs.extend([co["data"] for co in self.copyout])
 
         self.debug("libdata exit sharedlib", self._libdata)
         resdata = invoke_sharedlib(self._lang, self._libdata, "dataexit_%d" % self._id, *exitargs)
@@ -190,7 +192,7 @@ class Accel:
 
         if (self.section is None or self._lang not in AccelBase.avails or
             self._accel not in AccelBase.avails[self._lang]):
-            raise Exception("Kernel can not be crated.")
+            raise Exception("Kernel can not be created.")
 
         self.section.update_argnames(localvars)
 
@@ -206,7 +208,7 @@ class Accel:
         for lvar in localvars:
 
             if lvar["id"] in dids:
-                _uonly.append((dids[lvar["id"]], lvar))
+                _uonly.append(("d" + dids[lvar["id"]], lvar))
                 keys.append((dids[lvar["id"]], lvar["curname"]))
 
             else:
@@ -272,6 +274,7 @@ class Accel:
         enterargs.extend([co["data"] for co in self.copyout])
         enterargs.extend([al["data"] for al in self.alloc])
 
+        #import pdb;pdb.set_trace()
         resdata = invoke_sharedlib(lang, libdata, "dataenter_%d" % self._id, *enterargs)
         assert resdata == 0, "dataenter invoke fail"
 
@@ -340,6 +343,7 @@ class Accel:
         kernelargs = [lvar["data"] for lvar in localvars]
 
         self.debug("before kernel", *kernelargs)
+        import pdb; pdb.set_trace()
         reskernel = invoke_sharedlib(self._lang, libkernel, "runkernel_%d" % self._id, *kernelargs)
 
         self.debug("after kernel cio", *kernelargs)

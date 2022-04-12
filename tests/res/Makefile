@@ -1,3 +1,6 @@
+runhip: hipdriver.py
+	python hipdriver.py
+
 runomp: ompdriver.py
 	python ompdriver.py
 

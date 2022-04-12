@@ -1,4 +1,4 @@
-"""accelpy Cpp-based Accelerator module"""
+"""accelpy CUDA and HIP Accelerator module"""
 
 import os, sys
 
@@ -12,6 +12,8 @@ convfmt = "{dtype}(*apy_ptr_{name}){shape} = reinterpret_cast<{dtype}(*){shape}>
 
 datasrc = """
 #include <stdint.h>
+#include <stdio.h>
+#include <hip/hip_runtime.h>
 
 {modvars}
 
@@ -21,7 +23,7 @@ extern "C" int64_t dataenter_{runid}({enterargs}) {{
 
     {enterassign}
 
-    {enterdirective}
+    {enterapicall}
 
     res = 0;
 
@@ -33,7 +35,7 @@ extern "C" int64_t dataexit_{runid}({exitargs}) {{
 
     int64_t res;
 
-    {exitdirective}
+    {exitapicall}
 
     res = 0;
 
@@ -43,19 +45,30 @@ extern "C" int64_t dataexit_{runid}({exitargs}) {{
 """
 
 kernelsrc = """
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <hip/hip_runtime.h>
 
 {externs}
 
 {macrodefs}
 
-int64_t kernel_{runid}({kernelargs}) {{
-    int64_t res;
+__global__ void device_kernel({devicekernelargs}) {{
 
     {reshape}
 
     {spec}
+
+}}
+
+int64_t kernel_{runid}({kernelargs}) {{
+    int64_t res;
+
+    {kernelenter}
+
+    device_kernel<<<{launchconf}>>>({launchargs});
+
+    {kernelexit}
 
     res = 0;
 
@@ -75,19 +88,19 @@ extern "C" int64_t runkernel_{runid}({runkernelargs}) {{
 """
 
 
-class CppAccelBase(AccelBase):
+class CudaHipAccelBase(AccelBase):
 
     lang = "cpp"
     srcext = ".cpp"
     libext = ".dylib" if sys.platform == "darwin" else ".so"
 
-    def _mapto(cls, names):
+    def _mapto(cls, vname, dname, size, tname):
         raise NotImplementedError("_mapto")
 
-    def _mapfrom(cls, names):
+    def _mapfrom(cls, vname, dname, size, tname):
         raise NotImplementedError("_mapfrom")
 
-    def _mapalloc(cls, names):
+    def _mapalloc(cls, dname, size, tname):
         raise NotImplementedError("_mapalloc")
 
     @classmethod
@@ -149,6 +162,7 @@ class CppAccelBase(AccelBase):
     def _gen_kernelargs(cls, localvars, modvars):
 
         args = []
+        dargs = []
         shapes = []
         externs = []
 
@@ -156,8 +170,10 @@ class CppAccelBase(AccelBase):
             ndim = arg["data"].ndim
             dtype = get_c_dtype(arg)
             name = arg["curname"]
+            dname = "d" + name
 
             externs.append("extern void * %s;" % modname)
+            dargs.append(dname)
 
             if ndim > 0:
                 shape0 = "".join(["[%d]"%s for s in arg["data"].shape])
@@ -173,8 +189,12 @@ class CppAccelBase(AccelBase):
             ndim = arg["data"].ndim
             dtype = get_c_dtype(arg)
             name = arg["curname"]
+            dname = "d" + name
+
+            dargs.append(dname)
 
             if ndim > 0:
+
                 shape0 = "".join(["[%d]"%s for s in arg["data"].shape])
                 shape1 = ",".join([str(s) for s in arg["data"].shape])
 
@@ -184,7 +204,7 @@ class CppAccelBase(AccelBase):
             else:
                 args.append("%s %s" % (dtype, name))
 
-        return ", ".join(args), "\n".join(shapes), "\n".join(externs)
+        return ", ".join(args), ", ".join(dargs), "\n".join(shapes), "\n".join(externs)
 
     @classmethod
     def _gen_startmain(cls, localvars, modvars):
@@ -239,16 +259,26 @@ class CppAccelBase(AccelBase):
 
         kernelpath = os.path.join(workdir, "K%s%s" % (knlhash[2:], cls.srcext))
 
-        kernelargs, shapes, externs = cls._gen_kernelargs(localvars, modvars)
+        kernelargs, launchargs, shapes, externs = cls._gen_kernelargs(localvars, modvars)
         runkernelargs, startmain, actualargs = cls._gen_startmain(localvars, modvars)
+
+        devicekernelargs = ""
+        launchconf = ""
+        kernelenter = ""
+        kernelexit = ""
 
         kernelparams = {
             "runid": str(runid),
             "externs": externs,
             "macrodefs": cls._gen_macrodefs(localvars, modvars),
             "kernelargs": kernelargs,
+            "devicekernelargs": devicekernelargs,
             "runkernelargs": runkernelargs,
             "reshape": shapes,
+            "launchconf": launchconf,
+            "launchargs": launchargs,
+            "kernelenter": kernelenter,
+            "kernelexit": kernelexit,
             "spec": "\n".join(section.body),
             "startmain": startmain,
             "actualargs":actualargs 
@@ -257,12 +287,9 @@ class CppAccelBase(AccelBase):
         with open(kernelpath, "w") as fkernel:
             fkernel.write(kernelsrc.format(**kernelparams))
 
-        #import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
         return kernelpath
 
-class CppAccel(CppAccelBase):
-    accel = "cpp"
-
     @classmethod
     def gen_datafile(cls, modname, filename, runid, workdir, copyinout,
                         copyin, copyout, alloc, attr):
@@ -275,149 +302,105 @@ class CppAccel(CppAccelBase):
 
         enterargs = []
         enterassign = []
-
-        for item in copyinout+copyin+copyout+alloc:
-            itemname = item["curname"]
-            dtype = get_c_dtype(item)
-
-            modvars.append("%s * %s;" % (dtype, itemname))
-            enterargs.append("void * l"+itemname)
-
-            if item["data"].ndim > 0:
-                enterassign.append("%s = (%s *) %s;" % (itemname, dtype, "l"+itemname))
-
-            else:
-                enterassign.append("%s = *(%s *) %s;" % (itemname, dtype, "l"+itemname))
-
-        dataparams["modvars"] = "\n".join(modvars)
-        dataparams["enterargs"] = ", ".join(enterargs)
-        dataparams["enterdirective"] = ""
-        dataparams["enterassign"] = "\n".join(enterassign)
-        dataparams["exitargs"] = ""
-        dataparams["exitdirective"] = ""
-
-        with open(datapath, "w") as fdata:
-            fdata.write(datasrc.format(**dataparams))
-
-        #import pdb; pdb.set_trace()
-        return datapath
-
-
-
-class OpenmpCppAccel(CppAccel):
-    accel = "openmp"
-
-
-class AcctargetCppAccel(CppAccelBase):
-
-    @classmethod
-    def gen_datafile(cls, modname, filename, runid, workdir, copyinout,
-                        copyin, copyout, alloc, attr):
-
-        datapath = os.path.join(workdir, filename)
-
-        dataparams = {"runid": str(runid), "datamodname": modname}
-
-        modvars = []
-
-        enterargs = []
-        enterassign = []
-        enterdirective = []
-        exitdirective = []
-
-        cionames = []
-        cinames = []
-        conames = []
-        alnames = []
+        enterapicall = []
+        exitapicall = []
 
         for cio in copyinout:
             cioname = cio["curname"]
             lcioname = "l" + cioname
+            dcioname = "d" + cioname
             dtype = get_c_dtype(cio)
 
             enterargs.append("void * " + lcioname)
 
             if cio["data"].ndim > 0:
-                modvars.append("%s * %s;" % (dtype, cioname))
-                enterassign.append("%s = (%s *) %s;" % (cioname, dtype, "l"+cioname))
-                cionames.append("%s[0:%d]" % (cioname, cio["data"].size))
+                #modvars.append("%s * %s;" % (dtype, cioname))
+                #modvars.append("%s * %s;" % (dtype, dcioname))
+                #enterassign.append("%s = (%s *) %s;" % (cioname, dtype, lcioname))
+                modvars.append("void * %s;" % cioname)
+                modvars.append("hipDeviceptr_t %s;" % dcioname)
+                enterassign.append("%s = %s;" % (cioname, lcioname))
+                enterapicall.append(cls._mapto(cioname, dcioname, cio["data"].size, dtype))
+                exitapicall.append(cls._mapfrom(cioname, dcioname, cio["data"].size, dtype))
 
             else:
                 modvars.append("%s %s;" % (dtype, cioname))
-                enterassign.append("%s = *(%s *) %s;" % (cioname, dtype, "l"+cioname))
-                cionames.append(cioname)
-
-        if cionames:
-            enterdirective.append(cls._mapto(cionames))
-            exitdirective.append(cls._mapfrom(cionames))
-
+                enterassign.append("%s = *(%s *) %s;" % (cioname, dtype, lcioname))
+                #enterapicall.append(cls._mapto(cionames))
+                #exitapicall.append(cls._mapfrom(cionames))
 
         for ci in copyin:
             ciname = ci["curname"]
             lciname = "l" + ciname
+            dciname = "d" + ciname
             dtype = get_c_dtype(ci)
 
             enterargs.append("void * " + lciname)
 
             if ci["data"].ndim > 0:
-                modvars.append("%s * %s;" % (dtype, ciname))
-                enterassign.append("%s = (%s *) %s;" % (ciname, dtype, "l"+ciname))
-                cinames.append("%s[0:%d]" % (ciname, ci["data"].size))
+                #modvars.append("%s * %s;" % (dtype, ciname))
+                #modvars.append("%s * %s;" % (dtype, dciname))
+                #enterassign.append("%s = (%s *) %s;" % (ciname, dtype, lciname))
+                modvars.append("void * %s;" % ciname)
+                modvars.append("hipDeviceptr_t %s;" % dciname)
+                enterassign.append("%s = %s;" % (ciname, lciname))
+                enterapicall.append(cls._mapto(ciname, dciname, ci["data"].size, dtype))
 
             else:
-                enterassign.append("%s = *(%s *) %s;" % (ciname, dtype, "l"+ciname))
+                enterassign.append("%s = *(%s *) %s;" % (ciname, dtype, lciname))
                 modvars.append("%s %s;" % (dtype, ciname))
-                cinames.append(ciname)
-
-        if cinames:
-            enterdirective.append(cls._mapto(cinames))
+                #enterapicall.append(cls._mapto(cinames))
 
         for co in copyout:
             coname = co["curname"]
+            lconame = "l" + coname
+            dconame = "d" + coname
             dtype = get_c_dtype(co)
 
-            enterargs.append("void * l"+coname)
+            enterargs.append("void * " + lconame)
 
             if co["data"].ndim > 0:
-                modvars.append("%s * %s;" % (dtype, coname))
-                enterassign.append("%s = (%s *) %s;" % (coname, dtype, "l"+coname))
-                conames.append("%s[0:%d]" % (coname, co["data"].size))
+                #modvars.append("%s * %s;" % (dtype, coname))
+                #modvars.append("%s * %s;" % (dtype, dconame))
+                #enterassign.append("%s = (%s *) %s;" % (coname, dtype, lconame))
+                modvars.append("void * %s;" % coname)
+                modvars.append("hipDeviceptr_t %s;" % dconame)
+                enterassign.append("%s = %s;" % (coname, lconame))
+                exitapicall.append(cls._mapfrom(coname, dconame, co["data"].size, dtype))
 
             else:
                 modvars.append("%s %s;" % (dtype, coname))
-                enterassign.append("%s = *(%s *) %s;" % (coname, dtype, "l"+coname))
-                conames.append(coname)
-
-        if conames:
-            alnames.extend(cionames)
-            alnames.extend(conames)
-            exitdirective.append(cls._mapfrom(conames))
+                enterassign.append("%s = *(%s *) %s;" % (coname, dtype, lconame))
+                #exitapicall.append(cls._mapfrom(conames))
 
         for al in alloc:
             alname = al["curname"]
+            lalname = "l" + alname
+            dalname = "d" + alname
             dtype = get_c_dtype(al)
 
-            enterargs.append("void * l"+alname)
+            enterargs.append("void * " + lalname)
 
             if al["data"].ndim > 0:
-                modvars.append("%s * %s;" % (dtype, alname))
-                enterassign.append("%s = (%s *) %s;" % (alname, dtype, "l"+alname))
-                alnames.append("%s[0:%d]" % (alname, al["data"].size))
+                #modvars.append("%s * %s;" % (dtype, alname))
+                #modvars.append("%s * %s;" % (dtype, dalname))
+                #enterassign.append("%s = (%s *) %s;" % (alname, dtype, lalname))
+                modvars.append("void * %s;" % alname)
+                modvars.append("hipDeviceptr_t %s;" % dalname)
+                enterassign.append("%s = %s;" % (alname, lalname))
+                enterapicall.append(cls._mapalloc(dciname, ci["data"].size, dtype))
 
             else:
                 modvars.append("%s %s;" % (dtype, alname))
                 enterassign.append("%s = *(%s *) %s;" % (alname, dtype, "l"+alname))
-                alnames.append("%s" % alname)
-
-        if alnames:
-            enterdirective.append(cls._mapalloc(alnames))
+                #enterapicall.append(cls._mapalloc(alnames))
 
         dataparams["modvars"] = "\n".join(modvars)
         dataparams["enterargs"] = ", ".join(enterargs)
-        dataparams["enterdirective"] =  "\n".join(enterdirective)
+        dataparams["enterapicall"] =  "\n".join(enterapicall)
         dataparams["enterassign"] = "\n".join(enterassign)
         dataparams["exitargs"] = ""
-        dataparams["exitdirective"] = "\n".join(exitdirective)
+        dataparams["exitapicall"] = "\n".join(exitapicall)
 
         with open(datapath, "w") as fdata:
             fdata.write(datasrc.format(**dataparams))
@@ -425,9 +408,52 @@ class AcctargetCppAccel(CppAccelBase):
         #import pdb; pdb.set_trace()
         return datapath
 
+#class CppAccel(CppAccelBase):
+#    accel = "cpp"
+#
+#    @classmethod
+#    def gen_datafile(cls, modname, filename, runid, workdir, copyinout,
+#                        copyin, copyout, alloc, attr):
+#
+#        datapath = os.path.join(workdir, filename)
+#
+#        dataparams = {"runid": str(runid), "datamodname": modname}
+#
+#        modvars = []
+#
+#        enterargs = []
+#        enterassign = []
+#
+#        for item in copyinout+copyin+copyout+alloc:
+#            itemname = item["curname"]
+#            dtype = get_c_dtype(item)
+#
+#            modvars.append("%s * %s;" % (dtype, itemname))
+#            enterargs.append("void * l"+itemname)
+#
+#            if item["data"].ndim > 0:
+#                enterassign.append("%s = (%s *) %s;" % (itemname, dtype, "l"+itemname))
+#
+#            else:
+#                enterassign.append("%s = *(%s *) %s;" % (itemname, dtype, "l"+itemname))
+#
+#        dataparams["modvars"] = "\n".join(modvars)
+#        dataparams["enterargs"] = ", ".join(enterargs)
+#        dataparams["enterdirective"] = ""
+#        dataparams["enterassign"] = "\n".join(enterassign)
+#        dataparams["exitargs"] = ""
+#        dataparams["exitdirective"] = ""
+#
+#        with open(datapath, "w") as fdata:
+#            fdata.write(datasrc.format(**dataparams))
+#
+#        #import pdb; pdb.set_trace()
+#        return datapath
 
-class OmptargetCppAccel(AcctargetCppAccel):
-    accel = "omptarget"
+
+
+class CudaAccel(CudaHipAccelBase):
+    accel = "cuda"
 
     @classmethod
     def _mapto(cls, names):
@@ -442,26 +468,36 @@ class OmptargetCppAccel(AcctargetCppAccel):
         return "#pragma omp target enter data map(alloc:" + ", ".join(names) + ")"
 
 
-class OpenaccCppAccel(AcctargetCppAccel):
-    accel = "openacc"
+class HipAccel(CudaHipAccelBase):
+    accel = "hip"
 
     @classmethod
-    def _mapto(cls, names):
-        return "#pragma acc enter data copyin(" + ", ".join(names) + ")"
+    def _mapto(cls, vname, dname, size, tname):
+
+        fmt = ("hipMalloc((void **)&{dname}, {size} * sizeof({type}));\n"
+               "hipMemcpyHtoD({dname}, {name}, {size} * sizeof({type}));\n")
+
+        return fmt.format(name=vname, dname=dname, size=str(size), type=tname)
 
     @classmethod
-    def _mapfrom(cls, names):
-        return "#pragma acc exit data copyout(" + ", ".join(names) + ")"
+    def _mapfrom(cls, vname, dname, size, tname):
+
+        fmt = ("hipMemcpyDtoH({dname}, {name}, {size} * sizeof({type}));\n"
+               "hipFree({dname});\n")
+
+        return fmt.format(name=vname, dname=dname, size=str(size), type=tname)
 
     @classmethod
-    def _mapalloc(cls, names):
-        return "#pragma acc enter data create(" + ", ".join(names) + ")"
+    def _mapalloc(cls, dname, size, tname):
 
-_cppaccels = OrderedDict()
-AccelBase.avails[CppAccelBase.lang] = _cppaccels
+        fmt = "hipMalloc((void **)&{dname}, {size} * sizeof({type}));\n"
 
-_cppaccels[CppAccel.accel] = CppAccel
-_cppaccels[OpenmpCppAccel.accel] = OpenmpCppAccel
-_cppaccels[OmptargetCppAccel.accel] = OmptargetCppAccel
-_cppaccels[OpenaccCppAccel.accel] = OpenaccCppAccel
+        return fmt.format(dname=dname, size=str(size), type=tname)
+
+
+_chaccels = OrderedDict()
+AccelBase.avails[CudaHipAccelBase.lang] = _chaccels
+
+_chaccels[CudaAccel.accel] = CudaAccel
+_chaccels[HipAccel.accel] = HipAccel
 

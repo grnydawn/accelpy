@@ -31,7 +31,13 @@ cpp_enable = True
         c(id) = a(id) + b(id)
     END DO
 
-[hip: kernel="kernel"]
+[hip: launch=HIP_LAUNCH]
+
+    int id = blockIdx.x * blockDim.x + threadIdx.x;
+    if(id < SHAPE(x, 0)) z[id] = x[id] + y[id];
+    //if(id < 100) (*z)[id] = (*x)[id] + (*y)[id];
+
+[hhip: kernel="kernel"]
 
     hipMalloc((void **)&DPTR(x), SIZE(x) * sizeof(TYPE(x)));
     hipMemcpyHtoD(DVAR(x), VAR(x), SIZE(x) * sizeof(TYPE(x)));

@@ -19,6 +19,7 @@ builtin_compilers["cray_cpp_openmp"] = OrderedDict()
 builtin_compilers["cray_fortran_fortran"] = OrderedDict()
 builtin_compilers["cray_cpp_cpp"] = OrderedDict()
 
+builtin_compilers["amd_cpp_hip"] = OrderedDict()
 builtin_compilers["amd_fortran_omptarget"] = OrderedDict()
 builtin_compilers["amd_cpp_omptarget"] = OrderedDict()
 builtin_compilers["amd_fortran_openacc"] = OrderedDict()
@@ -78,6 +79,9 @@ def _cray_version_check(check):
 
 def _amd_version_check(check):
     return check.lower().lstrip().startswith(b"amd")
+
+def _amd_hip_check(check):
+    return check.lower().lstrip().startswith(b"hip")
 
 def _ibm_version_check(check):
     return check.lower().lstrip().startswith(b"ibm")
@@ -253,6 +257,11 @@ builtin_compilers["cray_fortran_fortran"]["generic"] = {
 builtin_compilers["cray_cpp_cpp"]["generic"] = {
         "check": ("crayCC --version",_cray_version_check),
         "build": "crayCC -shared -fPIC -o {outpath}"
+    }
+
+builtin_compilers["amd_cpp_hip"]["generic"] = {
+        "check": ("hipcc --version",_amd_hip_check),
+        "build": "hipcc -shared -fPIC -o {outpath}"
     }
 
 builtin_compilers["amd_fortran_omptarget"]["generic"] = {
@@ -433,6 +442,9 @@ def build_sharedlib(srcfile, outfile, workdir, compile=None, opts="", vendor=Non
     srcpath = os.path.join(workdir, srcfile)
     outpath = os.path.join(workdir, outfile)
 
+    if not os.path.isfile(srcpath):
+        raise Exception("Source file does not exist: %s" % srcpath)
+
     moddir = os.path.dirname(srcpath)
 
     if isinstance(compile, str):
@@ -488,7 +500,7 @@ def build_sharedlib(srcfile, outfile, workdir, compile=None, opts="", vendor=Non
                 if out.returncode == 0:
                     return outpath
 
-                #print(str(out.stderr).replace("\\n", "\n"))
+                print(str(out.stderr).replace("\\n", "\n"))
             except Exception as err:
                 print("command fail: %s" % cmd)
 
