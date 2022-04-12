@@ -1,6 +1,6 @@
 """accelpy Cpp-based Accelerator module"""
 
-import os, sys
+import os
 
 from collections import OrderedDict
 
@@ -79,7 +79,6 @@ class CppAccelBase(AccelBase):
 
     lang = "cpp"
     srcext = ".cpp"
-    libext = ".dylib" if sys.platform == "darwin" else ".so"
 
     def _mapto(cls, names):
         raise NotImplementedError("_mapto")

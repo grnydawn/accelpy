@@ -73,7 +73,6 @@ class CudaHipAccelBase(AccelBase):
 
     lang = "cpp"
     srcext = ".cpp"
-    libext = ".dylib" if sys.platform == "darwin" else ".so"
 
     def _mapto(cls, vname, dname, size, tname):
         raise NotImplementedError("_mapto")
@@ -94,17 +93,9 @@ class CudaHipAccelBase(AccelBase):
         consts = []
         macros = []
 
-        # TYPE(x), SHAPE(x, 0), SIZE(x), ####ARG(x), DVAR(x), FLATTEN(x)
-
         macros.append("#define TYPE(varname) apy_type_##varname")
         macros.append("#define SHAPE(varname, dim) apy_shape_##varname##dim")
         macros.append("#define SIZE(varname) apy_size_##varname")
-#        macros.append("#define ARG(varname) apy_type_##varname varname apy_shapestr_##varname")
-#        macros.append("#define VAR(varname) (*apy_ptr_##varname)")
-#        macros.append("#define DVAR(varname) (*apy_dptr_##varname)")
-#        macros.append("#define PTR(varname) apy_ptr_##varname")
-#        macros.append("#define DPTR(varname) apy_dptr_##varname")
-#        macros.append("#define FLATTEN(varname) accelpy_var_##varname")
 
         for oldname, arg in modvars:
             dtype = get_c_dtype(arg)
@@ -117,7 +108,6 @@ class CudaHipAccelBase(AccelBase):
             if ndim > 0:
 
                 shapestr = "".join(["[%d]"%s for s in arg["data"].shape])
-                #macros.append("#define apy_shapestr_%s %s" % (name, shapestr))
                 for d, s in enumerate(arg["data"].shape):
                     consts.append("const int64_t apy_shape_%s%d = %d;" % (name, d, s))
             else:
@@ -134,111 +124,12 @@ class CudaHipAccelBase(AccelBase):
             if ndim > 0:
 
                 shapestr = "".join(["[%d]"%s for s in arg["data"].shape])
-                #macros.append("#define apy_shapestr_%s %s" % (name, shapestr))
                 for d, s in enumerate(arg["data"].shape):
                     consts.append("const int64_t apy_shape_%s%d = %d;" % (name, d, s))
             else:
                 pass
 
         return "\n".join(macros) + "\n\n" + "\n".join(typedefs) + "\n\n" + "\n".join(consts)
-
-    @classmethod
-    def _gen_kernelargs(cls, localvars, modvars):
-
-        args = []
-        ldargs = []
-        shapes = []
-        externs = []
-
-        for modname, arg in modvars:
-            ndim = arg["data"].ndim
-            dtype = get_c_dtype(arg)
-            name = arg["curname"]
-            dname = "d" + name
-            dmodname = "d" + modname
-
-            externs.append("extern void * %s;" % modname)
-            externs.append("extern void * %s;" % dmodname)
-            ldargs.append(dmodname)
-
-            if ndim > 0:
-                shape0 = "".join(["[%d]"%s for s in arg["data"].shape])
-                shape1 = ",".join([str(s) for s in arg["data"].shape])
-
-                shapes.append("const int64_t shape_%s[%d] = {%s};" % (name, ndim, shape1))
-                #args.append("%s %s%s" % (dtype, name, shape0))
-                args.append("%s (*%s)%s" % (dtype, name, shape0))
-
-            else:
-                args.append("%s %s" % (dtype, name))
-
-        for arg in localvars:
-            ndim = arg["data"].ndim
-            dtype = get_c_dtype(arg)
-            name = arg["curname"]
-            dname = "d" + name
-
-            ldargs.append(dname)
-
-            if ndim > 0:
-
-                shape0 = "".join(["[%d]"%s for s in arg["data"].shape])
-                shape1 = ",".join([str(s) for s in arg["data"].shape])
-
-                shapes.append("const int64_t shape_%s[%d] = {%s};" % (name, ndim, shape1))
-                #args.append("%s %s%s" % (dtype, name, shape0))
-                args.append("%s (*%s)%s" % (dtype, name, shape0))
-
-            else:
-                args.append("%s %s" % (dtype, name))
-
-        return ", ".join(args), ", ".join(ldargs), "\n".join(shapes), "\n".join(externs)
-
-    @classmethod
-    def _gen_startmain(cls, localvars, modvars):
-
-        dummyargs = []
-        actualargs = []
-
-
-        for modname, arg in modvars:
-            dtype = get_c_dtype(arg)
-            ndim = arg["data"].ndim
-            name = arg["curname"]
-            dname = "d" + name
-            dmodname = "d" + modname
-
-            if ndim > 0:
-                shape = "".join(["[%d]"%s for s in arg["data"].shape])
-                #actualargs.append("(*apy_ptr_" + name + ")")
-                actualargs.append("apy_ptr_" + name)
-                #actualargs.append(dname)
-
-            else:
-                actualargs.append("accelpy_var_" + name)
-
-
-        for arg in localvars:
-            dtype = get_c_dtype(arg)
-            ndim = arg["data"].ndim
-            name = arg["curname"]
-            dname = "d" + name
-
-            dummyargs.append("void * %s" % name)
-
-            if ndim > 0:
-                shape = "".join(["[%d]"%s for s in arg["data"].shape])
-                #actualargs.append("(*apy_ptr_" + name + ")")
-                actualargs.append("apy_ptr_" + name)
-
-            else:
-                actualargs.append("*((%s *) %s)" % (dtype, name))
-
-        dummystr = ", ".join(dummyargs)
-        actualstr = ", ".join(actualargs)
-
-        return dummystr, actualstr
-
 
     @classmethod
     def _gen_launchconf(cls, secattr):
@@ -279,9 +170,6 @@ class CudaHipAccelBase(AccelBase):
     def gen_kernelfile(cls, knlhash, dmodname, runid, section, workdir, localvars, modvars):
 
         kernelpath = os.path.join(workdir, "K%s%s" % (knlhash[2:], cls.srcext))
-
-        #kernelargs, _launchargs, shapes, externs = cls._gen_kernelargs(localvars, modvars)
-        #runkernelargs, launchargs = cls._gen_startmain(localvars, modvars)
 
         externs = []
         runkernelargs = []
@@ -334,7 +222,7 @@ class CudaHipAccelBase(AccelBase):
         with open(kernelpath, "w") as fkernel:
             fkernel.write(kernelsrc.format(**kernelparams))
 
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
         return kernelpath
 
     @classmethod
@@ -414,67 +302,40 @@ class CudaHipAccelBase(AccelBase):
         with open(datapath, "w") as fdata:
             fdata.write(datasrc.format(**dataparams))
 
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
         return datapath
-
-#class CppAccel(CppAccelBase):
-#    accel = "cpp"
-#
-#    @classmethod
-#    def gen_datafile(cls, modname, filename, runid, workdir, copyinout,
-#                        copyin, copyout, alloc, attr):
-#
-#        datapath = os.path.join(workdir, filename)
-#
-#        dataparams = {"runid": str(runid), "datamodname": modname}
-#
-#        modvars = []
-#
-#        enterargs = []
-#        enterassign = []
-#
-#        for item in copyinout+copyin+copyout+alloc:
-#            itemname = item["curname"]
-#            dtype = get_c_dtype(item)
-#
-#            modvars.append("%s * %s;" % (dtype, itemname))
-#            enterargs.append("void * l"+itemname)
-#
-#            if item["data"].ndim > 0:
-#                enterassign.append("%s = (%s *) %s;" % (itemname, dtype, "l"+itemname))
-#
-#            else:
-#                enterassign.append("%s = *(%s *) %s;" % (itemname, dtype, "l"+itemname))
-#
-#        dataparams["modvars"] = "\n".join(modvars)
-#        dataparams["enterargs"] = ", ".join(enterargs)
-#        dataparams["enterdirective"] = ""
-#        dataparams["enterassign"] = "\n".join(enterassign)
-#        dataparams["exitargs"] = ""
-#        dataparams["exitdirective"] = ""
-#
-#        with open(datapath, "w") as fdata:
-#            fdata.write(datasrc.format(**dataparams))
-#
-#        #import pdb; pdb.set_trace()
-#        return datapath
-
 
 
 class CudaAccel(CudaHipAccelBase):
     accel = "cuda"
 
     @classmethod
-    def _mapto(cls, names):
-        return "#pragma omp target enter data map(to:" + ", ".join(names) + ")"
+    def _mapto(cls, hname, dname, size, tname):
+
+        fmt = ("cudaMalloc((void **)&{dname}, {size} * sizeof({type}));\n"
+               "cudaMemcpy({dname}, {hname}, {size} * sizeof({type}), cudaMemcpyHostToDevice);\n")
+
+        return fmt.format(hname=hname, dname=dname, size=str(size), type=tname)
 
     @classmethod
-    def _mapfrom(cls, names):
-        return "#pragma omp target exit data map(from:" + ", ".join(names) + ")"
+    def _mapfrom(cls, hname, dname, size, tname):
+
+        fmt = ("cudaMemcpy({hname}, {dname}, {size} * sizeof({type}), cudaMemcpyDeviceToHost);\n"
+               "cudaFree({dname});\n")
+
+        return fmt.format(hname=hname, dname=dname, size=str(size), type=tname)
 
     @classmethod
-    def _mapalloc(cls, names):
-        return "#pragma omp target enter data map(alloc:" + ", ".join(names) + ")"
+    def _mapalloc(cls, dname, size, tname):
+
+        fmt = "cudaMalloc((void **)&{dname}, {size} * sizeof({type}));\n"
+
+        return fmt.format(dname=dname, size=str(size), type=tname)
+
+    @classmethod
+    def _mapdelete(cls, dname):
+
+        return "cudaFree(%s);\n" % dname
 
 
 class HipAccel(CudaHipAccelBase):

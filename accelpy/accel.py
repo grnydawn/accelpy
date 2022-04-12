@@ -11,6 +11,7 @@ from accelpy.compile import build_sharedlib, builtin_compilers
 
 class AccelBase(Object):
 
+    libext = ".dylib" if sys.platform == "darwin" else ".so"
     avails = OrderedDict()
 
     @abc.abstractmethod
@@ -343,7 +344,7 @@ class Accel:
         kernelargs = [lvar["data"] for lvar in localvars]
 
         self.debug("before kernel", *kernelargs)
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
         reskernel = invoke_sharedlib(self._lang, libkernel, "runkernel_%d" % self._id, *kernelargs)
 
         self.debug("after kernel cio", *kernelargs)

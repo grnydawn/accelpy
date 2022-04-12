@@ -1,6 +1,6 @@
 """accelpy Fortran-based Accelerator module"""
 
-import os, uuid, sys
+import os
 
 from collections import OrderedDict
 
@@ -63,7 +63,6 @@ class FortranAccelBase(AccelBase):
 
     lang = "fortran"
     srcext = ".F90"
-    libext = ".dylib" if sys.platform == "darwin" else ".so"
 
     @classmethod
     def _dimension(cls, arg, attrspec):
