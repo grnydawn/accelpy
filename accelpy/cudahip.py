@@ -58,6 +58,8 @@ __global__ void device_kernel_{runid}({kernelargs}) {{
 extern "C" int64_t runkernel_{runid}({runkernelargs}) {{
     int64_t res;
 
+    hipPointerAttribute_t attr;
+
     {kernelenter}
 
     device_kernel_{runid}<<<{launchconf}>>>({launchargs});
@@ -148,10 +150,10 @@ class CudaHipAccelBase(AccelBase):
                 conf0 = _conf[0]
 
                 if isinstance(_conf[0], int):
-                    conf0 = str(_conf)
+                    conf0 = str(_conf[0])
 
                 elif isinstance(_conf[0], (tuple, list)): 
-                    conf0= "dim3(%s)" % ", ".join(_conf[0])
+                    conf0= "dim3(%s)" % ", ".join([str(i) for i in _conf[0]])
 
                 conf1 = _conf[1]
 
@@ -159,7 +161,7 @@ class CudaHipAccelBase(AccelBase):
                     conf1 = str(_conf[1])
 
                 elif isinstance(_conf[1], (tuple, list)): 
-                    conf1= "dim3(%s)" % ", ".join(_conf[1])
+                    conf1= "dim3(%s)" % ", ".join([str(i) for i in _conf[1]])
 
                 return "%s, %s" % (conf0, conf1)
 
@@ -178,7 +180,6 @@ class CudaHipAccelBase(AccelBase):
         launchargs = []
         kernelenter = []
         kernelexit = []
-
 
         for mname, arg in modvars:
             if arg["data"].ndim > 0:
@@ -201,6 +202,9 @@ class CudaHipAccelBase(AccelBase):
                 shape = "".join(["[%d]"%s for s in arg["data"].shape])
                 launchargs.append("*%s" % dname)
                 kernelargs.append("%s %s%s" % (dtype, hname, shape))
+                kernelenter.append("//hipPointerGetAttributes(&attr, %s);" % hname)
+                kernelenter.append("//printf(\"dptr, %s : %%p\\n\", %s);" % (mname, mname))
+                kernelenter.append("//printf(\"attr : %p\\n\", attr.devicePointer);")
 
             else:
                 launchargs.append("*((%s *) %s)" % (dtype, hname))

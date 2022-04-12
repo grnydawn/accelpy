@@ -31,56 +31,11 @@ cpp_enable = True
         c(id) = a(id) + b(id)
     END DO
 
-[hip: launch=HIP_LAUNCH]
+[cuda, hip: launch=LAUNCH_CONF]
 
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     if(id < SHAPE(x, 0)) z[id] = x[id] + y[id];
-    //if(id < 100) (*z)[id] = (*x)[id] + (*y)[id];
 
-[hhip: kernel="kernel"]
-
-    hipMalloc((void **)&DPTR(x), SIZE(x) * sizeof(TYPE(x)));
-    hipMemcpyHtoD(DVAR(x), VAR(x), SIZE(x) * sizeof(TYPE(x)));
-
-    hipMalloc((void **)&DPTR(y), SIZE(y) * sizeof(TYPE(y)));
-    hipMemcpyHtoD(DVAR(y), VAR(y), SIZE(y) * sizeof(TYPE(y)));
-
-    hipMalloc((void **)&DPTR(z), SIZE(z) * sizeof(TYPE(z)));
-    //accelpy_kernel<<<1, SIZE(x)>>>(DVAR(x), DVAR(y), DVAR(z));
-    accelpy_kernel<<<1, SHAPE(x,0) >>>(DVAR(x), DVAR(y), DVAR(z));
-
-    hipMemcpyDtoH(VAR(z), DVAR(z), SIZE(z) * sizeof(TYPE(z)));
-
-    hipFree(DPTR(x));
-    hipFree(DPTR(y));
-    hipFree(DPTR(z));
-
-[cuda: kernel="kernel"]
-
-    cudaMalloc((void **)&DPTR(x), SIZE(x) * sizeof(TYPE(x)));
-    cudaMemcpy(DVAR(x), VAR(x), SIZE(x) * sizeof(TYPE(x)), cudaMemcpyHostToDevice);
-
-    cudaMalloc((void **)&DPTR(y), SIZE(y) * sizeof(TYPE(y)));
-    cudaMemcpy(DVAR(y), VAR(y), SIZE(y) * sizeof(TYPE(y)), cudaMemcpyHostToDevice);
-
-    cudaMalloc((void **)&DPTR(z), SIZE(z) * sizeof(TYPE(z)));
-    //accelpy_kernel<<<1, SIZE(x)>>>(DVAR(x), DVAR(y), DVAR(z));
-    accelpy_kernel<<<1, SHAPE(x,0) >>>(DVAR(x), DVAR(y), DVAR(z));
-
-    cudaMemcpy(VAR(z), DVAR(z), SIZE(z) * sizeof(TYPE(z)), cudaMemcpyDeviceToHost);
-
-    cudaFree(DPTR(x));
-    cudaFree(DPTR(y));
-    cudaFree(DPTR(z));
-
-
-[kernel]
-
-    __global__ void accelpy_kernel(ARG(x), ARG(y), ARG(z)){
-
-        int id = blockIdx.x * blockDim.x + threadIdx.x;
-        if(id < SHAPE(x, 0)) z[id] = x[id] + y[id];
-    }
 
 [openacc_cpp]
     int length = shape_x[0];
@@ -172,55 +127,15 @@ set_argnames("x", "y", "z")
         END DO
     END DO
 
-[hip: kernel="kernel"]
+[cuda, hip: launch=LAUNCH_CONF]
 
-    hipMalloc((void **)&DPTR(x), SIZE(x) * sizeof(TYPE(x)));
-    hipMemcpyHtoD(DVAR(x), VAR(x), SIZE(x) * sizeof(TYPE(x)));
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
 
-    hipMalloc((void **)&DPTR(y), SIZE(y) * sizeof(TYPE(y)));
-    hipMemcpyHtoD(DVAR(y), VAR(y), SIZE(y) * sizeof(TYPE(y)));
+    if (i < SHAPE(x, 0) && j < SHAPE(x, 1) && k < SHAPE(x, 2))
+        z[i][j][k] = x[i][j][k] + y[i][j][k];
 
-    hipMalloc((void **)&DPTR(z), SIZE(z) * sizeof(TYPE(z)));
-
-    const dim3 workers = dim3(SHAPE(x,0), SHAPE(x,1), SHAPE(x,2));
-    accelpy_kernel<<<1, workers >>>(DVAR(x), DVAR(y), DVAR(z));
-
-    hipMemcpyDtoH(VAR(z), DVAR(z), SIZE(z) * sizeof(TYPE(z)));
-
-    hipFree(DPTR(x));
-    hipFree(DPTR(y));
-    hipFree(DPTR(z));
-
-[cuda: kernel="kernel"]
-
-    cudaMalloc((void **)&DPTR(x), SIZE(x) * sizeof(TYPE(x)));
-    cudaMemcpy(DVAR(x), VAR(x), SIZE(x) * sizeof(TYPE(x)), cudaMemcpyHostToDevice);
-
-    cudaMalloc((void **)&DPTR(y), SIZE(y) * sizeof(TYPE(y)));
-    cudaMemcpy(DVAR(y), VAR(y), SIZE(y) * sizeof(TYPE(y)), cudaMemcpyHostToDevice);
-
-    cudaMalloc((void **)&DPTR(z), SIZE(z) * sizeof(TYPE(z)));
-
-    const dim3 workers = dim3(SHAPE(x,0), SHAPE(x,1), SHAPE(x,2));
-    accelpy_kernel<<<1, workers >>>(DVAR(x), DVAR(y), DVAR(z));
-
-    cudaMemcpy(VAR(z), DVAR(z), SIZE(z) * sizeof(TYPE(z)), cudaMemcpyDeviceToHost);
-
-    cudaFree(DPTR(x));
-    cudaFree(DPTR(y));
-    cudaFree(DPTR(z));
-
-[kernel]
-
-    __global__ void accelpy_kernel(ARG(x), ARG(y), ARG(z)){
-
-        int i = blockIdx.x * blockDim.x + threadIdx.x;
-        int j = blockIdx.y * blockDim.y + threadIdx.y;
-        int k = blockIdx.z * blockDim.z + threadIdx.z;
-
-        if (i < SHAPE(x, 0) && j < SHAPE(x, 1) && k < SHAPE(x, 2))
-            z[i][j][k] = x[i][j][k] + y[i][j][k];
-    }
 [openacc_cpp]
 
     int len0 = SHAPE(x, 0);
@@ -379,37 +294,15 @@ set_argnames("A", "B", "C")
     cudaFree(DPTR(Y));
     cudaFree(DPTR(Z));
 
-[hip: X, Y, Z, kernel="kernel"]
+[cuda, hip: X, Y, Z, launch=LAUNCH_CONF]
 
-    hipMalloc((void **)&DPTR(X), SIZE(X) * sizeof(TYPE(X)));
-    hipMemcpyHtoD(DVAR(X), VAR(X), SIZE(X) * sizeof(TYPE(X)));
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
 
-    hipMalloc((void **)&DPTR(Y), SIZE(Y) * sizeof(TYPE(Y)));
-    hipMemcpyHtoD(DVAR(Y), VAR(Y), SIZE(Y) * sizeof(TYPE(Y)));
-
-    hipMalloc((void **)&DPTR(Z), SIZE(Z) * sizeof(TYPE(Z)));
-
-    const dim3 workers = dim3(SHAPE(X,0), SHAPE(Y,1));
-    accelpy_kernel<<<1, workers >>>(DVAR(X), DVAR(Y), DVAR(Z));
-
-    hipMemcpyDtoH(VAR(Z), DVAR(Z), SIZE(Z) * sizeof(TYPE(Z)));
-
-    hipFree(DPTR(Y));
-    hipFree(DPTR(Y));
-    hipFree(DPTR(Z));
-
-[kernel: X, Y, Z]
-
-    __global__ void accelpy_kernel(ARG(X), ARG(Y), ARG(Z)){
-
-        int i = blockIdx.x * blockDim.x + threadIdx.x;
-        int j = blockIdx.y * blockDim.y + threadIdx.y;
-
-        if (i < SHAPE(X, 0) && j < SHAPE(Y, 1)) {
-            Z[i][j] = 0.0;
-            for (int k = 0; k < SHAPE(Y, 0); k++) {
-                Z[i][j] += X[i][k] * Y[k][j];
-            }
+    if (i < SHAPE(X, 0) && j < SHAPE(Y, 1)) {
+        Z[i][j] = 0.0;
+        for (int k = 0; k < SHAPE(Y, 0); k++) {
+            Z[i][j] += X[i][k] * Y[k][j];
         }
     }
 
@@ -615,25 +508,30 @@ def get_testdata(testname, lang):
         order = "F"
 
     data = {"copyinout": [], "copyin":[], "copyout":[], "alloc":[]}
+    conf = []
 
     if testname == "vecadd1d":
         data["copyin"].append(np.reshape(np.arange(N1, dtype=np.int64), (N1,), order=order))
         data["copyin"].append(np.reshape(np.arange(N1, dtype=np.int64) * 2, (N1,), order=order))
         data["copyout"].append(np.reshape(np.zeros(N1, dtype=np.int64), (N1,), order=order))
+        conf.append(1)
+        conf.append(N1)
     elif testname == "matmul":
         data["copyin"].append(np.reshape(np.arange(100, dtype=np.float64), (4, 25), order=order))
         data["copyin"].append(np.reshape(np.arange(100, dtype=np.float64) * 2, (25, 4), order=order))
         data["copyout"].append(np.reshape(np.zeros(16, dtype=np.float64), (4, 4), order=order))
-
+        conf.append(1)
+        conf.append((25, 4))
     elif testname == "vecadd3d":
         data["copyin"].append(np.reshape(np.arange(100, dtype=np.int64), N3, order=order))
         data["copyin"].append(np.reshape(np.arange(100, dtype=np.int64) * 2, N3, order=order))
         data["copyout"].append(np.reshape(np.zeros(100, dtype=np.int64), N3, order=order))
-
+        conf.append(1)
+        conf.append(N3)
     else:
         assert False
 
-    return data, specs[testname]
+    return data, specs[testname], conf
 
 
 def assert_testdata(testname, data):

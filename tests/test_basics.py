@@ -17,8 +17,9 @@ test_vendors = ("amd",)
 #test_vendors = ("gnu",)
 
 #test_codes = ("vecadd1d", "vecadd3d", "matmul")
-test_codes = ("vecadd1d",)
-#test_codes = ("matmul", )
+#test_codes = ("vecadd1d",)
+#test_codes = ("vecadd3d",)
+test_codes = ("matmul", )
 
 #test_langs = ("fortran",)
 test_langs = ("cpp",)
@@ -110,7 +111,7 @@ def test_fortran():
 @mark.parametrize("vendor, code, lang, accel", testcases)
 def test_omptarget2(vendor, code, lang, accel):
 
-    data, knl  = get_testdata(code, lang)
+    data, knl, launchconf  = get_testdata(code, lang)
 
     # TODO: generate data var names
     acc = Accel(**data, vendor=vendor, accel=accel, lang=lang, recompile=False, _debug=DEBUG)
@@ -124,8 +125,8 @@ def test_omptarget2(vendor, code, lang, accel):
 
     attr = {}
 
-    if accel == "hip":
-        attr["HIP_LAUNCH"] = args[0].size
+    if accel in ("cuda", "hip"):
+        attr["LAUNCH_CONF"] = launchconf
 
     acc.launch(Kernel(knl), *args, environ=attr)
 
