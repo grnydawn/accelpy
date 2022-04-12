@@ -10,6 +10,9 @@ from accelpy.util import shellcmd, get_system
 
 builtin_compilers = OrderedDict()
 
+builtin_compilers["nvidia_cpp_cuda"] = OrderedDict()
+builtin_compilers["amd_cpp_hip"] = OrderedDict()
+
 builtin_compilers["cray_fortran_omptarget"] = OrderedDict()
 builtin_compilers["cray_cpp_omptarget"] = OrderedDict()
 builtin_compilers["cray_fortran_openacc"] = OrderedDict()
@@ -19,7 +22,6 @@ builtin_compilers["cray_cpp_openmp"] = OrderedDict()
 builtin_compilers["cray_fortran_fortran"] = OrderedDict()
 builtin_compilers["cray_cpp_cpp"] = OrderedDict()
 
-builtin_compilers["amd_cpp_hip"] = OrderedDict()
 builtin_compilers["amd_fortran_omptarget"] = OrderedDict()
 builtin_compilers["amd_cpp_omptarget"] = OrderedDict()
 builtin_compilers["amd_fortran_openacc"] = OrderedDict()
@@ -73,6 +75,9 @@ def _gnu_version_check(check):
 
 def _pgi_version_check(check):
     return check.lower().lstrip().startswith(b"pg")
+
+def _nvidia_cuda_check(check):
+    return check.lower().lstrip().startswith(b"nvcc")
 
 def _cray_version_check(check):
     return check.lower().lstrip().startswith(b"cray")
@@ -392,6 +397,11 @@ builtin_compilers["pgi_fortran_fortran"]["generic"] = {
 builtin_compilers["pgi_cpp_cpp"]["generic"] = {
         "check": ("pgc++ --version", _pgi_version_check),
         "build": "pgc++ -shared -fpic -o {outpath}"
+    }
+
+builtin_compilers["nvidia_cpp_cuda"]["generic"] = {
+        "check": ("nvcc --version", _nvidia_cuda_check),
+        "build": "nvcc -shared --compiler-options '-fPIC' -o {outpath}"
     }
 
 SHLIB = "-dynamiclib" if sys.platform == "darwin" else "-shared"

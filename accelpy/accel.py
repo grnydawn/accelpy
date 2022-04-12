@@ -286,7 +286,8 @@ class Accel:
         # build acceldata
         cmd = command.format(moddir=self._workdir, outpath=dstdata)
         out = shellcmd(cmd + " " + srcdata, cwd=self._workdir)
-        #import pdb; pdb.set_trace()
+        #print(str(out.stdout).replace("\\n", "\n"))
+        #print(str(out.stderr).replace("\\n", "\n"))
         assert os.path.isfile(dstdata), str(out.stderr)
 
         modname = None
