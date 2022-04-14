@@ -11,14 +11,14 @@ DEBUG = True
 
 #test_vendors = ("cray", "ibm", "amd", "gnu")
 #test_vendors = ("cray",)
-#test_vendors = ("amd",)
-test_vendors = ("nvidia",)
+test_vendors = ("amd",)
+#test_vendors = ("nvidia",)
 #test_vendors = ("ibm",)
 #test_vendors = ("pgi",)
 #test_vendors = ("gnu",)
 
-test_codes = ("vecadd1d", "vecadd3d", "matmul")
-#test_codes = ("vecadd1d",)
+#test_codes = ("vecadd1d", "vecadd3d", "matmul")
+test_codes = ("vecadd1d",)
 #test_codes = ("vecadd3d",)
 #test_codes = ("matmul", )
 
@@ -26,8 +26,8 @@ test_codes = ("vecadd1d", "vecadd3d", "matmul")
 test_langs = ("cpp",)
 
 #test_accels = ("omptarget", )
-#test_accels = ("hip", )
-test_accels = ("cuda", )
+test_accels = ("hip", )
+#test_accels = ("cuda", )
 #test_accels = ("openacc", )
 #test_accels = ("openmp", )
 #test_accels = ("fortran", )
@@ -35,7 +35,7 @@ test_accels = ("cuda", )
 
 testcases = itertools.product(test_vendors, test_codes, test_langs, test_accels)
 
-def test_fortran():
+def ttest_fortran():
 
     import os, sys
     import numpy as np

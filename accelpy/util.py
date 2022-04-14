@@ -221,19 +221,35 @@ def invoke_sharedlib(lang, libobj, funcname, *args):
 def get_system():
     return System()
 
-def pack_arguments(data, prefix=None, setnames=None):
+def pack_arguments(data, updateto=None, updatefrom=None, prefix=None,
+                    setnames=None):
 
     res = []
+    utoids = []
+    ufromids = []
+
+    if updateto is not None:
+        utoids = [id(uto) for uto in updateto]
+
+    if updatefrom is not None:
+        ufromids = [id(ufrom) for ufrom in updatefrom]
 
     if data is not None:
         for idx, arg in enumerate(data):
             idarg = id(arg)
+
             narg = arg if isinstance(arg, numpy.ndarray) else numpy.asarray(arg)
+
             curname = "apyvar_" if prefix is None else prefix+str(idx)
             if setnames is not None:
                 curname = setnames[idx]
-            res.append({"data": narg, "id": idarg, "curname": curname,
-                        "orgdata": arg})
+
+            packed = {"data": narg, "id": idarg, "curname": curname, "orgdata": arg}
+
+            packed["updateto"] = True if idarg in utoids else False
+            packed["updatefrom"] = True if idarg in ufromids else False
+
+            res.append(packed)
 
     return res
 

@@ -182,9 +182,9 @@ class Accel:
 
         assert resdata == 0, "dataexit invoke fail"
 
-    def launch(self, spec, *kargs, macro={}, environ={}):
+    def launch(self, spec, *kargs, updateto=None, updatefrom=None, macro={}, environ={}):
 
-        localvars = pack_arguments(kargs)
+        localvars = pack_arguments(kargs, updateto=updateto, updatefrom=updatefrom)
 
         self.spec = spec
         self.spec.eval_pysection(environ)
@@ -202,6 +202,7 @@ class Accel:
         dids = {}
         _kargs = []
         _uonly = []
+        _mvars = []
 
         dids = dict((d["id"], d["curname"]) for d in
                         self.copyinout+self.copyin+self.copyout+self.alloc)
@@ -209,15 +210,17 @@ class Accel:
         for lvar in localvars:
 
             if lvar["id"] in dids:
-                _uonly.append(("d" + dids[lvar["id"]], lvar))
+                _mvars.append(lvar)
+                _uonly.append((dids[lvar["id"]], lvar))
                 keys.append((dids[lvar["id"]], lvar["curname"]))
 
             else:
                 _kargs.append(lvar)
+                keys.append(lvar["data"].shape)
+                keys.append(lvar["data"].dtype)
 
-        for item in _kargs:
-            keys.append(item["data"].shape)
-            keys.append(item["data"].dtype)
+            keys.append(lvar["updateto"])
+            keys.append(lvar["updatefrom"])
 
         self._knlhash = gethash(self.section.hash() + str(keys) + str(macro) +
                             str(environ))
@@ -232,11 +235,11 @@ class Accel:
         klibpath = os.path.join(kldir, klname)
 
         if self._knlhash in self._tasks:
-            self._run_kernel(self._tasks[self._knlhash], _kargs)
+            self._run_kernel(self._tasks[self._knlhash], _kargs, _mvars)
             self.debug("kernel run using memory cache")
 
         elif os.path.isfile(klibpath): 
-            klib = self._load_run_kernel(klibpath, _kargs)
+            klib = self._load_run_kernel(klibpath, _kargs, _mvars)
             self._tasks[self._knlhash] = klib
             self.debug("kernel run using %s" % klibpath)
 
@@ -246,10 +249,10 @@ class Accel:
 
             srckernel = AccelBase.avails[self._lang][self._accel
                                 ].gen_kernelfile(self._knlhash, self._dmodname,
-                                self._id, self.section, self._workdir, _kargs,
+                                self._id, self.spec._id, self.section, self._workdir, _kargs,
                                 _uonly)
 
-            dstpath, klib = self._build_load_run_kernel(srckernel, _kargs)
+            dstpath, klib = self._build_load_run_kernel(srckernel, _kargs, _mvars)
 
             if not os.path.isfile(klibpath):
                 if not os.path.isdir(kldir):
@@ -288,6 +291,7 @@ class Accel:
         out = shellcmd(cmd + " " + srcdata, cwd=self._workdir)
         #print(str(out.stdout).replace("\\n", "\n"))
         #print(str(out.stderr).replace("\\n", "\n"))
+        #import pdb; pdb.set_trace()
         assert os.path.isfile(dstdata), str(out.stderr)
 
         modname = None
@@ -299,7 +303,7 @@ class Accel:
 
         return modname, self._load_run_enter(dstdata, lang)
 
-    def _build_load_run_kernel(self, srckernel, localvars):
+    def _build_load_run_kernel(self, srckernel, localvars, modvars):
 
         libext = AccelBase.avails[self._lang][self._accel].libext
 
@@ -322,31 +326,33 @@ class Accel:
                         srckernel), cwd=self._workdir)
         #print(str(out.stdout).replace("\\n", "\n"))
         #print(str(out.stderr).replace("\\n", "\n"))
-        #import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
         assert os.path.isfile(dstkernel), str(out.stderr).replace("\\n", "\n")
 
-        return dstkernel, self._load_run_kernel(dstkernel, localvars)
+        return dstkernel, self._load_run_kernel(dstkernel, localvars, modvars)
 
-    def _load_run_kernel(self, libpath, localvars):
+    def _load_run_kernel(self, libpath, localvars, modvars):
 
         # load accelkernel
         libkernel = load_sharedlib(libpath)
         self.debug("libkernel sharedlib", libkernel)
         assert libkernel is not None, "libkernel load fail"
 
-        self._run_kernel(libkernel, localvars)
+        self._run_kernel(libkernel, localvars, modvars)
 
         return libkernel
 
 
-    def _run_kernel(self, libkernel, localvars):
+    def _run_kernel(self, libkernel, localvars, modvars):
 
         # invoke function in accelkernel
-        kernelargs = [lvar["data"] for lvar in localvars]
+        kernelargs = [mvar["data"] for mvar in modvars]
+        kernelargs.extend([lvar["data"] for lvar in localvars])
 
         self.debug("before kernel", *kernelargs)
         #import pdb; pdb.set_trace()
-        reskernel = invoke_sharedlib(self._lang, libkernel, "runkernel_%d" % self._id, *kernelargs)
+        reskernel = invoke_sharedlib(self._lang, libkernel,
+                        "runkernel_%d%d" % (self._id, self.spec._id),  *kernelargs)
 
         self.debug("after kernel cio", *kernelargs)
 

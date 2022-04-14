@@ -66,7 +66,9 @@ extern "C" int64_t runkernel_{runid}({runkernelargs}) {{
 
     {kernelenter}
 
-    device_kernel_{runid}<<<{launchconf}>>>({launchargs});
+    {launchconf}
+
+    device_kernel_{runid}<<<gridsize, blocksize>>>({launchargs});
 
     {kernelexit}
 
@@ -92,7 +94,7 @@ class CudaHipAccelBase(AccelBase):
         macros.append("#define SHAPE(varname, dim) apy_shape_##varname##dim")
         macros.append("#define SIZE(varname) apy_size_##varname")
 
-        for oldname, arg in modvars:
+        for mhname, arg in modvars:
             dtype = get_c_dtype(arg)
             name = arg["curname"]
             ndim = arg["data"].ndim
@@ -129,30 +131,36 @@ class CudaHipAccelBase(AccelBase):
     @classmethod
     def _gen_launchconf(cls, secattr):
 
-        grid, block = "1", "1"
+        grid, block = "dim3 gridsize(1);", "dim3 blocksize(1);"
 
         if "gridsize" in secattr:
             _grid = secattr["gridsize"]
 
-            if isinstance(_grid, (int, str)):
-                grid = str(_grid)
+            if isinstance(_grid , str):
+                grid = _grid
+
+            elif isinstance(_grid, int):
+                grid = "dim3 gridsize(%d);" % _grid
 
             else:
-                grid= "dim3(%s)" % ", ".join([str(i) for i in _grid])
+                grid= "dim3 gridsize(%s);" % ", ".join([str(i) for i in _grid])
 
         if "blocksize" in secattr:
             _block = secattr["blocksize"]
 
-            if isinstance(_block, (int, str)):
-                block = str(_block)
+            if isinstance(_block , str):
+                block = _block
+
+            elif isinstance(_block, int):
+                block = "dim3 blocksize(%d);" % _block
 
             else:
-                block= "dim3(%s)" % ", ".join([str(i) for i in _block])
+                block= "dim3 blocksize(%s);" % ", ".join([str(i) for i in _block])
 
-        return "%s, %s" % (grid, block)
+        return "%s\n%s\n" % (grid, block)
 
     @classmethod
-    def gen_kernelfile(cls, knlhash, dmodname, runid, section, workdir, localvars, modvars):
+    def gen_kernelfile(cls, knlhash, dmodname, runid, specid, section, workdir, localvars, modvars):
 
         kernelpath = os.path.join(workdir, "K%s%s" % (knlhash[2:], cls.srcext))
 
@@ -164,20 +172,29 @@ class CudaHipAccelBase(AccelBase):
         kernelenter = []
         kernelexit = []
 
-        for mname, arg in modvars:
+        for mhname, arg in modvars:
+            mdname = "d" + mhname
+
+
             if arg["data"].ndim > 0:
                 dtype = get_c_dtype(arg)
                 hname = arg["curname"]
                 shape = "".join(["[%d]"%s for s in arg["data"].shape])
-
-                externs.append("%s (* %s)%s;" % (dtype, mname, shape))
-                launchargs.append("*%s" % mname)
+                externs.append("extern %s (* %s)%s;" % (dtype, mdname, shape))
+                runkernelargs.append("void * %s" % hname)
+                launchargs.append("*%s" % mdname)
                 kernelargs.append("%s %s%s" % (dtype, hname, shape))
+
+                if arg["updateto"]:
+                    kernelenter.append(cls._updateto(hname, mdname, arg["data"].size, dtype))
+
+                if arg["updatefrom"]:
+                    kernelexit.append(cls._updatefrom(hname, mdname, arg["data"].size, dtype))
 
         for arg in localvars:
             dtype = get_c_dtype(arg)
             hname = arg["curname"]
-            dname = "d" + name
+            dname = "d" + hname
 
             runkernelargs.append("void * %s" % hname)
 
@@ -195,8 +212,14 @@ class CudaHipAccelBase(AccelBase):
                 launchargs.append("*((%s *) %s)" % (dtype, hname))
                 kernelargs.append("%s %s" % (dtype, hname))
 
+        kernelenter.append(cls._gen_enterfini())
+        kernelexit.append(cls._gen_exitfini())
+
+        #kernelenter.append("printf(\"KENTER\\n\");")
+        #kernelexit.append("printf(\"KEXIT\\n\");")
+
         kernelparams = {
-            "runid": str(runid),
+            "runid": str(runid) + str(specid),
             "externs": "\n".join(externs),
             "include": "\n".join(cls._gen_include()),
             "runkernelargs": ", ".join(runkernelargs),
@@ -307,24 +330,46 @@ class CudaAccel(CudaHipAccelBase):
     srcext = ".cu"
 
     @classmethod
-    def _mapto(cls, hname, dname, size, tname):
+    def _updateto(cls, hname, dname, size, tname):
 
-        fmt = ("cudaMalloc((void **)&{dname}, {size} * sizeof({type}));\n"
-               "CHECK_API();\n"
-               "cudaMemcpy({dname}, {hname}, {size} * sizeof({type}), cudaMemcpyHostToDevice);\n"
-               "CHECK_API();")
+        fmt = ("cudaMemcpy({dname}, {hname}, {size} * sizeof({type}), cudaMemcpyHostToDevice);\n"
+               "CHECK_API();\n")
 
         return fmt.format(hname=hname, dname=dname, size=str(size), type=tname)
 
     @classmethod
-    def _mapfrom(cls, hname, dname, size, tname):
+    def _updatefrom(cls, hname, dname, size, tname):
 
         fmt = ("cudaMemcpy({hname}, {dname}, {size} * sizeof({type}), cudaMemcpyDeviceToHost);\n"
-               "CHECK_API();\n"
-               "cudaFree({dname});\n"
-               "CHECK_API();")
+               "CHECK_API();\n")
 
         return fmt.format(hname=hname, dname=dname, size=str(size), type=tname)
+
+    @classmethod
+    def _mapto(cls, hname, dname, size, tname):
+
+        return (cls._mapalloc(dname, size, tname) +
+                cls._updateto(hname, dname, size, tname))
+
+        #fmt = ("cudaMalloc((void **)&{dname}, {size} * sizeof({type}));\n"
+        #       "CHECK_API();\n"
+        #       "cudaMemcpy({dname}, {hname}, {size} * sizeof({type}), cudaMemcpyHostToDevice);\n"
+        #       "CHECK_API();")
+
+        #return fmt.format(hname=hname, dname=dname, size=str(size), type=tname)
+
+    @classmethod
+    def _mapfrom(cls, hname, dname, size, tname):
+
+        return (cls._updatefrom(hname, dname, size, tname) +
+                cls._mapdelete(dname))
+
+        #fmt = ("cudaMemcpy({hname}, {dname}, {size} * sizeof({type}), cudaMemcpyDeviceToHost);\n"
+        #       "CHECK_API();\n"
+        #       "cudaFree({dname});\n"
+        #       "CHECK_API();")
+
+        #return fmt.format(hname=hname, dname=dname, size=str(size), type=tname)
 
     @classmethod
     def _mapalloc(cls, dname, size, tname):
@@ -372,37 +417,59 @@ class HipAccel(CudaHipAccelBase):
     srcext = ".cpp"
 
     @classmethod
-    def _mapto(cls, hname, dname, size, tname):
+    def _updateto(cls, hname, dname, size, tname):
 
-        fmt = ("hipMalloc((void **)&{dname}, {size} * sizeof({type}));\n"
-               "CHECK_API();\n"
-               "hipMemcpyHtoD({dname}, {hname}, {size} * sizeof({type}));\n"
-               "CHECK_API();")
+        fmt = ("hipMemcpyHtoD({dname}, {hname}, {size} * sizeof({type}));\n"
+               "CHECK_API();\n")
 
         return fmt.format(hname=hname, dname=dname, size=str(size), type=tname)
 
     @classmethod
-    def _mapfrom(cls, hname, dname, size, tname):
+    def _updatefrom(cls, hname, dname, size, tname):
 
         fmt = ("hipMemcpyDtoH({hname}, {dname}, {size} * sizeof({type}));\n"
-               "CHECK_API();\n"
-               "hipFree({dname});\n"
-               "CHECK_API();")
+               "CHECK_API();\n")
 
         return fmt.format(hname=hname, dname=dname, size=str(size), type=tname)
+
+    @classmethod
+    def _mapto(cls, hname, dname, size, tname):
+
+        return (cls._mapalloc(dname, size, tname) +
+                cls._updateto(hname, dname, size, tname))
+
+#        fmt = ("hipMalloc((void **)&{dname}, {size} * sizeof({type}));\n"
+#               "CHECK_API();\n"
+#               "hipMemcpyHtoD({dname}, {hname}, {size} * sizeof({type}));\n"
+#               "CHECK_API();")
+#
+#        return fmt.format(hname=hname, dname=dname, size=str(size), type=tname)
+
+    @classmethod
+    def _mapfrom(cls, hname, dname, size, tname):
+
+        return (cls._updatefrom(hname, dname, size, tname) +
+                cls._mapdelete(dname))
+
+#        fmt = ("hipMemcpyDtoH({hname}, {dname}, {size} * sizeof({type}));\n"
+#               "CHECK_API();\n"
+#               "hipFree({dname});\n"
+#               "CHECK_API();")
+#
+#        return fmt.format(hname=hname, dname=dname, size=str(size), type=tname)
 
     @classmethod
     def _mapalloc(cls, dname, size, tname):
 
         fmt = ("hipMalloc((void **)&{dname}, {size} * sizeof({type}));\n"
-               "CHECK_API();")
+               "CHECK_API();\n")
 
         return fmt.format(dname=dname, size=str(size), type=tname)
 
     @classmethod
     def _mapdelete(cls, dname):
 
-        return "hipFree(%s);\nCHECK_API();"  % dname
+        return "hipFree(%s);\nCHECK_API();\n"  % dname
 
     @classmethod
     def _gen_include(cls):
@@ -430,11 +497,4 @@ void CHECK_API(void)
     @classmethod
     def _gen_exitfini(cls):
         return "hipDeviceSynchronize();\nCHECK_API();"
-
-
-_chaccels = OrderedDict()
-AccelBase.avails[CudaHipAccelBase.lang] = _chaccels
-
-_chaccels[CudaAccel.accel] = CudaAccel
-_chaccels[HipAccel.accel] = HipAccel
 
