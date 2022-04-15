@@ -12,10 +12,7 @@ moddatasrc = """
 module {datamodname}
 USE, INTRINSIC :: ISO_C_BINDING
 
-{modvardefs}
-
 public dataenter_{runid}, dataexit_{runid}
-public {modvars}
 
 contains
 
@@ -24,16 +21,16 @@ INTEGER (C_INT64_T) FUNCTION dataenter_{runid}({enterargs}) BIND(C, name="dataen
 
     {entervardefs}
 
-    {enterassign}
-
     {enterdirective}
 
     dataenter_{runid} = 0
 
 END FUNCTION
 
-INTEGER (C_INT64_T) FUNCTION dataexit_{runid}() BIND(C, name="dataexit_{runid}")
+INTEGER (C_INT64_T) FUNCTION dataexit_{runid}({exitargs}) BIND(C, name="dataexit_{runid}")
     USE, INTRINSIC :: ISO_C_BINDING
+
+    {exitvardefs}
 
     {exitdirective}
 
@@ -47,7 +44,6 @@ end module
 modkernelsrc = """
 INTEGER (C_INT64_T) FUNCTION runkernel_{runid}({kernelargs}) BIND(C, name="runkernel_{runid}")
     USE, INTRINSIC :: ISO_C_BINDING
-    {useonlyvars}
 
     {kernelvardefs}
 
@@ -87,13 +83,13 @@ class FortranAccelBase(AccelBase):
             return "%s, POINTER :: %s" % (get_f_dtype(arg), arg["curname"])
 
     @classmethod
-    def _entervardefs(cls, arg, intent, attrspec={}):
+    def _funcvardefs(cls, arg, intent, attrspec={}):
 
         dim = cls._dimension(arg, attrspec)
 
         if dim:
             return "%s, DIMENSION(%s), INTENT(%s), TARGET :: %s" % (get_f_dtype(arg),
-                dim, intent, "l"+arg["curname"])
+                dim, intent, arg["curname"])
 
         else:
             return "%s, INTENT(IN) :: %s" % (get_f_dtype(arg), arg["curname"])
@@ -110,25 +106,29 @@ class FortranAccelBase(AccelBase):
 
         if dim:
             return "%s, DIMENSION(%s), INTENT(%s), TARGET :: %s" % (get_f_dtype(arg),
-                dim, intent, "l"+arg["curname"])
+                dim, intent, arg["curname"])
 
         else:
             return "%s, INTENT(IN) :: %s" % (get_f_dtype(arg), arg["curname"])
 
     @classmethod
-    def gen_kernelfile(cls, knlhash, dmodname, runid, section, workdir, localvars, modvars):
+    def gen_kernelfile(cls, knlhash, dmodname, runid, specid, section, workdir, localvars, modvars):
 
         kernelpath = os.path.join(workdir, "K%s%s" % (knlhash[2:], cls.srcext))
 
-        kernelparams = {"runid": str(runid)}
+        kernelparams = {
+            "runid": str(runid) + str(specid)
+        }
+
         kernelargs = []
-        uonlyvars = []
         kernelvardefs = []
 
-        for old, newobj in modvars:
-            uonlyvars.append("USE %s, ONLY : %s => %s" % (dmodname, newobj["curname"], old))
-
         attrspec = section.kwargs.get("attrspec", {})
+
+        for old, mvar in modvars:
+
+            kernelargs.append(mvar["curname"])
+            kernelvardefs.append(cls._kernelvardefs(mvar, "INOUT", attrspec=attrspec))
 
         for lvar in localvars:
 
@@ -137,7 +137,6 @@ class FortranAccelBase(AccelBase):
 
         kernelparams["kernelmodname"] = "MOD%s" % knlhash[2:].upper()
         kernelparams["kernelargs"] = ", ".join(kernelargs)
-        kernelparams["useonlyvars"] = "\n".join(uonlyvars)
         kernelparams["kernelvardefs"] = "\n".join(kernelvardefs)
         kernelparams["kernelbody"] = "\n".join(section.body)
 
@@ -147,90 +146,6 @@ class FortranAccelBase(AccelBase):
         #import pdb; pdb.set_trace()
         return kernelpath
 
-
-class FortranAccel(FortranAccelBase):
-    accel = "fortran"
-
-    @classmethod
-    def gen_datafile(cls, modname, filename, runid, workdir, copyinout,
-                        copyin, copyout, alloc, attr):
-
-        datapath = os.path.join(workdir, filename)
-
-        dataparams = {"runid": str(runid), "datamodname": modname}
-
-        modvardefs = []
-        modvars = []
-
-        enterargs = []
-        entervardefs = []
-        enterassign = []
-
-        for cio in copyinout:
-            cioname = cio["curname"]
-
-            modvars.append(cioname)
-            enterargs.append("l"+cioname)
-            entervardefs.append(cls._entervardefs(cio, "INOUT", attrspec=attr))
-            modvardefs.append(cls._modvardefs(cio))
-            enterassign.append("%s => %s" % (cioname, "l"+cioname))
-
-        for ci in copyin:
-            ciname = ci["curname"]
-
-            modvars.append(ciname)
-            enterargs.append("l"+ciname)
-            entervardefs.append(cls._entervardefs(ci, "INOUT", attrspec=attr))
-            modvardefs.append(cls._modvardefs(ci))
-            enterassign.append("%s => %s" % (ciname, "l"+ciname))
-
-        for co in copyout:
-            coname = co["curname"]
-
-            modvars.append(coname)
-            enterargs.append("l"+coname)
-            entervardefs.append(cls._entervardefs(co, "INOUT", attrspec=attr))
-            modvardefs.append(cls._modvardefs(co))
-            enterassign.append("%s => %s" % (coname, "l"+coname))
-
-        for al in alloc:
-            alname = al["curname"]
-
-            modvars.append(alname)
-            enterargs.append("l"+alname)
-            entervardefs.append(cls._entervardefs(al, "INOUT", attrspec=attr))
-            modvardefs.append(cls._modvardefs(al))
-            enterassign.append("%s => %s" % (alname, "l"+alname))
-
-        dataparams["modvardefs"] = "\n".join(modvardefs)
-        dataparams["modvars"] = ", ".join(modvars)
-        dataparams["enterargs"] = ", ".join(enterargs)
-        dataparams["entervardefs"] = "\n".join(entervardefs)
-        dataparams["enterdirective"] = ""
-        dataparams["enterassign"] = "\n".join(enterassign)
-        dataparams["exitdirective"] = ""
-
-        with open(datapath, "w") as fdata:
-            fdata.write(moddatasrc.format(**dataparams))
-
-        return datapath
-
-
-class OpenmpFortranAccel(FortranAccel):
-    accel = "openmp"
-
-
-class AcctargetFortranAccel(FortranAccelBase):
-
-    def _mapto(cls, names):
-        raise NotImplementedError("_mapto")
-
-    def _mapfrom(cls, names):
-        raise NotImplementedError("_mapfrom")
-
-    def _mapalloc(cls, names):
-        raise NotImplementedError("_mapalloc")
-
     @classmethod
     def gen_datafile(cls, modname, filename, runid, workdir, copyinout, copyin, copyout, alloc, attr):
 
@@ -238,12 +153,10 @@ class AcctargetFortranAccel(FortranAccelBase):
 
         dataparams = {"runid": str(runid), "datamodname": modname}
 
-        modvardefs = []
-        modvars = []
-
         enterargs = []
         entervardefs = []
-        enterassign = []
+        exitargs = []
+        exitvardefs = []
 
         enterdirective = []
         exitdirective = []
@@ -256,11 +169,11 @@ class AcctargetFortranAccel(FortranAccelBase):
             cioname = cio["curname"]
             cionames.append(cioname)
 
-            modvars.append(cioname)
-            enterargs.append("l"+cioname)
-            entervardefs.append(cls._entervardefs(cio, "INOUT", attrspec=attr))
-            modvardefs.append(cls._modvardefs(cio))
-            enterassign.append("%s => %s" % (cioname, "l"+cioname))
+            enterargs.append(cioname)
+            entervardefs.append(cls._funcvardefs(cio, "INOUT", attrspec=attr))
+
+            exitargs.append(cioname)
+            exitvardefs.append(cls._funcvardefs(cio, "INOUT", attrspec=attr))
 
         if cionames:
             enterdirective.append(cls._mapto(cionames))
@@ -272,11 +185,8 @@ class AcctargetFortranAccel(FortranAccelBase):
             ciname = ci["curname"]
             cinames.append(ciname)
 
-            modvars.append(ciname)
-            enterargs.append("l"+ciname)
-            entervardefs.append(cls._entervardefs(ci, "INOUT", attrspec=attr))
-            modvardefs.append(cls._modvardefs(ci))
-            enterassign.append("%s => %s" % (ciname, "l"+ciname))
+            enterargs.append(ciname)
+            entervardefs.append(cls._funcvardefs(ci, "INOUT", attrspec=attr))
 
         if cinames:
             enterdirective.append(cls._mapto(cinames))
@@ -287,11 +197,11 @@ class AcctargetFortranAccel(FortranAccelBase):
             coname = co["curname"]
             conames.append(coname)
 
-            modvars.append(coname)
-            enterargs.append("l"+coname)
-            entervardefs.append(cls._entervardefs(co, "INOUT", attrspec=attr))
-            modvardefs.append(cls._modvardefs(co))
-            enterassign.append("%s => %s" % (coname, "l"+coname))
+            enterargs.append(coname)
+            entervardefs.append(cls._funcvardefs(co, "INOUT", attrspec=attr))
+
+            exitargs.append(coname)
+            exitvardefs.append(cls._funcvardefs(co, "INOUT", attrspec=attr))
 
 
         if conames:
@@ -302,22 +212,17 @@ class AcctargetFortranAccel(FortranAccelBase):
             alname = al["curname"]
             alnames.append(alname)
 
-            modvars.append(alname)
-            enterargs.append("l"+alname)
-            entervardefs.append(cls._entervardefs(al, "INOUT", attrspec=attr))
-            modvardefs.append(cls._modvardefs(al))
-            enterassign.append("%s => %s" % (alname, "l"+alname))
+            enterargs.append(alname)
+            entervardefs.append(cls._funcvardefs(al, "INOUT", attrspec=attr))
 
         if alnames:
             enterdirective.append(cls._mapalloc(alnames))
 
-        dataparams["modvardefs"] = "\n".join(modvardefs)
-        dataparams["modvars"] = ", ".join(modvars)
         dataparams["enterargs"] = ", ".join(enterargs)
         dataparams["entervardefs"] = "\n".join(entervardefs)
         dataparams["enterdirective"] = "\n".join(enterdirective)
-        dataparams["enterassign"] = "\n".join(enterassign)
-
+        dataparams["exitargs"] = ", ".join(exitargs)
+        dataparams["exitvardefs"] = "\n".join(exitvardefs)
         dataparams["exitdirective"] = "\n".join(exitdirective)
 
         with open(datapath, "w") as fdata:
@@ -325,6 +230,29 @@ class AcctargetFortranAccel(FortranAccelBase):
 
         #import pdb; pdb.set_trace()
         return datapath
+
+class FortranAccel(FortranAccelBase):
+    accel = "fortran"
+
+    @classmethod
+    def _mapto(cls, names):
+        return ""
+
+    @classmethod
+    def _mapfrom(cls, names):
+        return ""
+
+    @classmethod
+    def _mapalloc(cls, names):
+        return ""
+
+
+class OpenmpFortranAccel(FortranAccel):
+    accel = "openmp"
+
+
+class AcctargetFortranAccel(FortranAccelBase):
+    pass
 
 
 class OmptargetFortranAccel(AcctargetFortranAccel):
@@ -361,8 +289,8 @@ class OpenaccFortranAccel(AcctargetFortranAccel):
 _fortaccels = OrderedDict()
 AccelBase.avails[FortranAccelBase.lang] = _fortaccels
 
-_fortaccels[FortranAccel.accel] = FortranAccel
-_fortaccels[OpenmpFortranAccel.accel] = OpenmpFortranAccel
 _fortaccels[OmptargetFortranAccel.accel] = OmptargetFortranAccel
 _fortaccels[OpenaccFortranAccel.accel] = OpenaccFortranAccel
+_fortaccels[OpenmpFortranAccel.accel] = OpenmpFortranAccel
+_fortaccels[FortranAccel.accel] = FortranAccel
 

@@ -351,25 +351,11 @@ class CudaAccel(CudaHipAccelBase):
         return (cls._mapalloc(dname, size, tname) +
                 cls._updateto(hname, dname, size, tname))
 
-        #fmt = ("cudaMalloc((void **)&{dname}, {size} * sizeof({type}));\n"
-        #       "CHECK_API();\n"
-        #       "cudaMemcpy({dname}, {hname}, {size} * sizeof({type}), cudaMemcpyHostToDevice);\n"
-        #       "CHECK_API();")
-
-        #return fmt.format(hname=hname, dname=dname, size=str(size), type=tname)
-
     @classmethod
     def _mapfrom(cls, hname, dname, size, tname):
 
         return (cls._updatefrom(hname, dname, size, tname) +
                 cls._mapdelete(dname))
-
-        #fmt = ("cudaMemcpy({hname}, {dname}, {size} * sizeof({type}), cudaMemcpyDeviceToHost);\n"
-        #       "CHECK_API();\n"
-        #       "cudaFree({dname});\n"
-        #       "CHECK_API();")
-
-        #return fmt.format(hname=hname, dname=dname, size=str(size), type=tname)
 
     @classmethod
     def _mapalloc(cls, dname, size, tname):
@@ -438,25 +424,11 @@ class HipAccel(CudaHipAccelBase):
         return (cls._mapalloc(dname, size, tname) +
                 cls._updateto(hname, dname, size, tname))
 
-#        fmt = ("hipMalloc((void **)&{dname}, {size} * sizeof({type}));\n"
-#               "CHECK_API();\n"
-#               "hipMemcpyHtoD({dname}, {hname}, {size} * sizeof({type}));\n"
-#               "CHECK_API();")
-#
-#        return fmt.format(hname=hname, dname=dname, size=str(size), type=tname)
-
     @classmethod
     def _mapfrom(cls, hname, dname, size, tname):
 
         return (cls._updatefrom(hname, dname, size, tname) +
                 cls._mapdelete(dname))
-
-#        fmt = ("hipMemcpyDtoH({hname}, {dname}, {size} * sizeof({type}));\n"
-#               "CHECK_API();\n"
-#               "hipFree({dname});\n"
-#               "CHECK_API();")
-#
-#        return fmt.format(hname=hname, dname=dname, size=str(size), type=tname)
 
     @classmethod
     def _mapalloc(cls, dname, size, tname):

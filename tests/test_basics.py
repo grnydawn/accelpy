@@ -7,7 +7,7 @@ from pytest import mark
 from accelpy import Kernel, Accel, build_sharedlib, load_sharedlib, invoke_sharedlib
 from testdata import get_testdata, assert_testdata
 
-DEBUG = True
+DEBUG = False
 
 #test_vendors = ("cray", "ibm", "amd", "gnu")
 #test_vendors = ("cray",)
@@ -17,16 +17,16 @@ test_vendors = ("amd",)
 #test_vendors = ("pgi",)
 #test_vendors = ("gnu",)
 
-#test_codes = ("vecadd1d", "vecadd3d", "matmul")
-test_codes = ("vecadd1d",)
+test_codes = ("vecadd1d", "vecadd3d", "matmul")
+#test_codes = ("vecadd1d",)
 #test_codes = ("vecadd3d",)
 #test_codes = ("matmul", )
 
-#test_langs = ("fortran",)
-test_langs = ("cpp",)
+test_langs = ("fortran",)
+#test_langs = ("cpp",)
 
-#test_accels = ("omptarget", )
-test_accels = ("hip", )
+test_accels = ("omptarget", )
+#test_accels = ("hip", )
 #test_accels = ("cuda", )
 #test_accels = ("openacc", )
 #test_accels = ("openmp", )
@@ -35,7 +35,7 @@ test_accels = ("hip", )
 
 testcases = itertools.product(test_vendors, test_codes, test_langs, test_accels)
 
-def ttest_fortran():
+def test_any():
 
     import os, sys
     import numpy as np
@@ -111,7 +111,7 @@ def ttest_fortran():
         assert np.array_equal(Z, X+Y)
 
 @mark.parametrize("vendor, code, lang, accel", testcases)
-def test_omptarget2(vendor, code, lang, accel):
+def test_case(vendor, code, lang, accel):
 
     data, knl, launchconf  = get_testdata(code, lang)
 

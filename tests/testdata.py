@@ -61,7 +61,7 @@ cpp_enable = True
 [openmp_cpp]
 
     #pragma omp for
-    for (int id = 0; id < shape_x[0]; id++) {
+    for (int id = 0; id < SHAPE(x, 0); id++) {
         z[id] = x[id] + y[id];
         //printf("thread = %d\\n", omp_get_thread_num());
     }
@@ -69,7 +69,7 @@ cpp_enable = True
 [omptarget_cpp]
 
     #pragma omp target teams distribute parallel for
-    for (int id = 0; id < shape_x[0]; id++) {
+    for (int id = 0; id < SHAPE(x, 0); id++) {
         z[id] = x[id] + y[id];
         //printf("thread = %d\\n", omp_get_thread_num());
     }
@@ -201,6 +201,7 @@ set_argnames("x", "y", "z")
             }
         }
     }
+
 [openmp_fortran]
     INTEGER i, j, k, b1, b2, b3, e1, e2, e3
 
