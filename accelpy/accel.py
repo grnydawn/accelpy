@@ -326,7 +326,7 @@ class Accel:
                         srckernel), cwd=self._workdir)
         #print(str(out.stdout).replace("\\n", "\n"))
         #print(str(out.stderr).replace("\\n", "\n"))
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
         assert os.path.isfile(dstkernel), str(out.stderr).replace("\\n", "\n")
 
         return dstkernel, self._load_run_kernel(dstkernel, localvars, modvars)

@@ -1,6 +1,6 @@
 """accelpy Kernel module"""
 
-import os, hashlib
+import os, hashlib, itertools
 
 from accelpy.util import Object, _accelpy_builtins, appeval, funcargseval, gethash
 
@@ -39,7 +39,11 @@ class Section():
 
 class Kernel(Object):
 
+    _ids = itertools.count(0)
+
     def __init__(self, spec):
+
+        self._id = next(self._ids)
 
         # invargs, outvars, kwargs
         self._argnames = []

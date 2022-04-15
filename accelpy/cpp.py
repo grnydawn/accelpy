@@ -464,3 +464,7 @@ _cppaccels[OpenmpCppAccel.accel] = OpenmpCppAccel
 _cppaccels[OmptargetCppAccel.accel] = OmptargetCppAccel
 _cppaccels[OpenaccCppAccel.accel] = OpenaccCppAccel
 
+from .cudahip import CudaAccel, HipAccel
+
+_cppaccels[CudaAccel.accel] = CudaAccel
+_cppaccels[HipAccel.accel] = HipAccel

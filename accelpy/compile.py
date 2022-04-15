@@ -266,7 +266,7 @@ builtin_compilers["cray_cpp_cpp"]["generic"] = {
 
 builtin_compilers["amd_cpp_hip"]["generic"] = {
         "check": ("hipcc --version",_amd_hip_check),
-        "build": "hipcc -shared -fPIC -o {outpath}"
+        "build": "hipcc -shared -fPIC -lamdhip64 -o {outpath}"
     }
 
 builtin_compilers["amd_fortran_omptarget"]["generic"] = {
@@ -401,7 +401,7 @@ builtin_compilers["pgi_cpp_cpp"]["generic"] = {
 
 builtin_compilers["nvidia_cpp_cuda"]["generic"] = {
         "check": ("nvcc --version", _nvidia_cuda_check),
-        "build": "nvcc -shared --compiler-options '-fPIC' -o {outpath}"
+        "build": "nvcc -shared --compiler-options '-fPIC -lcudart' -o {outpath}"
     }
 
 SHLIB = "-dynamiclib" if sys.platform == "darwin" else "-shared"

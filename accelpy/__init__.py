@@ -7,4 +7,3 @@ from .accel import Accel
 from .kernel import Kernel
 from .fortran import FortranAccel
 from .cpp import CppAccel
-from .cudahip import CudaAccel, HipAccel
