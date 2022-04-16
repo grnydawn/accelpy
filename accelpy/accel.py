@@ -199,6 +199,8 @@ class Accel:
 
         keys = [os.uname().release, version, self._dlibhash]
 
+        # TODO: key gen from environ and Accel env
+
         dids = {}
         _kargs = []
         _uonly = []
@@ -249,7 +251,7 @@ class Accel:
 
             srckernel = AccelBase.avails[self._lang][self._accel
                                 ].gen_kernelfile(self._knlhash, self._dmodname,
-                                self._id, self.spec._id, self.section, self._workdir, _kargs,
+                                self._id, self.spec._id, self._attr, self.section, self._workdir, _kargs,
                                 _uonly)
 
             dstpath, klib = self._build_load_run_kernel(srckernel, _kargs, _mvars)

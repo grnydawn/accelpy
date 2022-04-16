@@ -101,26 +101,27 @@ class FortranAccelBase(AccelBase):
 
         else:
             return "%s, INTENT(IN) :: %s" % (get_f_dtype(arg), arg["curname"])
+#
+#    @classmethod
+#    def _kernelvardefs(cls, arg, intent, attrspec={}):
+#
+#        curname = arg["curname"]
+#
+#        if curname in attrspec and "dimension" in attrspec[curname]:
+#            dim = attrspec[curname]["dimension"]
+#
+#        else:
+#            dim = ", ".join([str(s) for s in arg["data"].shape])
+#
+#        if dim:
+#            return "%s, DIMENSION(%s), INTENT(%s), TARGET :: %s" % (get_f_dtype(arg),
+#                dim, intent, arg["curname"])
+#
+#        else:
+#            return "%s, INTENT(IN) :: %s" % (get_f_dtype(arg), arg["curname"])
 
     @classmethod
-    def _kernelvardefs(cls, arg, intent, attrspec={}):
-
-        curname = arg["curname"]
-
-        if curname in attrspec and "dimension" in attrspec[curname]:
-            return attrspec[curname]["dimension"]
-                
-        dim = ", ".join([str(s) for s in arg["data"].shape])
-
-        if dim:
-            return "%s, DIMENSION(%s), INTENT(%s), TARGET :: %s" % (get_f_dtype(arg),
-                dim, intent, arg["curname"])
-
-        else:
-            return "%s, INTENT(IN) :: %s" % (get_f_dtype(arg), arg["curname"])
-
-    @classmethod
-    def gen_kernelfile(cls, knlhash, dmodname, runid, specid, section, workdir, localvars, modvars):
+    def gen_kernelfile(cls, knlhash, dmodname, runid, specid, modattr, section, workdir, localvars, modvars):
 
         kernelpath = os.path.join(workdir, "K%s%s" % (knlhash[2:], cls.srcext))
 
@@ -136,12 +137,12 @@ class FortranAccelBase(AccelBase):
         for old, mvar in modvars:
 
             kernelargs.append(mvar["curname"])
-            kernelvardefs.append(cls._kernelvardefs(mvar, "INOUT", attrspec=attrspec))
+            kernelvardefs.append(cls._funcvardefs(mvar, "INOUT", attrspec=modattr))
 
         for lvar in localvars:
 
             kernelargs.append(lvar["curname"])
-            kernelvardefs.append(cls._kernelvardefs(lvar, "INOUT", attrspec=attrspec))
+            kernelvardefs.append(cls._funcvardefs(lvar, "INOUT", attrspec=attrspec))
 
         kernelparams["kernelmodname"] = "MOD%s" % knlhash[2:].upper()
         kernelparams["kernelargs"] = ", ".join(kernelargs)
