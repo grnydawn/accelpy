@@ -13,6 +13,8 @@ convfmt = "{dtype}(*apy_ptr_{name}){shape} = reinterpret_cast<{dtype}(*){shape}>
 datasrc = """
 #include <stdint.h>
 
+{include}
+
 extern "C" int64_t dataenter_{runid}({enterargs}) {{
 
     int64_t res;
@@ -42,6 +44,8 @@ kernelsrc = """
 #include <stdio.h>
 #include <stdint.h>
 
+{include}
+
 
 {macrodefs}
 
@@ -70,6 +74,10 @@ class CppAccelBase(AccelBase):
 
     lang = "cpp"
     srcext = ".cpp"
+
+    @classmethod
+    def _gen_include(cls):
+        return []
 
     @classmethod
     def _gen_macrodefs(cls, localvars, modvars):
@@ -190,6 +198,7 @@ class CppAccelBase(AccelBase):
         dataparams["enterdirective"] =  "\n".join(enterdirective)
         dataparams["exitargs"] = ", ".join(exitargs)
         dataparams["exitdirective"] = "\n".join(exitdirective)
+        dataparams["include"] = "\n".join(cls._gen_include())
 
         with open(datapath, "w") as fdata:
             fdata.write(datasrc.format(**dataparams))
@@ -246,7 +255,8 @@ class CppAccelBase(AccelBase):
             "kernelargs": ", ".join(kernelargs),
             "runkernelargs": ", ".join(runkernelargs),
             "spec": "\n".join(section.body),
-            "actualargs":", ".join(actualargs) 
+            "actualargs":", ".join(actualargs),
+            "include":"\n".join(cls._gen_include()) 
         }
 
         with open(kernelpath, "w") as fkernel:
@@ -273,6 +283,10 @@ class CppAccel(CppAccelBase):
 
 class OpenmpCppAccel(CppAccel):
     accel = "openmp"
+
+    @classmethod
+    def _gen_include(cls):
+        return ["#include <omp.h>"]
 
 
 class AcctargetCppAccel(CppAccelBase):

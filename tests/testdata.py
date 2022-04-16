@@ -60,10 +60,10 @@ cpp_enable = True
 
 [openmp_cpp]
 
-    #pragma omp for
+    #pragma omp parallel for
     for (int id = 0; id < SHAPE(x, 0); id++) {
         z[id] = x[id] + y[id];
-        //printf("thread = %d\\n", omp_get_thread_num());
+        printf("thread = %d\\n", omp_get_thread_num());
     }
 
 [omptarget_cpp]
@@ -80,12 +80,12 @@ cpp_enable = True
     begin = LBOUND(x,1) 
     end = UBOUND(x,1) 
 
-    !$omp do
+    !$omp parallel do
     DO id=begin, end
         z(id) = x(id) + y(id)
-        !print *, omp_get_thread_num()
+        print *, omp_get_thread_num()
     END DO
-    !$omp end do
+    !$omp end parallel do
 
 [omptarget_fortran: x, y, z]
     INTEGER id, begin, end 
@@ -180,7 +180,7 @@ set_argnames("x", "y", "z")
     !$acc end parallel
 
 [openmp_cpp]
-    #pragma omp for
+    #pragma omp parallel for
     for (int i = 0; i < SHAPE(x, 0); i++) {
         for (int j = 0; j < SHAPE(x, 1); j++) {
             for (int k = 0; k < SHAPE(x, 2); k++) {
@@ -212,7 +212,7 @@ set_argnames("x", "y", "z")
     e2 = UBOUND(x,2) 
     e3 = UBOUND(x,3) 
 
-    !$omp do
+    !$omp parallel do
     DO i=b1, e1
         DO j=b2, e2
             DO k=b3, e3
@@ -220,7 +220,7 @@ set_argnames("x", "y", "z")
             END DO
         END DO
     END DO
-    !$omp end do
+    !$omp end parallel do
 
 [omptarget_fortran: a, b, c]
     INTEGER i, j, k, b1, b2, b3, e1, e2, e3
@@ -342,7 +342,7 @@ set_argnames("A", "B", "C")
 
 [openmp_cpp: X, Y, Z]
 
-    #pragma omp for
+    #pragma omp parallel for
     for (int i = 0; i < SHAPE(X, 0); i++) {
         for (int j = 0; j < SHAPE(Y, 1); j++) {
             Z[i][j] = 0.0;
@@ -377,7 +377,7 @@ set_argnames("A", "B", "C")
     yl2 = LBOUND(Y,2) 
     yu2 = UBOUND(Y,2) 
 
-    !$omp do
+    !$omp parallel do
     DO i=xl1, xu1
         DO j=yl2, yu2
             Z(i, j) = 0
@@ -386,7 +386,7 @@ set_argnames("A", "B", "C")
             END DO
         END DO
     END DO
-    !$omp end do
+    !$omp end parallel do
 
 [omptarget_fortran: A, B, C]
 

@@ -12,6 +12,8 @@ moddatasrc = """
 module {datamodname}
 USE, INTRINSIC :: ISO_C_BINDING
 
+{use}
+
 public dataenter_{runid}, dataexit_{runid}
 
 contains
@@ -45,6 +47,8 @@ modkernelsrc = """
 INTEGER (C_INT64_T) FUNCTION runkernel_{runid}({kernelargs}) BIND(C, name="runkernel_{runid}")
     USE, INTRINSIC :: ISO_C_BINDING
 
+    {use}
+
     {kernelvardefs}
 
     {kernelbody}
@@ -59,6 +63,10 @@ class FortranAccelBase(AccelBase):
 
     lang = "fortran"
     srcext = ".F90"
+
+    @classmethod
+    def _gen_include(cls):
+        return []
 
     @classmethod
     def _dimension(cls, arg, attrspec):
@@ -139,6 +147,7 @@ class FortranAccelBase(AccelBase):
         kernelparams["kernelargs"] = ", ".join(kernelargs)
         kernelparams["kernelvardefs"] = "\n".join(kernelvardefs)
         kernelparams["kernelbody"] = "\n".join(section.body)
+        kernelparams["use"] = "\n".join(cls._gen_include())
 
         with open(kernelpath, "w") as fkernel:
             fkernel.write(modkernelsrc.format(**kernelparams))
@@ -224,6 +233,7 @@ class FortranAccelBase(AccelBase):
         dataparams["exitargs"] = ", ".join(exitargs)
         dataparams["exitvardefs"] = "\n".join(exitvardefs)
         dataparams["exitdirective"] = "\n".join(exitdirective)
+        dataparams["use"] = "\n".join(cls._gen_include())
 
         with open(datapath, "w") as fdata:
             fdata.write(moddatasrc.format(**dataparams))
@@ -249,6 +259,10 @@ class FortranAccel(FortranAccelBase):
 
 class OpenmpFortranAccel(FortranAccel):
     accel = "openmp"
+
+    @classmethod
+    def _gen_include(cls):
+        return ["USE OMP_LIB"]
 
 
 class AcctargetFortranAccel(FortranAccelBase):
