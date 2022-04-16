@@ -207,9 +207,12 @@ class CppAccelBase(AccelBase):
         return datapath
 
     @classmethod
-    def gen_kernelfile(cls, knlhash, dmodname, runid, specid, section, workdir, localvars, modvars):
+    def gen_kernelfile(cls, knlhash, dmodname, runid, specid, modattr, section, workdir, localvars, modvars):
 
         kernelpath = os.path.join(workdir, "K%s%s" % (knlhash[2:], cls.srcext))
+
+        attrspec = section.kwargs.get("attrspec", {})
+        modattr.update(attrspec)
 
         runkernelargs = []
         kernelargs = []

@@ -16,7 +16,7 @@ cpp_enable = True
 
 [cpp: enable=cpp_enable]
 
-    //for (int id = 0; id < shape_x[0]; id++) {
+    //for (int id = 0; id < SHAPE(x, 0); id++) {
     for (int id = 0; id < SHAPE(x,0); id++) {
         z[id] = x[id] + y[id];
     }
@@ -38,7 +38,7 @@ cpp_enable = True
 
 
 [openacc_cpp]
-    int length = shape_x[0];
+    int length = SHAPE(x, 0);
 
     #pragma acc parallel loop worker 
     for (int id = 0; id < length; id++) {

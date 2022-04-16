@@ -64,22 +64,22 @@ class Accel:
             _vendor, _lang, _accel = comptype.split("_")
 
             if isinstance(vendor, (list, tuple)):
-                if _vendor not in vendor: continue
+                if _vendor != "*" and _vendor not in vendor: continue
 
             elif isinstance(vendor, str):
-                if _vendor != vendor: continue
+                if _vendor != "*" and _vendor != vendor: continue
 
             if isinstance(lang, (list, tuple)):
-                if _lang not in lang: continue
+                if _lang != "*" and _lang not in lang: continue
 
             elif isinstance(lang, str):
-                if _lang != lang: continue
+                if _lang != "*" and _lang != lang: continue
 
             if isinstance(accel, (list, tuple)):
-                if _accel not in accel: continue
+                if _accel != "*" and _accel not in accel: continue
 
             elif isinstance(accel, str):
-                if _accel != accel: continue
+                if _accel != "*" and _accel != accel: continue
 
             libdir = get_config("libdir")
 
@@ -248,10 +248,11 @@ class Accel:
         else:
 
             self.macro = macro
+            modattr = dict(self._attr)
 
             srckernel = AccelBase.avails[self._lang][self._accel
                                 ].gen_kernelfile(self._knlhash, self._dmodname,
-                                self._id, self.spec._id, self._attr, self.section, self._workdir, _kargs,
+                                self._id, self.spec._id, modattr, self.section, self._workdir, _kargs,
                                 _uonly)
 
             dstpath, klib = self._build_load_run_kernel(srckernel, _kargs, _mvars)

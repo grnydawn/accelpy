@@ -133,6 +133,7 @@ class FortranAccelBase(AccelBase):
         kernelvardefs = []
 
         attrspec = section.kwargs.get("attrspec", {})
+        modattr.update(attrspec)
 
         for old, mvar in modvars:
 

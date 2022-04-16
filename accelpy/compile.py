@@ -11,7 +11,7 @@ from accelpy.util import shellcmd, get_system
 builtin_compilers = OrderedDict()
 
 builtin_compilers["nvidia_cpp_cuda"] = OrderedDict()
-builtin_compilers["amd_cpp_hip"] = OrderedDict()
+builtin_compilers["*_cpp_hip"] = OrderedDict()
 
 builtin_compilers["cray_fortran_omptarget"] = OrderedDict()
 builtin_compilers["cray_cpp_omptarget"] = OrderedDict()
@@ -85,7 +85,7 @@ def _cray_version_check(check):
 def _amd_version_check(check):
     return check.lower().lstrip().startswith(b"amd")
 
-def _amd_hip_check(check):
+def _hip_check(check):
     return check.lower().lstrip().startswith(b"hip")
 
 def _ibm_version_check(check):
@@ -264,8 +264,8 @@ builtin_compilers["cray_cpp_cpp"]["generic"] = {
         "build": "crayCC -shared -fPIC -o {outpath}"
     }
 
-builtin_compilers["amd_cpp_hip"]["generic"] = {
-        "check": ("hipcc --version",_amd_hip_check),
+builtin_compilers["*_cpp_hip"]["generic"] = {
+        "check": ("hipcc --version",_hip_check),
         "build": "hipcc -shared -fPIC -lamdhip64 -o {outpath}"
     }
 
@@ -474,23 +474,23 @@ def build_sharedlib(srcfile, outfile, workdir, compile=None, opts="", vendor=Non
         _vendor, _lang, _accel = comptype.split("_")
 
         if isinstance(vendor, (list, tuple)):
-            if _vendor not in vendor: continue
+            if _vendor != "*" and _vendor not in vendor: continue
 
         elif isinstance(vendor, str):
-            if _vendor != vendor: continue
+            if _vendor != "*" and _vendor != vendor: continue
 
         if isinstance(lang, (list, tuple)):
-            if _lang not in lang: continue
+            if _lang != "*" and _lang not in lang: continue
 
         elif isinstance(lang, str):
-            if _lang != lang: continue
+            if _lang != "*" and _lang != lang: continue
 
         if isinstance(accel, (list, tuple)):
-            if _accel not in accel: continue
+            if _accel != "*" and _accel not in accel: continue
 
         elif isinstance(accel, str):
-            if _accel != accel: continue
-        
+            if _accel != "*" and _accel != accel: continue
+    
         for compid, compinfo in comps.items():
 
             try:
