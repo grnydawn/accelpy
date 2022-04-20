@@ -95,11 +95,11 @@ class CppAccelBase(AccelBase):
             name = arg["curname"]
             ndim = arg["data"].ndim
 
-            consts.append("const int64_t apy_size_%s = %d;" % (name, arg["data"].size))
             typedefs.append("typedef %s apy_type_%s;" % (dtype, name))
 
             if ndim > 0:
 
+                consts.append("const int64_t apy_size_%s = %d;" % (name, arg["data"].size))
                 shapestr = "".join(["[%d]"%s for s in arg["data"].shape])
                 for d, s in enumerate(arg["data"].shape):
                     consts.append("const int64_t apy_shape_%s%d = %d;" % (name, d, s))
@@ -111,11 +111,11 @@ class CppAccelBase(AccelBase):
             name = arg["curname"]
             ndim = arg["data"].ndim
 
-            consts.append("const int64_t apy_size_%s = %d;" % (name, arg["data"].size))
             typedefs.append("typedef %s apy_type_%s;" % (dtype, name))
 
             if ndim > 0:
 
+                consts.append("const int64_t apy_size_%s = %d;" % (name, arg["data"].size))
                 shapestr = "".join(["[%d]"%s for s in arg["data"].shape])
                 for d, s in enumerate(arg["data"].shape):
                     consts.append("const int64_t apy_shape_%s%d = %d;" % (name, d, s))
@@ -233,7 +233,7 @@ class CppAccelBase(AccelBase):
             else:
                 runkernelargs.append("%s * %s" % (dtype, vname))
                 kernelargs.append("%s %s" % (dtype, vname))
-                actualargs.append("*%s" % (dtype, vname))
+                actualargs.append("*%s" % vname)
 
         for lvar in localvars:
             ndim = lvar["data"].ndim
@@ -250,7 +250,7 @@ class CppAccelBase(AccelBase):
             else:
                 runkernelargs.append("%s * %s" % (dtype, vname))
                 kernelargs.append("%s %s" % (dtype, vname))
-                actualargs.append("*%s" % (dtype, vname))
+                actualargs.append("*%s" % vname)
 
         kernelparams = {
             "runid": str(runid) + str(specid),
@@ -298,6 +298,10 @@ class AcctargetCppAccel(CppAccelBase):
 
 class OmptargetCppAccel(AcctargetCppAccel):
     accel = "omptarget"
+
+    @classmethod
+    def _gen_include(cls):
+        return ["#include <omp.h>"]
 
     @classmethod
     def _mapto(cls, names):

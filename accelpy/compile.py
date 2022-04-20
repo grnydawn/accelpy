@@ -10,7 +10,7 @@ from accelpy.util import shellcmd, get_system
 
 builtin_compilers = OrderedDict()
 
-builtin_compilers["nvidia_cpp_cuda"] = OrderedDict()
+builtin_compilers["*_cpp_cuda"] = OrderedDict()
 builtin_compilers["*_cpp_hip"] = OrderedDict()
 
 builtin_compilers["cray_fortran_omptarget"] = OrderedDict()
@@ -76,7 +76,7 @@ def _gnu_version_check(check):
 def _pgi_version_check(check):
     return check.lower().lstrip().startswith(b"pg")
 
-def _nvidia_cuda_check(check):
+def _cuda_check(check):
     return check.lower().lstrip().startswith(b"nvcc")
 
 def _cray_version_check(check):
@@ -399,8 +399,8 @@ builtin_compilers["pgi_cpp_cpp"]["generic"] = {
         "build": "pgc++ -shared -fpic -o {outpath}"
     }
 
-builtin_compilers["nvidia_cpp_cuda"]["generic"] = {
-        "check": ("nvcc --version", _nvidia_cuda_check),
+builtin_compilers["*_cpp_cuda"]["generic"] = {
+        "check": ("nvcc --version", _cuda_check),
         "build": "nvcc -shared --compiler-options '-fPIC -lcudart' -o {outpath}"
     }
 
@@ -515,4 +515,3 @@ def build_sharedlib(srcfile, outfile, workdir, compile=None, opts="", vendor=Non
                 print("command fail: %s" % cmd)
 
     raise Exception("All build commands were failed")
-

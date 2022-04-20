@@ -10,10 +10,9 @@ from testdata import get_testdata, assert_testdata
 DEBUG = False
 
 #test_vendors = ("cray", "ibm", "amd", "gnu")
-test_vendors = ("cray",)
+#test_vendors = ("cray",)
 #test_vendors = ("amd",)
-#test_vendors = ("nvidia",)
-#test_vendors = ("ibm",)
+test_vendors = ("ibm",)
 #test_vendors = ("pgi",)
 #test_vendors = ("gnu",)
 
@@ -22,12 +21,12 @@ test_codes = ("vecadd1d", "vecadd3d", "matmul")
 #test_codes = ("vecadd3d",)
 #test_codes = ("matmul", )
 
-test_langs = ("fortran",)
-#test_langs = ("cpp",)
+#test_langs = ("fortran",)
+test_langs = ("cpp",)
 
 #test_accels = ("omptarget", )
 #test_accels = ("hip", )
-#test_accels = ("cuda", )
+test_accels = ("cuda", )
 #test_accels = ("openacc", )
 #test_accels = ("openmp", )
 #test_accels = ("fortran", )

@@ -99,27 +99,25 @@ class CudaHipAccelBase(AccelBase):
             name = arg["curname"]
             ndim = arg["data"].ndim
 
-            consts.append("const int64_t apy_size_%s = %d;" % (name, arg["data"].size))
             typedefs.append("typedef %s apy_type_%s;" % (dtype, name))
 
             if ndim > 0:
 
+                consts.append("const int64_t apy_size_%s = %d;" % (name, arg["data"].size))
                 shapestr = "".join(["[%d]"%s for s in arg["data"].shape])
                 for d, s in enumerate(arg["data"].shape):
                     consts.append("const int64_t apy_shape_%s%d = %d;" % (name, d, s))
-            else:
-                pass
 
         for arg in localvars:
             dtype = get_c_dtype(arg)
             name = arg["curname"]
             ndim = arg["data"].ndim
 
-            consts.append("const int64_t apy_size_%s = %d;" % (name, arg["data"].size))
             typedefs.append("typedef %s apy_type_%s;" % (dtype, name))
 
             if ndim > 0:
 
+                consts.append("const int64_t apy_size_%s = %d;" % (name, arg["data"].size))
                 shapestr = "".join(["[%d]"%s for s in arg["data"].shape])
                 for d, s in enumerate(arg["data"].shape):
                     consts.append("const int64_t apy_shape_%s%d = %d;" % (name, d, s))
@@ -217,9 +215,6 @@ class CudaHipAccelBase(AccelBase):
 
         kernelenter.append(cls._gen_enterfini())
         kernelexit.append(cls._gen_exitfini())
-
-        #kernelenter.append("printf(\"KENTER\\n\");")
-        #kernelexit.append("printf(\"KEXIT\\n\");")
 
         kernelparams = {
             "runid": str(runid) + str(specid),
@@ -364,7 +359,7 @@ class CudaAccel(CudaHipAccelBase):
     def _mapalloc(cls, dname, size, tname):
 
         fmt = ("cudaMalloc((void **)&{dname}, {size} * sizeof({type}));\n"
-               "CHECK_API();")
+               "CHECK_API();\n")
 
         return fmt.format(dname=dname, size=str(size), type=tname)
 

@@ -275,6 +275,10 @@ class OmptargetFortranAccel(AcctargetFortranAccel):
     accel = "omptarget"
 
     @classmethod
+    def _gen_include(cls):
+        return ["USE OMP_LIB"]
+
+    @classmethod
     def _mapto(cls, names):
         return "!$omp target enter data map(to:" + ", ".join(names) + ")"
 
