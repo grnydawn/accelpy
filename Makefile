@@ -71,8 +71,8 @@ test: ## run tests quickly with the default Python: --tb=short
 	pytest ./tests -s -vv --pyargs accelpy --tb=short
 
 testnv:
-	#nvprof --profile-child-processes -- pytest ./tests -s -vv --pyargs accelpy --tb=short
-	jsrun -n1 -g1 -- nvprof --profile-child-processes -- pytest ./tests -s -vv --pyargs accelpy --tb=short
+	nvprof --profile-child-processes -- pytest ./tests -s -vv --pyargs accelpy --tb=short
+	#jsrun -n1 -g1 -- nvprof --profile-child-processes pytest ./tests -s -vv --pyargs accelpy --tb=short
 
 testamd:
 	rocprof --hsa-trace pytest ./tests -s -vv --pyargs accelpy --tb=short

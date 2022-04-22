@@ -45,6 +45,8 @@ builtin_compilers["intel_cpp_openmp"] = OrderedDict()
 builtin_compilers["intel_fortran_fortran"] = OrderedDict()
 builtin_compilers["intel_cpp_cpp"] = OrderedDict()
 
+builtin_compilers["pgi_fortran_omptarget"] = OrderedDict()
+builtin_compilers["pgi_cpp_omptarget"] = OrderedDict()
 builtin_compilers["pgi_fortran_openacc"] = OrderedDict()
 builtin_compilers["pgi_cpp_openacc"] = OrderedDict()
 builtin_compilers["pgi_fortran_openmp"] = OrderedDict()
@@ -368,6 +370,17 @@ builtin_compilers["ibm_cpp_cpp"]["generic"] = {
         "check": ("xlc++_r -qversion",_ibm_version_check),
         "build": "xlc++_r -qmkshrobj -qpic -o {outpath}"
     }
+
+builtin_compilers["pgi_fortran_omptarget"]["generic"] = {
+        "check": ("pgfortran --version", _pgi_version_check),
+        "build": "pgfortran -shared -fpic -mp -module {moddir} -o {outpath}"
+    }
+
+builtin_compilers["pgi_cpp_omptarget"]["generic"] = {
+        "check": ("pgc++ --version", _pgi_version_check),
+        "build": "pgc++ -shared -fpic -mp -o {outpath}"
+    }
+
 
 builtin_compilers["pgi_fortran_openacc"]["generic"] = {
         "check": ("pgfortran --version", _pgi_version_check),

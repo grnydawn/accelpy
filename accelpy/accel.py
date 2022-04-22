@@ -67,19 +67,19 @@ class Accel:
                 if _vendor != "*" and _vendor not in vendor: continue
 
             elif isinstance(vendor, str):
-                if _vendor != "*" and _vendor != vendor: continue
+                if vendor != "*" and _vendor != vendor: continue
 
             if isinstance(lang, (list, tuple)):
                 if _lang != "*" and _lang not in lang: continue
 
             elif isinstance(lang, str):
-                if _lang != "*" and _lang != lang: continue
+                if lang != "*" and _lang != lang: continue
 
             if isinstance(accel, (list, tuple)):
                 if _accel != "*" and _accel not in accel: continue
 
             elif isinstance(accel, str):
-                if _accel != "*" and _accel != accel: continue
+                if accel != "*" and _accel != accel: continue
 
             libdir = get_config("libdir")
 
