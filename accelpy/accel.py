@@ -58,28 +58,28 @@ class Accel:
 
         orghash = gethash(str(keys))
 
+        if not isinstance(vendor, (list, tuple)):
+            vendor = (vendor, )
+
+        if not isinstance(lang, (list, tuple)):
+            lang = (lang, )
+
+        if not isinstance(accel, (list, tuple)):
+            accel = (accel, )
+
         # user or system defined compilers
         for comptype, comps in builtin_compilers.items():
             
             _vendor, _lang, _accel = comptype.split("_")
 
-            if isinstance(vendor, (list, tuple)):
-                if _vendor != "*" and _vendor not in vendor: continue
+            if (vendor and "*" not in vendor and _vendor != "*" and
+                _vendor not in vendor): continue
 
-            elif isinstance(vendor, str):
-                if vendor != "*" and _vendor != vendor: continue
+            if (lang and "*" not in lang and _lang != "*" and
+                _lang not in lang): continue
 
-            if isinstance(lang, (list, tuple)):
-                if _lang != "*" and _lang not in lang: continue
-
-            elif isinstance(lang, str):
-                if lang != "*" and _lang != lang: continue
-
-            if isinstance(accel, (list, tuple)):
-                if _accel != "*" and _accel not in accel: continue
-
-            elif isinstance(accel, str):
-                if accel != "*" and _accel != accel: continue
+            if (accel and "*" not in accel and _accel != "*" and
+                _accel not in accel): continue
 
             libdir = get_config("libdir")
 
