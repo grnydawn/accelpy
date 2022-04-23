@@ -37,7 +37,7 @@ Capabilities
 Example
 --------------
 
-In this example, we will add two 2-dimensional vectors(x, y) element-wisely and save their sum in a vector(z). The three positional arguments(x, y, z) to Accel object are NumPy ndarrays. "copyin" and "copyout" with a tuple of input arguments each ensure that the specified data are available to target device such as CPU or GPU. In case of CPU, it those optional argument do nothing because the data are already available. Howver, in case of GPU, AccelPy does allocate and copy the data to GPU.
+In this example, we will add two 2-dimensional vectors(x, y) element-wisely and save their sum in a vector(z). User can define acceleration task using Accel class. The named arguments of "copyin" and "copyout"ensure that the specified data are available to target device such as CPU or GPU. In this example, two Numpy ndarray "x" and "y" are available in the target device as input variables and "z" as an output varilable. In the case of CPU, those optional argument do nothing because the data are already available on CPU memory space. Howver, in the case of GPU, AccelPy does allocate and copy the data to GPU.
 
 "launch" function compiles and run the kernel that is specified in the file of "vecadd.knl". The details of the kernel file is explained below. The launch function also needs the input data arguments of "x", "y", and "z". However, because these data are already available in target device through the "copyin", there is no actual data movement during the execution of "launch" function.
 
@@ -68,11 +68,11 @@ Finally, "stop" function of Accel finalize and copy back the data specified by "
     print("SUCCESS" if np.array_equal(z, x+y) else "FAIL")
 
 
-Following AccelPy Kernel Specification is written in "vecad.knl" file. To make is simple, it shows Fortran versions only. However, AccelPy support C++ kernel implementation also.
+"vecadd.knl" is an AccelPy Kernel Specification that defines the kernel. To make is simple, it shows Fortran versions only. However, AccelPy support C++ kernel implementation also.
 
-The pair of square brackets is a kernel section. The three target prgramming models are specified before the colon in the brackets. It tells that this section implements plain fortran, openacc fortran, and openmp target fortran implementation. AccelPy also supports plain c++, openacc c++, openmp c++, openmp target c++, cuda, hip, and openmp fortran. Next three arguments are the names of input arguments to this kernel.
+The pair of square brackets is a kernel section. Three prgramming models are specified in the line before the colon in the brackets. The names of the programming models indicates that this section implements plain fortran, openacc fortran, and openmp target fortran implementation. AccelPy also supports plain c++, openacc c++, openmp c++, openmp target c++, cuda, hip, and openmp fortran. Next three arguments are the names of input arguments to this kernel.
 
-The following lines implements the kernel for adding two vectors element by element. Because AccelPy handles the inputs and outputs of this kernel, user can focus on the implementation of algorithm in the kernel body.
+The next lines implements the kernel of adding two vectors element by element. Because AccelPy handles the data movements for the inputs and the outputs of this kernel, user only need to focus on the implementation of algorithm in the kernel body.
 
 **vecadd.knl**
 ::
