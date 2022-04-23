@@ -55,7 +55,10 @@ Finally, "stop" function of Accel finalize and copy back the data specified by "
     y = np.ones((N1, N2), order="F")
     z = np.zeros((N1, N2), order="F")
 
-    accel = Accel(copyin=(x, y), copyout=(z,))
+
+    acctarget = "openacc" # "omptarget"
+
+    accel = Accel(accel=acctarget, copyin=(x, y), copyout=(z,))
 
     accel.launch(Kernel(vecadd), x, y, z)
 
@@ -66,31 +69,40 @@ Finally, "stop" function of Accel finalize and copy back the data specified by "
 
 "vecadd.knl" is an AccelPy Kernel Specification that defines the kernel. To make is simple, it shows Fortran versions only. However, AccelPy support C++ kernel implementation also.
 
-The pair of square brackets is a kernel section. Three prgramming models are specified in the line before the colon in the brackets. The names of the programming models indicates that this section implements plain fortran, openacc fortran, and openmp target fortran implementation. AccelPy also supports plain c++, openacc c++, openmp c++, openmp target c++, cuda, hip, and openmp fortran. Next three arguments are the names of input arguments to this kernel.
+The pair of square brackets is a kernel section. In the file, there are two kernel section. One defines kernel for Fortran and Openmp target and the other defines for Openacc. User can specify a particular target of kernel type. Otherwise AccelPy select one of available kernel types. The names of the programming models indicates that this section implements plain fortran, openacc fortran, and openmp target fortran implementation. AccelPy also supports plain c++, openacc c++, openmp c++, openmp target c++, cuda, hip, and openmp fortran. Next three arguments are the names of input arguments to this kernel.
 
 The next lines implements the kernel of adding two vectors element by element. Because AccelPy handles the data movements for the inputs and the outputs of this kernel, user only need to focus on the implementation of algorithm in the kernel body.
 
 **vecadd.knl**
 ::
 
-    [fortran, openacc_fortran, omptarget_fortran:a, b, c]
+	[fortran, omptarget_fortran: a, b, c]
 
-        INTEGER i, j
+	INTEGER i, j
 
-        !$omp target teams num_teams(SIZE(a, 1))
-        !$omp distribute
-        !$acc parallel num_gangs(SIZE(a, 1)), vector_length(SIZE(a, 2))
-        !$acc loop gang
-        DO i=LBOUND(a,1), UBOUND(a,1)
-            !$omp parallel do
-            !$acc loop vector
-            DO j=LBOUND(a,2), UBOUND(a,2)
-                c(i, j) = a(i, j) + b(i, j)
-            END DO
-        END DO
-        !$acc end parallel
-        !$omp end target teams
+	!$omp target teams num_teams(SIZE(a, 1))
+	!$omp distribute
+	DO i=LBOUND(a,1), UBOUND(a,1)
+		!$omp parallel do
+		DO j=LBOUND(a,2), UBOUND(a,2)
+			c(i, j) = a(i, j) + b(i, j)
+		END DO
+	END DO
+	!$omp end target teams
 
+	[openacc_fortran: a, b, c]
+
+	INTEGER i, j
+
+	!$acc parallel num_gangs(SIZE(a, 1)), vector_length(SIZE(a, 2))
+	!$acc loop gang
+	DO i=LBOUND(a,1), UBOUND(a,1)
+		!$acc loop vector
+		DO j=LBOUND(a,2), UBOUND(a,2)
+			c(i, j) = a(i, j) + b(i, j)
+		END DO
+	END DO
+	!$acc end parallel
 
 Installation
 ----------------

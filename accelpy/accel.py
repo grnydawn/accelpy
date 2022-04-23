@@ -72,7 +72,7 @@ class Accel:
             
             _vendor, _lang, _accel = comptype.split("_")
 
-            print(vendor, _vendor, lang, _lang, accel, _accel)
+            #print(vendor, _vendor, lang, _lang, accel, _accel)
 
             if (vendor and "*" not in vendor and _vendor != "*" and
                 _vendor not in vendor): continue
@@ -116,6 +116,9 @@ class Accel:
 
                     if not avail: continue
 
+                    print("Compiling with %s %s compiler for %s target."
+                            % (_vendor, _lang, _accel))
+    
                     cmdline = compinfo["build"]
 
                     self._dlibhash = gethash(self._dsrchash +str(compid) + str(cmdline))
