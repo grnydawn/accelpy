@@ -1,0 +1,17 @@
+[fortran, openacc_fortran, omptarget_fortran: a, b, c]
+
+INTEGER i, j
+
+!$omp target teams num_teams(SIZE(a, 1))
+!$omp distribute
+!$acc parallel num_gangs(SIZE(a, 1)), vector_length(SIZE(a, 2))
+!$acc loop gang
+DO i=LBOUND(a,1), UBOUND(a,1)
+    !$omp parallel do
+    !$acc loop vector
+    DO j=LBOUND(a,2), UBOUND(a,2)
+	c(i, j) = a(i, j) + b(i, j)
+    END DO
+END DO
+!$acc end parallel
+!$omp end target teams

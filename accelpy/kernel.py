@@ -51,7 +51,7 @@ class Kernel(Object):
         if isinstance(spec, str):
             if os.path.isfile(spec):
                 with open(spec) as fs:
-                    spec = Kernel(fs.read())
+                    spec = fs.read()
 
             self._sections = self._parse_spec(spec)
 

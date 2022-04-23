@@ -30,8 +30,8 @@ class Accel:
     _ids = itertools.count(0)
 
     def __init__(self, copyinout=None, copyin=None, copyout=None,
-                    alloc=None, compile=None, lang=None, vendor=None,
-                    accel=None, attr={}, recompile=False, _debug=False):
+                    alloc=None, compile=None, lang=[], vendor=[],
+                    accel=[], attr={}, recompile=False, _debug=False):
 
         self._id = next(self._ids)
         self._debug = _debug
@@ -72,6 +72,8 @@ class Accel:
             
             _vendor, _lang, _accel = comptype.split("_")
 
+            print(vendor, _vendor, lang, _lang, accel, _accel)
+
             if (vendor and "*" not in vendor and _vendor != "*" and
                 _vendor not in vendor): continue
 
@@ -89,6 +91,8 @@ class Accel:
             self._dfdir = os.path.join(libdir, self._dsrchash[:2])
             dsrcpath = os.path.join(self._dfdir, dfname)
             self._dmodname = "mod" + self._dsrchash[2:]
+
+            #import pdb; pdb.set_trace()
 
             if os.path.isfile(dsrcpath) and not recompile: 
                 srcdata = dsrcpath
@@ -158,7 +162,7 @@ class Accel:
 
     def __del__(self):
 
-        if os.path.isdir(self._workdir):
+        if hasattr(self, "_workdir") and os.path.isdir(self._workdir):
             self.debug("removing workdir: %s" % self._workdir)
             shutil.rmtree(self._workdir)
 

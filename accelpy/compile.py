@@ -68,7 +68,8 @@ builtin_compilers["gnu_cpp_cpp"] = OrderedDict()
 def _gnu_version_check(check):
 
     if sys.platform == "darwin":
-        return check.lower().lstrip().startswith(b"configured")
+        return (check.lower().lstrip().startswith(b"gnu") or
+            check.lower().lstrip().startswith(b"configured"))
 
     else:
         return (check.lower().lstrip().startswith(b"gnu") or
