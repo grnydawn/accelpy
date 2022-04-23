@@ -104,6 +104,18 @@ The next lines implements the kernel of adding two vectors element by element. B
 	END DO
 	!$acc end parallel
 
+
+**running the kernel**
+::
+        >>> python main.py
+        SUCCESS
+
+        # NOTE: AccelPy uses a compiler that supports Openmp target or Openacc on the system.
+        # Also to run the kernel on GPU, GPU should be avilable.
+        # Otherwise, the kernel will be compiled to plain Fortran version at runtime.
+
+
+
 Installation
 ----------------
 
